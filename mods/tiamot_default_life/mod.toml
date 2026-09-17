@@ -1,0 +1,11 @@
+# Tiamot Default Life — health, hunger, air, warmth, and what ends them.
+#
+# The survival layer for Tiamot: hearts and drumsticks, bubbles when you are
+# under, a thermometer only when it matters, food that heals and clothing
+# that keeps you warm. Animals and mobs are this mod's too, and arrive next.
+id = "tiamot_default_life"
+name = "Tiamot Default Life"
+version = "0.1.0"
+depends = ["core >=0.1"]
+description = "Health, hunger, air and body temperature for players, and everything that lives in the world."
+license = "GPL-3.0-only"

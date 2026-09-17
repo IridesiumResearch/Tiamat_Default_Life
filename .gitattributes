@@ -1,0 +1,8 @@
+# Text files are stored with LF and checked out as-is on every platform;
+# the engine reads Lua byte for byte and a CRLF hud.lua hashes differently.
+* text=auto eol=lf
+
+*.png binary
+*.wav binary
+*.glb binary
+*.ttf binary
