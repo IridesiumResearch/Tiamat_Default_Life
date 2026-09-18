@@ -4,7 +4,46 @@ What the survival layer has needed from the engine, found by building it.
 Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Items are removed when they land.
 
-## 10. Gates on the engine's own power keys (2026-09-18)
+## Where these stand (the engine's answer, 2026-09-18)
+
+| Item | Answer | When it lands, this mod... |
+|---|---|---|
+| 8 operator query | Builds as asked. | drops its own admin list and `op`/`deop`; admins ARE operators. |
+| 4 `detail` on a dropped stack | Builds as asked. | nothing to change; `drops.lua` already passes it through. |
+| 7 `submerged` and `fell` on a player | Builds as asked. | replaces the head-block fluid test and the peak-height fall tracker in `environment.lua`. |
+| 5 looking at, server side | Builds as asked. | makes X act on what is aimed at; cooking on a campfire follows. |
+| 3 `chat_to` | **A confirmed bug, not a request**: the engine's own stub calls it in a worked example and it was never registered. | moves refusals and notices from HUD toasts to chat lines; toasts stay for the moment-to-moment. |
+| 0 models | The biggest win, and better founded than this file knew: `fuzz/gltf_ingest` already exists, so charter rule 14's fuzz requirement is met for step 1. | flips `placeholder_models` off and names a model per creature. |
+| 1 and 9 speed, sprint, flight | **Has a hole, now fixed below**: a server-side change the client does not know about makes prediction diverge every tick. It must go on the wire. | sends cold, hunger and creative flight through the one call. |
+| 10 key gates | **Split, as below**: only the sky keys are a cheat. The rest just move. | nothing; it is all the engine's. |
+
+## 10. The sky keys need a permission; the debug keys only need to move (2026-09-18, revised)
+
+*Revised after the engine's answer. The first draft asked for operator gates
+on all of these, which was plumbing for nothing: a control that cannot move
+your body or change the world needs no permission.*
+
+**10a. The sky keys are a cheat, and unbinding them is not a fix.**
+`engine:time_back` / `time_forward` / `time_resync` wind the player's OWN
+sky. Nothing on the server changes, but the client draws stored sunlight
+scaled by the sky's intensity, so winding to noon lights the player's
+night: seeing in the dark for free, in a survival or a one-life world.
+Taking the default keys away does nothing, since anybody can bind them
+again. **Ask:** a server permission, decided where flight is: the server
+tells the client whether this player may wind the sky, and a client that
+may not ignores the action whatever it is bound to.
+
+**10b. The rest just move off the letters.** `teleport_far` /
+`teleport_home` shift the render origin for the floating-point check and do
+not move the body; `material_row` is singleplayer-only already;
+`chunk_borders` draws lines. None is a cheat. They hold Y, H, G and B,
+which are keys a game wants (this mod had to move its wardrobe off G).
+**Ask:** defaults on function keys only (F4 chunk borders, F9 material row,
+F7/F8 teleports with no letter twins). No permission.
+
+The first draft, kept for the record of what was seen:
+
+## 10 (first draft). Gates on the engine's own power keys (2026-09-18)
 
 **Seen.** Flight is operator-only and server-enforced, which is right. The
 rest of the engine's debug controls are not gated at all, and sit on prime
@@ -43,6 +82,17 @@ every one of them an operator, with everything else that implies.
 **Ask.** `game.set_player_abilities(uuid, { fly = true })`, replaced whole
 like `set_hud`, forgotten on leave, OR-ed with the operator list. The same
 call is where item 1's speed modifier and sprint flag belong.
+
+**The constraint the engine named, and it is the whole design.** The
+client PREDICTS its own movement. If the server scales a player's speed or
+grants flight and the client does not know, the two disagree every tick
+and the player rubber-bands for as long as the ability lasts. So an
+ability is not server state a mod pokes; it is a MESSAGE: the server sends
+the player's current abilities (`fly`, `speed`, `sprint`) whenever they
+change, the client predicts with exactly those numbers, and the server
+steps the body with the same ones. One call for the mod, one message on
+the wire, one set of numbers on both ends. Items 1 and 9 are this one
+mechanism and should land together.
 
 ## 8. Asking who is an operator (2026-09-18)
 
@@ -91,6 +141,12 @@ Until 1 lands, every mob is a white humanoid or invisible, and the mob
 work goes ahead on behaviour, spawning and drops with the humanoid as a
 stand-in.
 
+*The engine's note, 2026-09-18: `fuzz/gltf_ingest` already exists and is in
+the CI smoke job, so charter rule 14's requirement (a fuzz target in the
+same task as the parser) is already met for step 1. What remains is
+wiring, not a new hostile-input surface: a registration, a table sent on
+join like the picture table, and a client that loads what arrives.*
+
 ## 1. A speed modifier on a player (2026-09-11)
 
 **Wanted.** The design says cold slows you a little, and an empty hunger
@@ -101,11 +157,12 @@ inputs and their entity mirror is overwritten every tick; `game.set_entity`
 on it does nothing and `drive` is not read for players. There is no way to
 scale a player's walk or sprint speed, or to refuse the sprint gait.
 
-**Ask.** `game.set_player_movement(uuid, { speed = 0.85, sprint = false })`,
-a multiplier on the gait speeds and a flag on whether the sprint key does
-anything, replaced whole each call like `set_hud`. Predicted on the client
-as the ordinary correction already is. Until then cold and hunger cost food
-and show on the HUD, and nothing else.
+**Ask.** A speed multiplier on the gaits and a flag on whether the sprint
+key does anything, as fields of item 9's `set_player_abilities` rather than
+a call of their own. **Not** "predicted as the ordinary correction is", as
+the first draft said: a correction every tick is rubber-banding. The
+numbers travel to the client, which predicts with them; see item 9. Until
+then cold and hunger cost food and show on the HUD, and nothing else.
 
 ## 2. Setting the time of day (2026-09-11)
 
@@ -120,7 +177,13 @@ frozen world. The mod's sleep already heals, clears afflictions and sets
 home; with this it would also end the night when every player present is
 in a bed.
 
-## 3. A line of text to one player (2026-09-11)
+## 3. `game.chat_to` is documented and does not exist (2026-09-11): a BUG, confirmed by the engine 2026-09-18
+
+The engine's own stub calls `game.chat_to(event.player, "somebody is using
+that")` in the worked example under `game.open_container`, and no such
+function is registered. `scripts/check-stubs.sh` catches a registered
+function the stubs omit, and has no eye for the reverse: a call inside a
+doc comment to something that was never there.
 
 **Wanted.** "You cannot sleep now", "you ate an apple", "you died".
 

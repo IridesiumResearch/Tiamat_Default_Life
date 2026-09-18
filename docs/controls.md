@@ -79,15 +79,19 @@ Surveyed from `crates/client/src/input.rs` at engine `a9d6349` (2026-09-17).
 | K | Shadow resolution | |
 | F6, V | Third person | |
 
-### Powers: behind the operator list, and off the letter keys
+### Powers and debug keys
 
-| Key now | Action | Gated now? | Proposal |
+Agreed with the engine side, 2026-09-18: a permission belongs only on what
+is actually a power. A control that cannot move your body or change the
+world needs no gate, only a better key.
+
+| Key now | Action | A cheat? | Agreed |
 |---|---|---|---|
-| **N** | Fly | **Yes**, operators only, server-enforced. | Keep the gate. Hide the row from a non-operator's settings screen, so a key that does nothing is not offered. |
-| **[ ] \\** and PageDown, PageUp, Home | Wind your own sky back, on, and resync | **No.** Client-side only, but it turns your night into day on your own screen, which in a survival or adventure world is seeing in the dark for free. | Operators only, enforced where flight is: the client asks, the server says whether this player may. |
-| **F8, Y** / **F7, H** | "Teleport" far and home | No, and it is not a teleport: it shifts the render origin for the floating-point test. Your body does not move. | Debug builds or operators only; drop the letter twins Y and H, which are prime keys for a game to want. |
-| **G** | Lay out one of every block | Singleplayer only (it writes through the embedded server). | Operators only, and off G: F9. |
-| **B** | Chunk borders | No. Harmless, but a letter key. | F4, leaving B free. |
+| **N** | Fly | It is a power, and it is already gated: operators only, server-enforced. | Keep. |
+| **[ ] \\** and PageDown, PageUp, Home | Wind your own sky back, on, and resync | **Yes.** Client-side only, but it turns your night into day on your own screen: seeing in the dark for free in a survival or one-life world. | A **server permission**, decided where flight is. Taking the default keys away is not enough, since anybody can bind them again. |
+| **F8, Y** / **F7, H** | "Teleport" far and home | No. It shifts the render origin for the floating-point test; your body does not move. | Off the letters: F7 and F8 only. No permission. |
+| **G** | Lay out one of every block | No. Singleplayer only already (it writes through the embedded server). | Off the letter: F9. No permission. |
+| **B** | Chunk borders | No. It draws lines. | Off the letter: F4. No permission. |
 
 Letters this frees for games: **B, G, H, Y**, and with the laptop twins of
 lighting and third person reconsidered, **L** and **V** as well.
@@ -98,6 +102,10 @@ Filed in `engine-asks.md`:
 
 - `game.is_operator(uuid)`, so this mod's admins ARE the engine's operators
   and the two lists cannot disagree.
-- `game.set_player_abilities(uuid, { fly = true })`, so a creative world
-  can let everybody fly without making everybody an operator.
-- The gates above on the sky-winding and debug keys.
+- `game.set_player_abilities(uuid, { fly = true, speed = ..., sprint = ... })`,
+  so a creative world can let everybody fly without making everybody an
+  operator, and cold and hunger can slow a player. It has to travel to the
+  client, which predicts its own movement: an ability the client does not
+  know about is rubber-banding for as long as it lasts.
+- A server permission on the sky keys, and the debug keys moved off the
+  letters, as in the table above.
