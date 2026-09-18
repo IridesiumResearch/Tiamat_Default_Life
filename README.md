@@ -1,9 +1,11 @@
 # Tiamot Default Life
 
 The survival layer for the [Tiamot](https://github.com/IridesiumResearch/Tiamot-Voxel-Game)
-voxel engine: hearts, drumsticks, bubbles when you are under, a thermometer
-only when it matters, food that heals and clothing that keeps you warm. Every
-animal and mob in the world will be this mod's too; they arrive next.
+voxel engine: hearts, cookies, bubbles when you are under, a thermometer
+only when it matters, food that heals and clothing that keeps you warm; three
+kinds of world (Default, Creative, and a one-life Adventure) with admins over
+them; and everything that lives in the world, beginning with cows, sheep,
+pigs, crows and bats.
 
 Written against the engine's public Lua API and nothing else. The rules that
 shape it are in [`AGENTS.md`](AGENTS.md) (vendored from the engine's `api/`),
@@ -19,6 +21,7 @@ mods/tiamot_default_life/   the mod (this is what the engine loads)
   hooks.lua                 one engine registration per hook, many subscribers
   items.lua                 food, medicine, clothing, the bed, the campfire, sounds, actions
   effects.lua               poison, burning, regeneration and the rest
+  modes.lua                 Default, Creative, Adventure; admins, ghosts, the chat words' doors
   environment.lua           what the world is doing to each body; falls
   vitals.lua                health, hunger, air, temperature; tdl.damage / tdl.heal
   drops.lua                 stacks on the ground and picking them up
@@ -31,6 +34,7 @@ mods/tiamot_default_life/   the mod (this is what the engine loads)
 tests/native/               the mod run through the engine's real script VM, and the icon hasher
 tools/                      the asset generators (stdlib Python only)
 docs/engine-asks.md         what this mod needed from the engine and could not get
+docs/controls.md            every key and power: whose it is, who may use it, what should move
 ```
 
 ## Pictures, and replacing them
@@ -65,8 +69,22 @@ registered draws as a magenta box for ever. A NEW icon name needs adding to
 that list as well as to `hud.lua`; replacing an existing file needs only
 the hasher.
 
+**Sharing the screen with the interface mod.** Two rules, agreed with the
+inventory mod that owns the look. This mod declares a HUD `reserve` of 216
+virtual pixels (in `init.lua`): its bubble and thermometer row tops out at
+206, above the inventory mod's own 138, and the engine clears the tallest
+reserve any mod declares, so an open inventory rises clear of the hearts.
+And this mod declares **no `[theme]`**: the engine wears the last theme in
+load order, this mod loads later, and a theme here would replace the whole
+interface's look. If a row is ever added above the bubbles, raise the
+reserve with it.
+
+**The status tray.** The bottom-right corner of the screen is where
+protections, effects, potions and spells show: protections as large
+pictures in the corner, effects named in a column above them.
+
 **The weather shield.** When the surroundings are cold or hot enough to
-matter, a shield appears beside the thermometer's row: faint when what you
+matter, a shield appears in the tray, five times the size of a heart: faint when what you
 wear answers the weather (a warm coat in the cold, a cool cloak in the
 heat), cracked when it does not. It keys off the surroundings rather than
 your body, so a coat that is doing its job shows the faint shield while the
@@ -119,15 +137,38 @@ settings screen.
 | Key | Action |
 |---|---|
 | **X** | Use what you are holding: eat food, take medicine. With an empty hand beside a bed: sleep. |
-| **G** | Wardrobe: four worn slots. Clothing there keeps you warm or cool. |
+| **Right mouse** on a bed | Sleep in it. |
+| **O** | Wardrobe: four worn slots. Clothing there keeps you warm or cool. |
+
+Every binding, the engine's included, with who may use it and what should
+move, is in [`docs/controls.md`](docs/controls.md).
+
+## Modes and admins
+
+A world is made in one of three modes, picked on the new-world screen and
+fixed for its life:
+
+- **Default**: survival, as everything below describes.
+- **Creative**: nobody can be hurt, nothing drains, the HUD shows no hearts
+  or cookies, hunters ignore you, and anyone may say `kit`.
+- **Adventure**: one life. Die and everything you carried falls, worn and
+  carried, and you stay as a ghost who may walk and watch and touch nothing,
+  for good, until an admin says `revive`.
+
+Whoever first joins a world is its admin, as the engine makes whoever hosts
+a world its operator. Admins may be indestructible (`god`), go anywhere
+(`tp <x> <y> <z>`, `tp <name>`, `tp home`), raise the dead (`revive`), make
+more admins (`op`, `deop`, `admins`), and use the testing words. Flight is
+the engine's own power and stays with its operators. Say `mode` to hear
+what kind of world you are in.
 
 ## What the numbers mean
 
 - **Health**: 9 hearts of 3 points, 27 in all. They break a third at a time.
-- **Hunger**: 9 drumsticks of 2 points, 18 visible, and 9 more hidden points
+- **Hunger**: 9 cookies of 2 points, 18 visible, and 9 more hidden points
   of saturation on top. With saturation you heal a point a second; with the
-  drumsticks nearly full, a point every four seconds; below that, not at all.
-  Empty drumsticks drain health slowly, never past your last heart.
+  cookies nearly full, a point every four seconds; below that, not at all.
+  Empty cookies drain health slowly, never past your last heart.
 - **Air**: 9 bubbles of 3 points, shown only when your head is under. About
   eighteen seconds of breath, then a heart a second. Surfacing refills it at
   once.
@@ -171,7 +212,7 @@ one, the classic rule.
 
 Some of what you carry is scattered where you fell (one stack in three), the
 rest is kept. You wake at your bed if you have slept in one, or else where
-you last stood safely a little while ago, with full hearts, full drumsticks
+you last stood safely a little while ago, with full hearts, full cookies
 and no saturation, and a few seconds of protection. A small screen says what
 happened.
 
@@ -179,11 +220,11 @@ happened.
 
 | Item | Does |
 |---|---|
-| Apple, berries, bread | Snacks: two drumsticks, one, two and a half. |
-| Cooked meat | The staple: four drumsticks and a full belly; leaves you **well fed** (faster healing for a while). |
-| Raw meat | A drumstick and a half, and a few seconds of poison. Cook it. |
-| Hot stew | Three drumsticks and a minute of **warmth**. |
-| Cool melon | A drumstick and a half and a minute of **cooling**. |
+| Apple, berries, bread | Snacks: two cookies, one, two and a half. |
+| Cooked meat | The staple: four cookies and a full belly; leaves you **well fed** (faster healing for a while). |
+| Raw meat | A cookie and a half, and a few seconds of poison. Cook it. |
+| Hot stew | Three cookies and a minute of **warmth**. |
+| Cool melon | A cookie and a half and a minute of **cooling**. |
 | Honey | Sweet: heals a heart and keeps healing briefly. |
 | Golden apple | Heals two hearts, keeps healing, and halves physical damage for twenty seconds. |
 | Bandage | A heart at once and three more over a few seconds; puts a fire out. The one healing item. |
@@ -197,12 +238,14 @@ Digging one of the world's brambles also gives berries.
 There are no recipes and no cooking yet. Say `kit` in chat for one of
 everything while `config.dev_commands` is on.
 
-## Chat words (development)
+## Chat words
 
-`vitals` (a line on the HUD and in the log), `kit`, `hurt [n]`, `heal`,
-`feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`, `choke`, `freeze`,
-`roast`, `boom [radius]`, `die`. Off when `dev_commands = false` in
-`config.lua`.
+Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
+`god`, `tp`, `revive`, `op`, `deop`, `admins`, and the testing words `hurt
+[n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
+`choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]`,
+`mobs`, `cull`. The testing words vanish altogether when `dev_commands =
+false` in `config.lua`.
 
 ## Creatures
 

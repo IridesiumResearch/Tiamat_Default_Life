@@ -1,11 +1,24 @@
 # Tiamot Default Life — health, hunger, air, warmth, and what ends them.
 #
-# The survival layer for Tiamot: hearts and drumsticks, bubbles when you are
+# The survival layer for Tiamot: hearts and cookies, bubbles when you are
 # under, a thermometer only when it matters, food that heals and clothing
-# that keeps you warm. Animals and mobs are this mod's too, and arrive next.
+# that keeps you warm; the world's modes and admins; and its creatures.
 id = "tiamot_default_life"
 name = "Tiamot Default Life"
 version = "0.1.0"
 depends = ["core >=0.1"]
 description = "Health, hunger, air and body temperature for players, and everything that lives in the world."
 license = "GPL-3.0-only"
+
+# NO `[theme]` HERE, ON PURPOSE. The engine wears the LAST theme in load
+# order, and this mod loads after the inventory mod that owns the look; a
+# theme declared here would replace the whole interface's. This mod's share
+# of the screen is its HUD and its `reserve` (init.lua), and nothing else.
+
+# Chosen on the new-world screen and fixed for the life of the world.
+[[world_option]]
+id = "mode"
+name = "Mode"
+description = "Default is survival. Creative: nobody can be hurt and nothing drains. Adventure: one life."
+options = ["Default", "Creative", "Adventure"]
+default = 1

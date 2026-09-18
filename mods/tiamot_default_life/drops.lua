@@ -68,7 +68,7 @@ tdl.on_tick(function(dt)
                     if person and person.owner then
                         local mine = person.owner == watch.owner
                         local v = tdl.get(person.owner)
-                        if not (mine and watch.ticks < SETTLE) and v and not v.dead then
+                        if not (mine and watch.ticks < SETTLE) and v and not v.dead and not tdl.is_ghost(person.owner) then
                             game.give(person.owner, {
                                 material = item.item.material,
                                 shape = item.item.shape,

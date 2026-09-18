@@ -2,16 +2,26 @@
 --
 -- Every number a designer might want to turn, in one place, in the units the
 -- rest of the mod uses: POINTS for health, food and air (27 of each, three to
--- a heart, drumstick or bubble) and TICKS for time (20 to a second).
+-- a heart, cookie or bubble) and TICKS for time (20 to a second).
 --
 -- Nothing here shapes the world, so nothing here is a `game.register_setting`:
 -- these are the mod's opinions, read once at load.
 
 local C = {}
 
--- Chat words for testing ("vitals", "kit", "hurt", "boom" and so on; see
--- actions.lua). On while the mod is being built; turn off for a real server.
+-- Chat words for testing ("hurt", "boom", "spawn" and so on; see actions.lua
+-- and mobs.lua). They are ADMIN words either way (modes.lua); this switch
+-- removes them altogether for a server that wants none of it.
 C.dev_commands = true
+
+-- The world's mode: "Default", "Creative" or "Adventure". A world option,
+-- picked when the world is made and fixed for its life (mod.toml); an
+-- engine from before world options gets Default.
+C.mode = "Default"
+if game.world_option then
+    local chosen = game.world_option(game.mod_id .. ":mode")
+    if type(chosen) == "string" then C.mode = chosen end
+end
 
 -- Whether one player's punch hurts another.
 C.pvp = true
@@ -19,21 +29,21 @@ C.pvp = true
 -- Vitals ------------------------------------------------------------------
 
 C.max_health = 27          -- nine hearts of three
-C.max_food = 27            -- nine drumsticks of two, plus nine hidden points of saturation
-C.visible_food = 18        -- the drumsticks show this much; the rest is the buffer
+C.max_food = 27            -- nine cookies of two, plus nine hidden points of saturation
+C.visible_food = 18        -- the cookies show this much; the rest is the buffer
 C.max_air = 27             -- nine bubbles of three
 
 -- A new player, and what a respawn gives back.
 C.spawn_health = 27
-C.spawn_food = 22          -- full drumsticks and a little saturation
-C.respawn_food = 18        -- full drumsticks, no saturation: eat something
+C.spawn_food = 22          -- full cookies and a little saturation
+C.respawn_food = 18        -- full cookies, no saturation: eat something
 
 -- Regeneration. With saturation (food above `visible_food`) a heart comes
--- back fast; with the drumsticks nearly full it comes back slowly; below
+-- back fast; with the cookies nearly full it comes back slowly; below
 -- that, not at all. Every point healed costs food.
 C.regen_fast_ticks = 20        -- one point a second while the buffer lasts
-C.regen_slow_ticks = 80        -- one point every four seconds on full drumsticks
-C.regen_slow_min_food = 16     -- eight drumsticks
+C.regen_slow_ticks = 80        -- one point every four seconds on full cookies
+C.regen_slow_min_food = 16     -- eight cookies
 C.regen_food_cost = 0.4        -- food points per health point healed
 C.regen_quiet_ticks = 60       -- no regeneration for three seconds after being hurt
 
@@ -52,7 +62,7 @@ C.exhaust_temperature = 1.5    -- multiplier while too hot or too cold
 C.exhaust_rested = 0.7         -- multiplier while well-rested
 C.speed_walking = 0.30         -- cells per tick; below is standing (walk is ~0.65)
 C.speed_sprinting = 0.72       -- above is running (sprint is ~0.84)
-C.low_food = 6                 -- three drumsticks: "hungry", shown on the HUD
+C.low_food = 6                 -- three cookies: "hungry", shown on the HUD
 
 -- Air ---------------------------------------------------------------------
 

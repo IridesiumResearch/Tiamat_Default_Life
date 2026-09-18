@@ -153,6 +153,8 @@ function tdl.damage(uuid, amount, kind, opts)
     local v = players[uuid]
     if v == nil or v.dead then return 0 end
     if v.invuln > 0 and not opts.force then return 0 end
+    -- A creative world, an admin who asked, or somebody already dead.
+    if tdl.is_invulnerable(uuid) and not opts.force then return 0 end
 
     local scale = E.damage_scale(v, kind)
     if kind == "physical" or kind == "explosion" then
@@ -375,6 +377,9 @@ local function push_hud(uuid, v)
         wet = v.env.submerged,
         shielded = v.invuln > 0,
         shield = shield_state(v),
+        ghost = tdl.is_ghost(uuid),
+        creative = tdl.mode == "Creative",
+        god = tdl.is_god(uuid),
     })
 end
 
@@ -382,7 +387,16 @@ tdl.on_join(function(event)
     names[event.player] = event.name
     local v = load(event.player)
     players[event.player] = v
-    tdl.toast(event.player, "Welcome, " .. event.name .. ". Stay fed and stay warm.", 120)
+    if tdl.is_ghost(event.player) then
+        v.hp = 0
+        tdl.toast(event.player, "You died in this world. It goes on without you.", 160)
+    elseif tdl.mode == "Adventure" then
+        tdl.toast(event.player, "Welcome, " .. event.name .. ". You have one life.", 140)
+    elseif tdl.mode == "Creative" then
+        tdl.toast(event.player, "Welcome, " .. event.name .. ". Nothing here can hurt you.", 120)
+    else
+        tdl.toast(event.player, "Welcome, " .. event.name .. ". Stay fed and stay warm.", 120)
+    end
 end)
 
 tdl.on_leave(function(event)
@@ -399,7 +413,13 @@ tdl.on_tick(function(dt)
     for uuid, v in pairs(players) do
         if v.hurt_cd > 0 then v.hurt_cd = v.hurt_cd - dt end
         if v.invuln > 0 then v.invuln = v.invuln - dt end
-        if not v.dead then
+        if tdl.is_invulnerable(uuid) then
+            -- Nothing drains. The living are kept whole; a ghost stays as it fell.
+            if not tdl.is_ghost(uuid) then
+                v.hp, v.food, v.air, v.temp = C.max_health, C.max_food, C.max_air, 0
+            end
+            v.fx = {}
+        elseif not v.dead then
             E.tick(uuid, v, dt)
             tick_food(uuid, v, dt)
             tick_air(uuid, v, dt)

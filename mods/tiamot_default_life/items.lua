@@ -38,11 +38,11 @@ end
 
 -- Food ----------------------------------------------------------------------
 --
--- `food` is in points (two to a drumstick); `saturation` is added on top and
--- fills the hidden buffer above the drumsticks. Numbers follow the classic
+-- `food` is in points (two to a cookie); `saturation` is added on top and
+-- fills the hidden buffer above the cookies. Numbers follow the classic
 -- feel: a snack, a meal, and something special.
 
-item("apple", "Apple", "Crisp. Two drumsticks.",
+item("apple", "Apple", "Crisp. Two cookies.",
     { kind = "food", food = 4, saturation = 1, sound = "eat" })
 item("berries", "Berries", "Picked from a bramble. A bite.",
     { kind = "food", food = 2, saturation = 0, sound = "eat" })
@@ -50,7 +50,7 @@ item("bread", "Bread", "A loaf. Filling.",
     { kind = "food", food = 5, saturation = 3, sound = "eat" })
 item("raw_meat", "Raw meat", "Better cooked. Eating it raw sits badly.",
     { kind = "food", food = 3, saturation = 0, sound = "eat", effects = { { "poison", 100 } } })
-item("cooked_meat", "Cooked meat", "The staple. Four drumsticks and a full belly.",
+item("cooked_meat", "Cooked meat", "The staple. Four cookies and a full belly.",
     { kind = "food", food = 8, saturation = 6, sound = "eat", well_fed = true })
 item("hot_stew", "Hot stew", "Warms you through for a good while.",
     { kind = "food", food = 6, saturation = 4, sound = "drink", temperature = "warm", well_fed = true })
@@ -162,7 +162,8 @@ end
 --
 -- The engine owns the keys (charter rule 11); these are suggestions, chosen
 -- clear of the engine's own defaults and the reference mods' (E inventory,
--- Q drop, Z gear, C chisel, R tool, F offhand, N fly, T chat).
+-- Q drop, Z gear, C chisel, R tool, F offhand, N fly, T chat, and the
+-- engine's debug letters B, G, H, K, L, V, Y). See docs/controls.md.
 
 game.register_action{
     id = "use",
@@ -171,7 +172,7 @@ game.register_action{
 }
 game.register_action{
     id = "wardrobe",
-    default_key = "KeyG",
+    default_key = "KeyO",
     description = "Open the worn slots: clothing for warm and cold",
 }
 

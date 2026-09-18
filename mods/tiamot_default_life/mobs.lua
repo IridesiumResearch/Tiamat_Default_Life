@@ -341,7 +341,7 @@ local function perceive(m, entity)
     local best, best_d2, best_pos = nil, math.huge, nil
     for _, pid in ipairs(game.entities_in_radius(entity.pos, m.kind.sight or 12, "engine:player")) do
         local p = game.entity(pid)
-        if p and p.owner then
+        if p and p.owner and not (m.kind.hostile and tdl.is_invulnerable(p.owner)) then
             local d2 = U.dist2(p.pos, entity.pos)
             if d2 < best_d2 then best, best_d2, best_pos = p.owner, d2, p.pos end
         end
@@ -478,7 +478,7 @@ local function step(id, dt)
     if m.state == "hunt" then
         local prey = U.body(m.threat)
         local v = m.threat and tdl.get(m.threat)
-        if prey and v and not v.dead and m.timer > 0 and hunts_now(kind, entity) then
+        if prey and v and not v.dead and not tdl.is_invulnerable(m.threat) and m.timer > 0 and hunts_now(kind, entity) then
             -- Reach is measured to the body's middle, not its feet: a flyer
             -- hovers at chest height and would otherwise never be close.
             local middle = { x = prey.pos.x, y = prey.pos.y + 0.9, z = prey.pos.z }
@@ -580,7 +580,7 @@ end)
 -- Chat words, for testing ---------------------------------------------------------------------
 
 if C.dev_commands then
-    tdl.on_chat("spawn", function(uuid, rest)
+    tdl.command("spawn", "admin", function(uuid, rest)
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
@@ -592,7 +592,7 @@ if C.dev_commands then
         local ids = tdl.spawn_mob(kind, at, tonumber(n) or 1)
         tdl.toast(uuid, #ids .. " " .. kind .. (#ids == 1 and "" or "s") .. " spawned.")
     end)
-    tdl.on_chat("mobs", function(uuid)
+    tdl.command("mobs", "admin", function(uuid)
         local body = U.body(uuid)
         if body == nil then return end
         local counts = {}
@@ -606,7 +606,7 @@ if C.dev_commands then
         table.sort(parts)
         tdl.toast(uuid, #parts > 0 and table.concat(parts, ", ") or "nothing about", 100)
     end)
-    tdl.on_chat("cull", function(uuid)
+    tdl.command("cull", "admin", function(uuid)
         local body = U.body(uuid)
         if body == nil then return end
         local n = 0

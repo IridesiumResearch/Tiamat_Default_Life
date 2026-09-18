@@ -62,21 +62,22 @@ local function bed_spawn(uuid)
     return { x = bed.x + 0.5, y = bed.y + C.respawn_above_bed, z = bed.z + 0.5 }
 end
 
---- Scatters a share of every stack where the body was.
-local function scatter(uuid, v, pos)
+--- Scatters one stack in `fraction` of a view where the body was; a
+--- fraction of one is everything.
+local function scatter(uuid, v, pos, fraction, view)
     local n = 0
-    for _, stack in ipairs(game.inventory(uuid)) do
+    for _, stack in ipairs(game.inventory(uuid, view)) do
         local units
         if stack.shape then
             -- A cut: whole items of it, so the shape stays a shape.
             local per = stack.units // math.max(1, stack.count)
-            units = (stack.count // C.drop_fraction) * per
+            units = (stack.count // fraction) * per
         else
-            units = stack.units // C.drop_fraction
+            units = stack.units // fraction
         end
         if units > 0 then
             local took = game.take(uuid, {
-                material = stack.material, units = units, shape = stack.shape, detail = stack.detail,
+                material = stack.material, units = units, shape = stack.shape, detail = stack.detail, view = view,
             })
             if took > 0 then
                 n = n + 1
@@ -95,7 +96,7 @@ local function scatter(uuid, v, pos)
     return n
 end
 
-local function death_screen(uuid, line)
+local function death_screen(uuid, line, after)
     game.show_dialog{
         player = uuid,
         form = "death",
@@ -105,7 +106,7 @@ local function death_screen(uuid, line)
             children = {
                 { type = "label", text = "You died", style = { text_size = 28, text_colour = { 230, 70, 70 } } },
                 { type = "label", text = line, style = { text_size = 18, text_colour = { 210, 210, 210 } } },
-                { type = "label", text = "Some of what you carried is where you fell.", style = { text_size = 15, text_colour = { 160, 160, 160 } } },
+                { type = "label", text = after or "Some of what you carried is where you fell.", style = { text_size = 15, text_colour = { 160, 160, 160 } } },
                 { type = "button", name = "respawn", text = "Carry on" },
             },
         },
@@ -131,8 +132,24 @@ function tdl.die(uuid, kind, cause)
     local line = "You " .. (cause or CAUSES[kind] or "died") .. "."
     game.log(string.format("tiamot_default_life: %s %s (%s)", tdl.name(uuid), cause or CAUSES[kind] or kind, kind))
 
+    -- One life: everything falls, worn and carried, and the player stays
+    -- where they fell as a ghost. There is no waking up.
+    if tdl.mode == "Adventure" then
+        if pos then
+            scatter(uuid, v, pos, 1)
+            scatter(uuid, v, pos, 1, I.worn_view)
+        end
+        tdl.set_ghost(uuid, true)
+        v.hp, v.fx, v.dead = 0, {}, false
+        v.env.fire = nil
+        local last = "You " .. (cause or CAUSES[kind] or "died") .. ". Your one life is spent."
+        tdl.toast(uuid, last, 200)
+        death_screen(uuid, last, "Everything you carried is where you fell. You may walk the world and watch it.")
+        return
+    end
+
     if pos then
-        scatter(uuid, v, pos)
+        scatter(uuid, v, pos, C.drop_fraction)
     end
 
     -- Where to wake up.
@@ -144,7 +161,7 @@ function tdl.die(uuid, kind, cause)
         game.move_player(uuid, target)
     end
 
-    -- The body is whole again: full hearts, full drumsticks and no buffer.
+    -- The body is whole again: full hearts, full cookies and no buffer.
     v.hp = C.max_health
     v.food = C.respawn_food
     v.exhaustion = 0

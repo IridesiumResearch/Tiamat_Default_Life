@@ -30,6 +30,7 @@ tdl.util = load("util")
 load("hooks")                -- one engine registration per hook, many subscribers
 tdl.items = load("items")    -- food, medicine, clothing, the bed and the campfire
 tdl.effects = load("effects") -- poison, burning, regeneration and the rest
+load("modes")                -- the world's mode, its admins, its ghosts: tdl.command
 -- Tick order is load order. The environment is sampled FIRST, so that the
 -- vitals tick in the same step acts on what the body is standing in right
 -- now and the HUD it pushes already shows the result.
@@ -41,9 +42,16 @@ load("actions")              -- eating, sleeping, the wardrobe, explosions, chat
 load("mobs")                 -- the mob system: spawning, behaviour, being hit, dropping
 load("creatures")            -- cow, sheep, pig, crow, bat, as data
 
--- The HUD: hearts, drumsticks, bubbles and the thermometer, drawn on the
+-- The HUD: hearts, cookies, bubbles and the thermometer, drawn on the
 -- player's machine from the values vitals.lua sends with `game.set_hud`.
-game.register_hud_script("hud.lua")
+--
+-- `reserve` keeps the engine's sheets (inventory, pause, dialogs) clear of
+-- the bottom rows: the bubbles and thermometer row tops out at 206 virtual
+-- pixels (ROW_Y + ROW_GAP in hud.lua), and a little air over it. An engine
+-- from before the table form takes the plain file name.
+if not pcall(game.register_hud_script, { file = "hud.lua", reserve = 216 }) then
+    game.register_hud_script("hud.lua")
+end
 
 game.log("tiamot_default_life ready: " .. tdl.items.count .. " items, " .. tdl.effects.count .. " effects, "
     .. #tdl.mobs.order .. " creatures")

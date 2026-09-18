@@ -1908,6 +1908,9 @@ function game.set_hud(player, values) end
 ---
 ---```lua
 ---game.register_hud_script("hud.lua")
+---
+----- Or, if your HUD draws along the bottom of the screen:
+---game.register_hud_script{ file = "hud.lua", reserve = 130 }
 ---```
 ---
 ---and in `hud.lua`:
@@ -1960,8 +1963,55 @@ function game.set_hud(player, values) end
 ---engine has no health, hunger or experience of its own (charter rule 1); it
 ---carries what you computed and reads none of it.
 ---
----@param file string Path to the Lua file inside your mod directory.
+---### `reserve` — keeping the engine's screens off your HUD
+---
+---A sheet — the inventory, the pause screen, a mod's dialog — is three quarters
+---of the window's height and centred, so it leaves an eighth of the window below
+---it. **A HUD with more than a row or two along the bottom edge does not fit in
+---that eighth**, and the sheet lands on top of it: hearts, food and warmth
+---covered by an open inventory.
+---
+---The engine cannot work this out for itself. A script draws whatever it likes
+---wherever it likes, and what the engine sees is a flat list of commands with no
+---height in it. So you say, in the table form:
+---
+---```lua
+---game.register_hud_script{ file = "hud.lua", reserve = 130 }
+---```
+---
+---`reserve` is **in the same virtual pixels `hud.lua` draws in** — the canvas is
+---1080 tall on every monitor — so it protects the same share of the screen
+---everywhere, exactly as your HUD scales. Measure it as the top of your tallest
+---bottom-anchored element plus that element's own height.
+---
+---The tallest reserve any loaded mod asked for is the one that applies, since
+---two HUDs drawing along the bottom edge stack. Sheets rise to clear it, and
+---only shrink when there is not enough window left to rise into. A reserve over
+---half the canvas is clamped: past that the sheet would be smaller than the
+---thing it was making way for, and a player still has to be able to read the
+---pause menu to leave.
+---
+---A reserve you leave out is none, which is what every mod written before this
+---existed asks for.
+---
+---@param file string|Tiamot.HudScriptSpec Path to the Lua file inside your mod directory, or a table.
 function game.register_hud_script(file) end
+
+---Fields accepted by the table form of `game.register_hud_script`.
+---@class Tiamot.HudScriptSpec
+---@field file string Required. Path to the Lua file inside your mod directory.
+---@field reserve number? Virtual pixels at the bottom of the canvas to keep the engine's sheets clear of. Default 0, clamped to 540.
+
+---There is no `game.register_theme`, and there cannot be.
+---
+---A mod's look for the engine's OWN screens — the pause screen, the settings
+---pages, the start screen — is declared in `mod.toml` under `[theme]`, not here.
+---The start screen runs before any server exists, so no Lua has run on it and
+---none can; a manifest is read without a VM, which is what lets the launcher
+---wear the look of the mods it is about to load. See `api/AGENTS.md`.
+---
+---`style` on a widget in your own dialogs is the other half and is unaffected:
+---a theme is the furniture around a screen, your styles are what is in it.
 
 ---Fields accepted by `game.play_sound`.
 ---@class Tiamot.PlaySpec

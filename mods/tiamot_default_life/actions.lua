@@ -130,6 +130,10 @@ tdl.on_action(USE, function(event)
     local uuid = event.player
     local v = tdl.get(uuid)
     if v == nil or v.dead then return end
+    if tdl.is_ghost(uuid) then
+        tdl.toast(uuid, "You died in this world. You can only watch.", 80)
+        return
+    end
     if (use_cd[uuid] or 0) > tdl.now then return end
     use_cd[uuid] = tdl.now + USE_COOLDOWN
 
@@ -271,9 +275,9 @@ if C.dev_commands then
         tdl.toast(uuid, "A kit: every food, medicine and garment, two beds, four campfires.", 100)
     end
 
-    tdl.on_chat("kit", kit)
+    tdl.command("kit", "creative", kit)
 
-    tdl.on_chat("vitals", function(uuid)
+    tdl.command("vitals", "anyone", function(uuid)
         local v = tdl.get(uuid)
         if v == nil then return end
         local line = string.format(
@@ -285,51 +289,51 @@ if C.dev_commands then
         tdl.toast(uuid, string.format("hp %d food %d air %d temp %.2f", v.hp, v.food, v.air, v.temp), 100)
     end)
 
-    tdl.on_chat("hurt", function(uuid, rest)
+    tdl.command("hurt", "admin", function(uuid, rest)
         tdl.damage(uuid, tonumber(rest) or 5, "physical", { cause = "were hurt on purpose" })
     end)
-    tdl.on_chat("heal", function(uuid)
+    tdl.command("heal", "admin", function(uuid)
         tdl.heal(uuid, C.max_health)
     end)
-    tdl.on_chat("feed", function(uuid)
+    tdl.command("feed", "admin", function(uuid)
         tdl.feed(uuid, C.max_food)
     end)
-    tdl.on_chat("starve", function(uuid, rest)
+    tdl.command("starve", "admin", function(uuid, rest)
         local v = tdl.get(uuid)
         if v then v.food = tonumber(rest) or 0 end
     end)
-    tdl.on_chat("poison", function(uuid, rest)
+    tdl.command("poison", "admin", function(uuid, rest)
         local v = tdl.get(uuid)
         if v then E.apply(v, "poison", tonumber(rest) or 200) end
     end)
-    tdl.on_chat("wither", function(uuid, rest)
+    tdl.command("wither", "admin", function(uuid, rest)
         local v = tdl.get(uuid)
         if v then E.apply(v, "wither", tonumber(rest) or 200) end
     end)
-    tdl.on_chat("burn", function(uuid, rest)
+    tdl.command("burn", "admin", function(uuid, rest)
         local v = tdl.get(uuid)
         if v then E.apply(v, "burning", tonumber(rest) or 100) end
     end)
-    tdl.on_chat("choke", function(uuid)
+    tdl.command("choke", "admin", function(uuid)
         local v = tdl.get(uuid)
         if v then v.air = 3 end
     end)
-    tdl.on_chat("freeze", function(uuid)
+    tdl.command("freeze", "admin", function(uuid)
         local v = tdl.get(uuid)
         if v then v.temp = -0.95 end
     end)
-    tdl.on_chat("roast", function(uuid)
+    tdl.command("roast", "admin", function(uuid)
         local v = tdl.get(uuid)
         if v then v.temp = 0.95 end
     end)
-    tdl.on_chat("boom", function(uuid, rest)
+    tdl.command("boom", "admin", function(uuid, rest)
         local body = U.body(uuid)
         if body then
             tdl.explode{ pos = { x = body.pos.x + 2, y = body.pos.y + 1, z = body.pos.z },
                 radius = tonumber(rest) or 3, damage = 12 }
         end
     end)
-    tdl.on_chat("die", function(uuid)
+    tdl.command("die", "admin", function(uuid)
         tdl.damage(uuid, 999, "physical", { force = true, cause = "gave up" })
     end)
 end

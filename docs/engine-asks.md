@@ -4,6 +4,59 @@ What the survival layer has needed from the engine, found by building it.
 Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Items are removed when they land.
 
+## 10. Gates on the engine's own power keys (2026-09-18)
+
+**Seen.** Flight is operator-only and server-enforced, which is right. The
+rest of the engine's debug controls are not gated at all, and sit on prime
+letter keys:
+
+- `engine:time_back` / `time_forward` / `time_resync` (`[`, `]`, `\\`, and
+  PageDown, PageUp, Home) wind the player's OWN sky. Nothing on the server
+  changes, but the client draws stored sunlight scaled by the sky's
+  intensity, so winding to noon lights the player's night: seeing in the
+  dark for free, in a survival or a one-life world.
+- `engine:teleport_far` / `teleport_home` (F8, F7, and the letter twins Y,
+  H) shift the render origin for the floating-point check. The body does
+  not move, so it is not a cheat, but it is a debug control on Y and H.
+- `engine:material_row` (G) is singleplayer only already; `chunk_borders`
+  (B) is harmless. Both hold letters a game wants (this mod had to move its
+  wardrobe off G).
+
+**Why the mod cannot do it.** The engine owns bindings (charter rule 11); a
+mod cannot move one, hide one, or put a permission on one.
+
+**Ask.** The sky keys honoured for operators only, decided where flight is
+(the server says whether this player may, the client asks). The debug
+teleport and the material row for operators or debug builds only. Letter
+defaults dropped from all of them: F4 for chunk borders, F9 for the
+material row, no letter twins for the teleports. A control a player may not
+use left out of their settings screen rather than offered and refused. The
+full table is in `docs/controls.md`.
+
+## 9. Abilities a mod grants a player (2026-09-18)
+
+**Wanted.** A Creative world where everybody flies. Flight is a PERMISSION
+held by the server's operator list, and a mod has no hand on it: a creative
+world on a dedicated server has grounded builders unless the host makes
+every one of them an operator, with everything else that implies.
+
+**Ask.** `game.set_player_abilities(uuid, { fly = true })`, replaced whole
+like `set_hud`, forgotten on leave, OR-ed with the operator list. The same
+call is where item 1's speed modifier and sprint flag belong.
+
+## 8. Asking who is an operator (2026-09-18)
+
+**Wanted.** This mod's admin powers (indestructible, `tp`, `revive`, the
+testing words) belong to the people the server already trusts.
+
+**Why the mod cannot do it.** The operator list lives in `server.toml` and
+the embedded host's identity; nothing in the mod API reads it. So the mod
+keeps a second list in its own storage, bootstrapped the way the engine's
+is (the first player ever to join is the admin), with `op` and `deop` to
+change it. Two lists that mean the same thing will one day disagree.
+
+**Ask.** `game.is_operator(uuid)`. With it the mod's list goes away.
+
 ## 0. Models a mod ships (2026-09-11)
 
 **Wanted.** Animals and mobs that look like animals and mobs. A cow, a

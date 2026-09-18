@@ -61,12 +61,20 @@ local EFFECT_NAMES = {
     rested = { "Well rested", { 190, 230, 190, 255 } },
 }
 
-local function icon(name, x, y, size)
+local function icon(name, x, y, size, anchor)
     local hash = ICONS[name]
     if hash == nil then return end
     size = size or ICON
-    hud.image{ anchor = "bottom", x = x, y = y, w = size, h = size, hash = hash }
+    hud.image{ anchor = anchor or "bottom", x = x, y = y, w = size, h = size, hash = hash }
 end
+
+-- The status tray: the bottom-right corner, where protections, effects,
+-- potions and spells show. Measured from the corner: with the
+-- "bottom_right" anchor, x and y are how far the picture's LEFT and TOP
+-- edges stand in from the right and the bottom.
+local TRAY_MARGIN = 24
+local TRAY_ICON = ICON * 5     -- a protection is drawn large: 150 virtual pixels
+local TRAY_LINE = 22
 
 --- Hearts, nine of them, left of the middle. Three points each; a missing
 --- third is a wedge gone from the picture.
@@ -143,13 +151,14 @@ local function thermometer(temp, hot, cold, extreme)
     hud.text{ anchor = "bottom", x = x + ICON + 6, y = y - 5, text = word, size = 17, colour = temp > 0 and HOT or COLD }
 end
 
---- The weather shield, beside the thermometer's row: faint when what you
---- wear answers the weather, cracked when it does not.
+--- The weather shield, large in the status tray: faint when what you wear
+--- answers the weather, cracked when it does not. Returns how much of the
+--- tray's height it took, so what stacks above it starts clear of it.
 local function shield(state)
-    if state == nil or state == "" then return end
-    local x = -HALF_WIDTH + PITCH * 5
-    local y = ROW_Y + ROW_GAP
-    icon(state == "ok" and "shield_faint" or "shield_broken", x, y)
+    if state == nil or state == "" then return 0 end
+    icon(state == "ok" and "shield_faint" or "shield_broken",
+        TRAY_MARGIN + TRAY_ICON, TRAY_MARGIN + TRAY_ICON, TRAY_ICON, "bottom_right")
+    return TRAY_ICON + 10
 end
 
 --- Bands along the four edges of the screen, in a colour, fading inward.
@@ -168,17 +177,17 @@ local function edges(colour, alpha, depth)
     end
 end
 
---- The active effects, named, in a row above the vitals.
-local function effects(list)
+--- The active effects, named, stacked in the status tray above whatever
+--- protection is showing. `above` is the height already taken.
+local function effects(list, above)
     if list == nil or list == "" then return end
-    local x = -HALF_WIDTH + ICON + 4
-    local y = ROW_Y + ROW_GAP * 2
     local n = 0
     for id in string.gmatch(list, "[^,]+") do
         local entry = EFFECT_NAMES[id]
-        if entry and n < 5 then
-            hud.text{ anchor = "bottom", x = x, y = y, text = entry[1], size = 16, colour = entry[2] }
-            x = x + #entry[1] * 9 + 14
+        if entry and n < 8 then
+            hud.text{ anchor = "bottom_right", x = TRAY_MARGIN + TRAY_ICON,
+                y = TRAY_MARGIN + above + (n + 1) * TRAY_LINE,
+                text = entry[1], size = 17, colour = entry[2] }
             n = n + 1
         end
     end
@@ -222,15 +231,26 @@ hud.on_draw(function(state)
         edges({ 40, 40, 40 }, 90, 110)
     end
 
-    hearts(v.hp, v.hurt)
-    cookies(v.food, v.hungry, v.starving)
-    if v.air_show then
-        bubbles(v.air)
+    -- A creative world has no survival to show: no hearts, no cookies.
+    if not v.creative then
+        hearts(v.hp, v.hurt)
+        cookies(v.food, v.hungry, v.starving)
+        if v.air_show then
+            bubbles(v.air)
+        end
+        if v.temp_show then
+            thermometer(v.temp, v.hot, v.cold, v.extreme)
+        end
     end
-    if v.temp_show then
-        thermometer(v.temp, v.hot, v.cold, v.extreme)
+    if v.ghost then
+        local line = "You died in this world. It goes on without you."
+        hud.text{ anchor = "bottom", x = -(#line * 9.6) / 2, y = ROW_Y + ROW_GAP * 2, text = line, size = 20, colour = { 200, 200, 210, 255 } }
+    elseif v.god then
+        hud.text{ anchor = "bottom", x = -HALF_WIDTH, y = ROW_Y + ROW_GAP + 20, text = "Indestructible", size = 16, colour = { 255, 220, 120, 255 } }
     end
-    shield(v.shield)
-    effects(v.fx)
+
+    -- The status tray, bottom right: protections, then effects above them.
+    local taken = shield(v.shield)
+    effects(v.fx, taken)
     toast(v.toast)
 end)

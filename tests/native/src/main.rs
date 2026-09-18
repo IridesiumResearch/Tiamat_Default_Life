@@ -274,13 +274,18 @@ impl sound::Access for Sounds {
 }
 
 #[derive(Default)]
-struct Huds(Mutex<Values>);
+struct Huds(Mutex<HashMap<[u8; 32], Values>>);
+
+impl Huds {
+    fn of(&self, player: [u8; 32]) -> Values {
+        self.0.lock().unwrap().get(&player).cloned().unwrap_or_default()
+    }
+}
 
 impl hud::Access for Huds {
     fn set_hud(&self, mod_id: &str, player: [u8; 32], values: Values) -> bool {
         assert_eq!(mod_id, MOD);
-        assert_eq!(player, PLAYER);
-        *self.0.lock().unwrap() = values;
+        self.0.lock().unwrap().insert(player, values);
         true
     }
 }
@@ -384,19 +389,29 @@ struct Rig {
 
 impl Rig {
     fn number(&self, key: &str) -> f64 {
-        match self.huds.0.lock().unwrap().get(key) {
+        match self.huds.of(PLAYER).get(key) {
             Some(Value::Number(n)) => *n,
             other => panic!("hud `{key}` is {other:?}, not a number"),
         }
     }
     fn flag(&self, key: &str) -> bool {
-        match self.huds.0.lock().unwrap().get(key) {
+        match self.huds.of(PLAYER).get(key) {
             Some(Value::Flag(f)) => *f,
             other => panic!("hud `{key}` is {other:?}, not a flag"),
         }
     }
+    fn text_of(&self, player: [u8; 32], key: &str) -> String {
+        match self.huds.of(player).get(key) {
+            Some(Value::Text(t)) => t.clone(),
+            other => panic!("hud `{key}` is {other:?}, not text"),
+        }
+    }
+    fn say_as(&mut self, player: [u8; 32], text: &str) {
+        self.vm.chat(&ChatEvent { player, text: text.into() });
+        assert!(self.vm.faulted_mods().is_empty(), "faulted after `{text}`: {:?}", self.vm.faulted_mods());
+    }
     fn text(&self, key: &str) -> String {
-        match self.huds.0.lock().unwrap().get(key) {
+        match self.huds.of(PLAYER).get(key) {
             Some(Value::Text(t)) => t.clone(),
             other => panic!("hud `{key}` is {other:?}, not text"),
         }
@@ -531,12 +546,12 @@ fn main() {
     r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
     r.tick(1);
     assert_eq!(r.number("hp"), 27.0);
-    assert_eq!(r.number("food"), 18.0, "visible food is capped at the drumsticks");
+    assert_eq!(r.number("food"), 18.0, "visible food is capped at the cookies");
     assert_eq!(r.number("air"), 27.0);
     assert!(!r.flag("air_show"));
     assert!(!r.flag("temp_show"));
     assert!(r.text("toast").starts_with("Welcome, Alice"));
-    println!("ok  join: hearts full, drumsticks full, nothing else showing");
+    println!("ok  join: hearts full, cookies full, nothing else showing");
 
     // Standing still for a while costs nothing visible and faults nothing.
     r.tick(300);
@@ -571,7 +586,7 @@ fn main() {
     assert_eq!(r.inventory.units_of("player:main", r.material("tiamot_default_life:antidote")), 27 * 3);
     println!("ok  poison to one point, antidote cured it and was spent");
 
-    // Eating: starve, then an apple is two drumsticks and a bite of buffer.
+    // Eating: starve, then an apple is two cookies and a bite of buffer.
     r.say("heal");
     r.say("starve 4");
     r.tick(1);
@@ -585,7 +600,7 @@ fn main() {
     assert!(r.plays("eat") >= 1);
     assert!(r.text("toast").contains("apple"));
     // Full players are told so and keep their food. The cooldown is waited
-    // out BEFORE the feed, so the press lands on exactly full drumsticks.
+    // out BEFORE the feed, so the press lands on exactly full cookies.
     r.tick(16);
     r.say("feed");
     let before = r.inventory.units_of("player:main", r.material("tiamot_default_life:apple"));
@@ -808,6 +823,7 @@ fn main() {
 
     mob_check(&mut r);
     climate_check();
+    modes_check();
 
     // The HUD script, drawn by the client's own VM, on several states.
     hud_check(&r);
@@ -955,12 +971,118 @@ fn climate_check() {
     println!("ok  climate: temperate comfortable, Glass Waste hot, Crown cold; creatures keep to their rings");
 }
 
+const BOB: [u8; 32] = [9; 32];
+
+fn dig(r: &mut Rig) -> bool {
+    r.vm
+        .dig_complete(&tiamot_core::script::DigEvent {
+            player: PLAYER,
+            target: tiamot_core::SubNodePos { x: 300, y: 190, z: 300 },
+            material: r.material("tiamot_default_world:grass"),
+            brush: tiamot_core::dig::Brush::Block,
+        })
+        .allowed
+}
+
+/// Admins, and the three kinds of world.
+fn modes_check() {
+    // A default world. Whoever joins first runs it; the second does not.
+    let mut r = rig();
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    r.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into() });
+    r.tick(1);
+    r.say_as(BOB, "god");
+    r.tick(1);
+    assert!(r.text_of(BOB, "toast").contains("admins"), "Bob is refused: {}", r.text_of(BOB, "toast"));
+    r.say_as(BOB, "hurt 5");
+    r.tick(1);
+    assert!(r.text_of(BOB, "toast").contains("admins"), "the testing words are admin words too");
+
+    r.tick(60);
+    r.say("god");
+    r.say("hurt 5");
+    r.tick(1);
+    assert_eq!(r.number("hp"), 27.0, "an indestructible admin is not hurt");
+    assert!(r.flag("god"));
+    r.say("god");
+    r.say("hurt 5");
+    r.tick(1);
+    assert_eq!(r.number("hp"), 22.0, "and can be again");
+
+    r.say("tp 10 70 -4");
+    assert_eq!(r.entities.0.lock().unwrap().moved_to.last().copied(), Some([10.0, 70.0, -4.0]));
+
+    r.say("op Bob");
+    r.say_as(BOB, "god");
+    r.tick(1);
+    assert!(r.text_of(BOB, "toast").contains("Nothing can hurt you"), "Bob was made an admin");
+    println!("ok  admins: the first to join runs the world; god, tp and op work, and are refused to others");
+
+    // A creative world: nothing hurts, nothing drains, the kit is everybody's.
+    let mut c = rig_with("tdl_overrides = { climate = false, world_radius = 500, mode = 'Creative' }\n");
+    c.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    c.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into() });
+    c.tick(70);
+    c.say("hurt 9");
+    c.world.fluids.lock().unwrap().insert((100, 65, 100), 27);
+    c.tick(2000);
+    assert_eq!(c.number("hp"), 27.0);
+    assert_eq!(c.number("food"), 18.0);
+    assert_eq!(c.number("air"), 27.0, "nobody drowns in a creative world");
+    assert!(c.flag("creative"));
+    c.say_as(BOB, "kit");
+    assert!(c.inventory.units_of("player:main", c.material("tiamot_default_life:apple")) > 0, "anyone may take the kit");
+    c.say_as(BOB, "boom");
+    c.tick(1);
+    assert!(c.text_of(BOB, "toast").contains("admins"), "but not the rest");
+    println!("ok  creative: no harm, no hunger, no drowning; the kit is open to all");
+
+    // An adventure world: one life.
+    let mut a = rig_with("tdl_overrides = { climate = false, world_radius = 500, mode = 'Adventure' }\n");
+    a.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    a.tick(70);
+    assert!(a.text("toast").contains("one life"));
+    a.say("kit");
+    let apple = a.material("tiamot_default_life:apple");
+    assert!(a.inventory.units_of("player:main", apple) > 0);
+    assert!(dig(&mut a), "the living dig");
+    a.say("die");
+    a.tick(1);
+    assert!(a.flag("ghost"), "dead for good");
+    assert_eq!(a.number("hp"), 0.0);
+    assert_eq!(a.inventory.units_of("player:main", apple), 0, "everything fell");
+    assert!(!a.entities.items(MOD).is_empty());
+    assert!(a.entities.0.lock().unwrap().moved_to.is_empty(), "there is no waking up somewhere else");
+    assert!(!dig(&mut a), "a ghost digs nothing");
+    a.tick(200);
+    assert_eq!(a.inventory.units_of("player:main", apple), 0, "and picks nothing up, even standing on it");
+    a.hold_nothing();
+    a.press("use");
+    a.tick(1);
+    assert!(a.text("toast").contains("only watch"));
+
+    // Still dead after leaving and coming back.
+    a.vm.player_leave(&LeaveEvent { player: PLAYER, name: "Alice".into() });
+    a.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    a.tick(1);
+    assert!(a.flag("ghost"), "death outlasts a rejoin");
+    assert!(!dig(&mut a));
+
+    // An admin can raise the dead, themselves included.
+    a.say("revive");
+    a.tick(1);
+    assert!(!a.flag("ghost"));
+    assert_eq!(a.number("hp"), 27.0);
+    assert!(dig(&mut a), "and the living dig again");
+    println!("ok  adventure: one life, everything falls, a ghost touches nothing, and only an admin undoes it");
+}
+
 fn hud_check(r: &Rig) {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../mods").join(MOD);
     let source = std::fs::read_to_string(dir.join("hud.lua")).unwrap();
 
     let mut states: Vec<(&str, Values)> = Vec::new();
-    let live = r.huds.0.lock().unwrap().clone();
+    let live = r.huds.of(PLAYER);
     states.push(("live", live.clone()));
 
     let mut full = live.clone();
@@ -996,7 +1118,17 @@ fn hud_check(r: &Rig) {
     thirds.insert("temp_show".into(), Value::Flag(true));
     thirds.insert("hot".into(), Value::Flag(true));
     thirds.insert("shield".into(), Value::Text("ok".into()));
-    states.push(("partial hearts and drumsticks", thirds));
+    states.push(("partial hearts and cookies", thirds));
+
+    let mut ghost = full.clone();
+    ghost.insert("hp".into(), Value::Number(0.0));
+    ghost.insert("ghost".into(), Value::Flag(true));
+    states.push(("a ghost", ghost));
+
+    let mut creative = full.clone();
+    creative.insert("creative".into(), Value::Flag(true));
+    creative.insert("toast".into(), Value::Text("Nothing here can hurt you.".into()));
+    states.push(("creative", creative));
 
     states.push(("before any values", Values::new()));
 
@@ -1052,7 +1184,7 @@ fn hud_check(r: &Rig) {
             std::fs::write(PathBuf::from(&dump).join(file), lines.join("
 ")).unwrap();
         }
-        if name != "before any values" {
+        if name != "before any values" && name != "creative" {
             // Nine hearts and nine cookies at the least, each one image.
             assert!(commands >= 18, "the HUD drew almost nothing for `{name}`: {commands}");
         }

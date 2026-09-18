@@ -132,8 +132,10 @@ end)
 
 game.register_on_dig_complete(function(event)
     for _, fn in ipairs(digs) do
-        if fn(event) == false then
-            return false
+        -- `false` refuses in the engine's words, a string in the mod's own.
+        local verdict = fn(event)
+        if verdict ~= nil and verdict ~= true then
+            return verdict
         end
     end
 end)
