@@ -14,11 +14,9 @@
 --
 -- And in any mode there are ADMINS, who may be indestructible (`god`), go
 -- anywhere (`tp`), raise the dead (`revive`) and use the testing words.
--- Flight is the engine's own power and is its operators' already; the
--- engine cannot yet tell a mod who its operators are, so this mod keeps its
--- own list, which starts the way the engine's does: whoever first joins a
--- world is its admin, which in a world you host is you. Admins make more
--- with `op <name>`.
+-- Admins ARE the server's operators (`game.is_operator`): whoever first
+-- joins a world, which in a world you host is you, and whoever the engine's
+-- own `/op` names after. This mod keeps no list of its own.
 --
 --   tdl.mode                          "Default" | "Creative" | "Adventure"
 --   tdl.is_admin(uuid)
@@ -31,7 +29,6 @@ local U = tdl.util
 
 tdl.mode = C.mode
 
-local admins = nil      -- uuid -> true, loaded from storage at the first join
 local gods = {}         -- uuid -> true, for the session
 local ghosts = {}       -- uuid -> true, loaded from storage per player
 local by_name = {}      -- lowercased display name -> uuid, for who is here
@@ -40,24 +37,8 @@ local GHOST_LINE = "You died in this world. You can walk it and watch it, and no
 
 -- Admins ---------------------------------------------------------------------------
 
-local function load_admins()
-    if admins then return end
-    admins = {}
-    local text = game.storage.get("admins")
-    if type(text) == "string" then
-        for uuid in string.gmatch(text, "[^,]+") do admins[uuid] = true end
-    end
-end
-
-local function save_admins()
-    local list = {}
-    for uuid in pairs(admins) do list[#list + 1] = uuid end
-    table.sort(list)
-    game.storage.set("admins", table.concat(list, ","))
-end
-
 function tdl.is_admin(uuid)
-    return admins ~= nil and admins[uuid] == true
+    return game.is_operator(uuid)
 end
 
 function tdl.is_ghost(uuid)
@@ -69,14 +50,15 @@ function tdl.set_ghost(uuid, on)
     game.storage.set("ghost:" .. uuid, on and true or nil)
 end
 
+--- An admin who asked for it; somebody `/deop`ed stops being one at once.
 function tdl.is_god(uuid)
-    return gods[uuid] == true
+    return gods[uuid] == true and tdl.is_admin(uuid)
 end
 
 --- Whether nothing can hurt them and nothing drains: a creative world, an
 --- admin who asked for it, or somebody already dead.
 function tdl.is_invulnerable(uuid)
-    return tdl.mode == "Creative" or gods[uuid] == true or ghosts[uuid] == true
+    return tdl.mode == "Creative" or ghosts[uuid] == true or tdl.is_god(uuid)
 end
 
 --- An online player's UUID by their display name, case-insensitive.
@@ -91,15 +73,15 @@ end
 function tdl.command(word, level, fn)
     tdl.on_chat(word, function(uuid, rest)
         if tdl.is_ghost(uuid) and level ~= "anyone" and not tdl.is_admin(uuid) then
-            tdl.toast(uuid, GHOST_LINE, 80)
+            tdl.say(uuid, GHOST_LINE)
             return
         end
         if level == "admin" and not tdl.is_admin(uuid) then
-            tdl.toast(uuid, "That is for admins.", 60)
+            tdl.say(uuid, "That is for admins.")
             return
         end
         if level == "creative" and not (tdl.mode == "Creative" or tdl.is_admin(uuid)) then
-            tdl.toast(uuid, "That is for creative worlds, or admins.", 60)
+            tdl.say(uuid, "That is for creative worlds, or admins.")
             return
         end
         fn(uuid, rest)
@@ -109,14 +91,7 @@ end
 -- Arriving and leaving ----------------------------------------------------------------------
 
 tdl.on_join(function(event)
-    load_admins()
     by_name[string.lower(event.name)] = event.player
-    if next(admins) == nil then
-        -- Nobody has ever run this world: whoever is first does.
-        admins[event.player] = true
-        save_admins()
-        game.log("tiamot_default_life: " .. event.name .. " is this world's first admin")
-    end
     if game.storage.get("ghost:" .. event.player) == true then
         ghosts[event.player] = true
     end
@@ -154,42 +129,12 @@ tdl.command("mode", "anyone", function(uuid)
     local line = "This is a " .. tdl.mode .. " world."
     if tdl.mode == "Adventure" then line = line .. " One life." end
     if tdl.is_admin(uuid) then line = line .. " You are an admin." end
-    tdl.toast(uuid, line, 100)
-end)
-
-tdl.command("op", "admin", function(uuid, rest)
-    local who = tdl.uuid_of(rest)
-    if who == nil then
-        tdl.toast(uuid, "op <name>: nobody here by that name.")
-        return
-    end
-    admins[who] = true
-    save_admins()
-    tdl.toast(uuid, tdl.name(who) .. " is an admin.")
-    tdl.toast(who, "You are an admin of this world.", 100)
-end)
-
-tdl.command("deop", "admin", function(uuid, rest)
-    local who = tdl.uuid_of(rest)
-    if who == nil then
-        tdl.toast(uuid, "deop <name>: nobody here by that name.")
-        return
-    end
-    local count = 0
-    for _ in pairs(admins) do count = count + 1 end
-    if count <= 1 then
-        tdl.toast(uuid, "A world keeps at least one admin.")
-        return
-    end
-    admins[who] = nil
-    gods[who] = nil
-    save_admins()
-    tdl.toast(uuid, tdl.name(who) .. " is no longer an admin.")
+    tdl.say(uuid, line)
 end)
 
 tdl.command("god", "admin", function(uuid)
     gods[uuid] = not gods[uuid] or nil
-    tdl.toast(uuid, gods[uuid] and "Nothing can hurt you." or "You can be hurt again.", 80)
+    tdl.say(uuid, gods[uuid] and "Nothing can hurt you." or "You can be hurt again.")
 end)
 
 --- tp <x> <y> <z>, tp <name>, tp home.
@@ -207,22 +152,22 @@ tdl.command("tp", "admin", function(uuid, rest)
         if body then target = { x = body.pos.x, y = body.pos.y, z = body.pos.z } end
     end
     if target == nil then
-        tdl.toast(uuid, "tp <x> <y> <z>, tp <name>, or tp home.")
+        tdl.say(uuid, "tp <x> <y> <z>, tp <name>, or tp home.")
         return
     end
     if game.move_player(uuid, target) then
         local v = tdl.get(uuid)
-        if v then v.fall_peak, v.was_ground = nil, true end
-        tdl.toast(uuid, string.format("Moved to %d, %d, %d.", math.floor(target.x), math.floor(target.y), math.floor(target.z)))
+        if v then v.last_vy = 0 end
+        tdl.say(uuid, string.format("Moved to %d, %d, %d.", math.floor(target.x), math.floor(target.y), math.floor(target.z)))
     else
-        tdl.toast(uuid, "The world would not have it.")
+        tdl.say(uuid, "The world would not have it.")
     end
 end)
 
 tdl.command("revive", "admin", function(uuid, rest)
     local who = rest ~= "" and tdl.uuid_of(rest) or uuid
     if who == nil or not tdl.is_ghost(who) then
-        tdl.toast(uuid, "revive <name>: nobody here by that name is dead.")
+        tdl.say(uuid, "revive <name>: nobody here by that name is dead.")
         return
     end
     tdl.set_ghost(who, false)
@@ -233,15 +178,18 @@ tdl.command("revive", "admin", function(uuid, rest)
         v.last_damage = tdl.now
     end
     tdl.cue(who, "rested")
-    tdl.toast(who, "You live again.", 100)
-    if who ~= uuid then tdl.toast(uuid, tdl.name(who) .. " lives again.") end
+    tdl.say(who, "You live again.")
+    if who ~= uuid then tdl.say(uuid, tdl.name(who) .. " lives again.") end
 end)
 
+--- The admins who are here. Making one is the engine's `/op`.
 tdl.command("admins", "admin", function(uuid)
     local names = {}
-    for who in pairs(admins) do names[#names + 1] = tdl.name(who) end
+    for _, who in pairs(by_name) do
+        if game.is_operator(who) then names[#names + 1] = tdl.name(who) end
+    end
     table.sort(names)
-    tdl.toast(uuid, "Admins: " .. table.concat(names, ", "), 100)
+    tdl.say(uuid, "Admins here: " .. table.concat(names, ", ") .. ". Make more with /op.")
 end)
 
 game.log("tiamot_default_life: a " .. tdl.mode .. " world")

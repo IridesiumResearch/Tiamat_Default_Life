@@ -14,7 +14,7 @@
 --   sight             blocks it notices a player from
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
 --   sound, sound_death, voice_min, voice_max
---   model, texture    files in this mod, for the day the engine draws them
+--   model, texture    files in this mod; the engine draws the model, untextured until it can take a texture
 --   grazes            idles with its head down now and then (the `sneak` clip)
 --   drops             { { item, min, max } }, items of this mod
 --   spawn             { ground = { block ids }, rings = { ring ids }, time = "day" | "night" | "any",

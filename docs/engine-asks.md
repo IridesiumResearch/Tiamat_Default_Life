@@ -2,22 +2,49 @@
 
 What the survival layer has needed from the engine, found by building it.
 Each entry says what was wanted, why the mod cannot do it, and the smallest
-engine change that would. Newest first. Items are removed when they land.
+engine change that would. Newest first. Landed items stay here, marked, as
+the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (the engine's answer, 2026-09-18)
+## Where these stand (2026-09-19)
 
-| Item | Answer | When it lands, this mod... |
+The engine answered almost all of it. What is still open is copied, without
+the history, to the engine's `docs/engine-asks/tiamot_default_life.md`, so
+the engine side finds every mod's open asks in one place. This file keeps
+everything, landed items included.
+
+| Item | State | In this mod |
 |---|---|---|
-| 8 operator query | Builds as asked. | drops its own admin list and `op`/`deop`; admins ARE operators. |
-| 4 `detail` on a dropped stack | Builds as asked. | nothing to change; `drops.lua` already passes it through. |
-| 7 `submerged` and `fell` on a player | Builds as asked. | replaces the head-block fluid test and the peak-height fall tracker in `environment.lua`. |
-| 5 looking at, server side | Builds as asked. | makes X act on what is aimed at; cooking on a campfire follows. |
-| 3 `chat_to` | **A confirmed bug, not a request**: the engine's own stub calls it in a worked example and it was never registered. | moves refusals and notices from HUD toasts to chat lines; toasts stay for the moment-to-moment. |
-| 0 models | The biggest win, and better founded than this file knew: `fuzz/gltf_ingest` already exists, so charter rule 14's fuzz requirement is met for step 1. | flips `placeholder_models` off and names a model per creature. |
-| 1 and 9 speed, sprint, flight | **Has a hole, now fixed below**: a server-side change the client does not know about makes prediction diverge every tick. It must go on the wire. | sends cold, hunger and creative flight through the one call. |
-| 10 key gates | **Split, as below**: only the sky keys are a cheat. The rest just move. | nothing; it is all the engine's. |
+| 11 `fell` counts a flight down | **Open**, new. | `environment.lua` gates on the speed at landing as well. |
+| 10 key gates | **Open.** Split: only the sky keys are a cheat; the rest just move. | nothing; it is all the engine's. |
+| 0 models, step 2 (a texture) | **Open.** | the cow draws matte white; `texture` waits in `creatures.lua`. |
+| 0 models, steps 1 and 3 | Landed, engine 15302d1. | the cow is a cow, with its own clips; other kinds keep the stand-in. |
+| 1 and 9 speed, sprint, flight | Landed, engine dc3b5ee and 82444e7. | cold slows, an empty stomach walks, a creative world flies. |
+| 2 time of day | Landed, engine eab4c2d. | a night everyone sleeps through ends at dawn. |
+| 3 `chat_to` | Landed, engine a3db9fa. | answers to chat words and their refusals are chat lines. |
+| 4 `detail` on a dropped stack | Landed, engine a3db9fa. | nothing to change. |
+| 5 looking at | Landed, engine a3db9fa. | X sleeps in the bed you look at. Cooking on a campfire is next. |
+| 7 `submerged` and `fell` | Landed, engine a3db9fa. | the head-block probe and the peak tracker are gone. |
+| 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
+| 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 10. The sky keys need a permission; the debug keys only need to move (2026-09-18, revised)
+## 11. `fell` counts a flight down to the ground (2026-09-19)
+
+**Seen.** `fell` is the descent since the feet last left the ground,
+settled on the tick they land, and a flying body's descent is part of it.
+So an operator who flies down twenty blocks and touches the grass lands
+with `fell = 20`, the same number as somebody who stepped off a cliff.
+
+**What the mod does now.** It keeps its own last-tick vertical speed and
+only hurts a landing that was moving down fast. That is a reconstruction
+of "were they flying", which the engine knows exactly: flight is an intent
+it steps with.
+
+**Smallest change.** Accrue nothing while the body is flying (the fall
+starts when flight stops), or say `flying` on the entity table beside
+`on_ground`. The first keeps `fell` meaning "fell"; the second lets a mod
+decide.
+
+## 10. The sky keys need a permission; the debug keys only need to move (2026-09-18, revised): OPEN
 
 *Revised after the engine's answer. The first draft asked for operator gates
 on all of these, which was plumbing for nothing: a control that cannot move
@@ -72,7 +99,7 @@ material row, no letter twins for the teleports. A control a player may not
 use left out of their settings screen rather than offered and refused. The
 full table is in `docs/controls.md`.
 
-## 9. Abilities a mod grants a player (2026-09-18)
+## 9. Abilities a mod grants a player (2026-09-18): LANDED, engine dc3b5ee
 
 **Wanted.** A Creative world where everybody flies. Flight is a PERMISSION
 held by the server's operator list, and a mod has no hand on it: a creative
@@ -94,7 +121,7 @@ steps the body with the same ones. One call for the mod, one message on
 the wire, one set of numbers on both ends. Items 1 and 9 are this one
 mechanism and should land together.
 
-## 8. Asking who is an operator (2026-09-18)
+## 8. Asking who is an operator (2026-09-18): LANDED, engine a3db9fa
 
 **Wanted.** This mod's admin powers (indestructible, `tp`, `revive`, the
 testing words) belong to the people the server already trusts.
@@ -107,7 +134,7 @@ change it. Two lists that mean the same thing will one day disagree.
 
 **Ask.** `game.is_operator(uuid)`. With it the mod's list goes away.
 
-## 0. Models a mod ships (2026-09-11)
+## 0. Models a mod ships (2026-09-11): steps 1 and 3 LANDED, engine 15302d1; step 2 OPEN
 
 **Wanted.** Animals and mobs that look like animals and mobs. A cow, a
 wolf, a bird: each a skinned, textured model with its own idle, walk and
@@ -137,6 +164,11 @@ white; a model has UVs and nothing to put on them.
 3. `scale = 3.0`: the reader takes model space in cells, and a model built
    at one unit to the yard needs a factor rather than a re-export.
 
+*Landed 2026-09-19 (engine 15302d1): step 1 with step 3's `scale` on the
+same call, and clips matched by name as asked. The cow is registered and
+drawn as itself. Step 2 is what remains: the engine's skinned shader draws
+every model matte white, and `register_model` refuses a `texture` field.*
+
 Until 1 lands, every mob is a white humanoid or invisible, and the mob
 work goes ahead on behaviour, spawning and drops with the humanoid as a
 stand-in.
@@ -147,7 +179,7 @@ same task as the parser) is already met for step 1. What remains is
 wiring, not a new hostile-input surface: a registration, a table sent on
 join like the picture table, and a client that loads what arrives.*
 
-## 1. A speed modifier on a player (2026-09-11)
+## 1. A speed modifier on a player (2026-09-11): LANDED with 9, engine dc3b5ee
 
 **Wanted.** The design says cold slows you a little, and an empty hunger
 bar stops you sprinting. Neither is expressible.
@@ -164,7 +196,7 @@ the first draft said: a correction every tick is rubber-banding. The
 numbers travel to the client, which predicts with them; see item 9. Until
 then cold and hunger cost food and show on the HUD, and nothing else.
 
-## 2. Setting the time of day (2026-09-11)
+## 2. Setting the time of day (2026-09-11): LANDED, engine eab4c2d
 
 **Wanted.** Sleeping in a bed at night should wake you at dawn. The classic
 comfort of a night skipped.
@@ -177,7 +209,7 @@ frozen world. The mod's sleep already heals, clears afflictions and sets
 home; with this it would also end the night when every player present is
 in a bed.
 
-## 3. `game.chat_to` is documented and does not exist (2026-09-11): a BUG, confirmed by the engine 2026-09-18
+## 3. `game.chat_to` is documented and does not exist (2026-09-11): a BUG, confirmed by the engine 2026-09-18, FIXED in engine a3db9fa
 
 The engine's own stub calls `game.chat_to(event.player, "somebody is using
 that")` in the worked example under `game.open_container`, and no such
@@ -197,7 +229,7 @@ vanilla client could show in the chat pane.
 **Ask.** `game.chat_to(uuid, text)`: a server line in that one player's
 chat, attributed to the mod. The example in the stubs already promises it.
 
-## 4. A dropped stack keeps its `detail` (2026-09-11)
+## 4. A dropped stack keeps its `detail` (2026-09-11): LANDED, engine a3db9fa
 
 **Seen.** `game.spawn_entity{ item = ... }` reads `material`, `units`/`count`
 and `shape`, and drops `detail`. A named sword dropped on death comes back
@@ -205,7 +237,7 @@ as a plain sword and merges with the others.
 
 **Ask.** Read `detail` in the item spec, the way `game.give` does. One field.
 
-## 5. What a player is looking at, server-side (2026-09-11), PARTLY LANDED 2026-09-17 as `game.register_on_use`: using a bed with the place control now sleeps in it; a campfire will cook the same way. Still open for anything that is not a click on a block.
+## 5. What a player is looking at, server-side (2026-09-11): LANDED, engine a3db9fa, as `game.looking_at` (the click half landed 2026-09-17 as `game.register_on_use`)
 
 **Wanted.** Use-on-block: X while looking at a bed sleeps in that bed, X
 while looking at a campfire cooks what you hold. The HUD script gets
@@ -235,7 +267,7 @@ script by hand and re-pasted whenever the picture changes (which is what
 serving and answers its hash, so a HUD script can be given it through
 `set_hud` or a generated constant.
 
-## 7. Submersion and fall state on a player's mirror (2026-09-11)
+## 7. Submersion and fall state on a player's mirror (2026-09-11): LANDED, engine a3db9fa
 
 **Seen.** The physics knows a body's submerged fraction and whether it just
 landed (it plays `engine:land`). The mirror exposes `on_ground` and

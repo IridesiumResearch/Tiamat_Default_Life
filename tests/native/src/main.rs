@@ -6,7 +6,8 @@
 // `EngineVm::load_mod`, its hooks fire through the same trait the server
 // calls, and the HUD script is drawn by the same `HudVm` a client runs. What
 // is faked is the world: one player body whose position, ground contact and
-// velocity the test sets; an inventory; a map of blocks and fluid; storage.
+// velocity the test sets; an inventory; a map of blocks and fluid; storage;
+// the operator list, each player's chat, what they may do and what they aim at.
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -26,7 +27,8 @@ use tiamot_core::{
         ActionEvent, ChatEvent, DialogEvent, EngineVm, HudLimits, HudVm, JoinEvent, LeaveEvent,
         ScriptVm, VmLimits, WorldEdit,
     },
-    sight::{self, Reading, Sighting},
+    phys::Abilities,
+    sight::{self, Looked, Reading, Sighting},
     sound::{self, LoopRequest, PlayRequest},
     storage::{self, Access as StorageAccess},
     ui::host::{self as uihost, ShowRequest},
@@ -72,6 +74,7 @@ struct EntityStore {
     player: u64,
     moved_to: Vec<[f64; 3]>,
     shoves: Vec<[f32; 3]>,
+    abilities: HashMap<[u8; 32], Option<Abilities>>,
 }
 
 #[derive(Clone)]
@@ -90,6 +93,7 @@ impl Entities {
             player: 1,
             moved_to: Vec::new(),
             shoves: Vec::new(),
+            abilities: HashMap::new(),
         })))
     }
     fn body(&self, edit: impl FnOnce(&mut Entity)) {
@@ -181,6 +185,10 @@ impl ent::Access for Entities {
     fn transfer(&self, _: EntityId, _: &str, _: [f64; 3]) -> bool {
         false
     }
+    fn set_abilities(&self, uuid: [u8; 32], abilities: Option<Abilities>) -> bool {
+        self.0.lock().unwrap().abilities.insert(uuid, abilities);
+        true
+    }
 }
 
 #[derive(Default)]
@@ -271,21 +279,49 @@ impl sound::Access for Sounds {
     fn stop_loop(&self, _: &sound::StopRequest) -> u32 {
         0
     }
+    fn set_time_of_day(&self, fraction: f32) -> bool {
+        *self.time.lock().unwrap() = fraction.rem_euclid(1.0);
+        true
+    }
 }
 
+/// The HUD values, and the two other things the engine answers through the
+/// same trait: who is an operator, and each player's chat.
 #[derive(Default)]
-struct Huds(Mutex<HashMap<[u8; 32], Values>>);
+struct Huds {
+    values: Mutex<HashMap<[u8; 32], Values>>,
+    operators: Mutex<Vec<[u8; 32]>>,
+    chat: Mutex<Vec<([u8; 32], String)>>,
+}
 
 impl Huds {
     fn of(&self, player: [u8; 32]) -> Values {
-        self.0.lock().unwrap().get(&player).cloned().unwrap_or_default()
+        self.values.lock().unwrap().get(&player).cloned().unwrap_or_default()
+    }
+    fn op(&self, player: [u8; 32]) {
+        self.operators.lock().unwrap().push(player);
+    }
+    fn deop(&self, player: [u8; 32]) {
+        self.operators.lock().unwrap().retain(|p| *p != player);
+    }
+    /// The last line said to a player, or empty.
+    fn said_to(&self, player: [u8; 32]) -> String {
+        let chat = self.chat.lock().unwrap();
+        chat.iter().rev().find(|(p, _)| *p == player).map(|(_, t)| t.clone()).unwrap_or_default()
     }
 }
 
 impl hud::Access for Huds {
     fn set_hud(&self, mod_id: &str, player: [u8; 32], values: Values) -> bool {
         assert_eq!(mod_id, MOD);
-        self.0.lock().unwrap().insert(player, values);
+        self.values.lock().unwrap().insert(player, values);
+        true
+    }
+    fn is_operator(&self, player: [u8; 32]) -> bool {
+        self.operators.lock().unwrap().contains(&player)
+    }
+    fn chat_to(&self, player: [u8; 32], text: &str) -> bool {
+        self.chat.lock().unwrap().push((player, text.to_owned()));
         true
     }
 }
@@ -310,6 +346,8 @@ struct World {
     edits: Mutex<Vec<(BlockPos, String)>>,
     /// Solid ground everywhere at and below a height, of one material.
     floor: Mutex<Option<(i32, MaterialId)>>,
+    /// The block the player's crosshair is on, if any.
+    aimed: Mutex<Option<(i32, i32, i32)>>,
 }
 
 impl World {
@@ -325,6 +363,19 @@ impl World {
 impl sight::Access for World {
     fn line_of_sight(&self, _: &str, _: [f64; 3], _: [f64; 3]) -> Sighting {
         Sighting::Clear
+    }
+    fn looking_at(&self, uuid: [u8; 32]) -> Option<Looked> {
+        let (x, y, z) = (*self.aimed.lock().unwrap())?;
+        if uuid != PLAYER {
+            return None;
+        }
+        let Reading::Single { material, occupancy } = self.block_at("", BlockPos { x, y, z }) else { return None };
+        (occupancy != 0).then(|| Looked {
+            domain: "overworld".into(),
+            cell: tiamot_core::SubNodePos { x: x * 3 + 1, y: y * 3 + 2, z: z * 3 + 1 },
+            material,
+            face: [0, 1, 0],
+        })
     }
     fn block_at(&self, _: &str, pos: BlockPos) -> Reading {
         match self.blocks.lock().unwrap().get(&(pos.x, pos.y, pos.z)) {
@@ -398,12 +449,6 @@ impl Rig {
         match self.huds.of(PLAYER).get(key) {
             Some(Value::Flag(f)) => *f,
             other => panic!("hud `{key}` is {other:?}, not a flag"),
-        }
-    }
-    fn text_of(&self, player: [u8; 32], key: &str) -> String {
-        match self.huds.of(player).get(key) {
-            Some(Value::Text(t)) => t.clone(),
-            other => panic!("hud `{key}` is {other:?}, not text"),
         }
     }
     fn say_as(&mut self, player: [u8; 32], text: &str) {
@@ -485,6 +530,13 @@ impl Rig {
         let mob = store.entities.get_mut(&id).unwrap();
         mob.transform = Transform::from_world(x, y, z);
     }
+    /// The last abilities said for the player.
+    fn abilities(&self) -> Option<Abilities> {
+        self.entities.0.lock().unwrap().abilities.get(&PLAYER).copied().flatten()
+    }
+    fn said(&self) -> String {
+        self.huds.said_to(PLAYER)
+    }
     fn plays(&self, sound: &str) -> usize {
         self.sounds.plays.lock().unwrap().iter().filter(|s| s.ends_with(sound)).count()
     }
@@ -541,6 +593,8 @@ fn rig_with(prelude: &str) -> Rig {
 fn main() {
     let mut r = rig();
     assert_eq!(r.vm.registered_hud_scripts().len(), 1);
+    // The engine makes the first player of a hosted world its operator.
+    r.huds.op(PLAYER);
 
     // Joining: fresh vitals, a welcome, values on the HUD after one tick.
     r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
@@ -633,6 +687,8 @@ fn main() {
     assert!(r.number("temp") < -0.5, "cooled to {}", r.number("temp"));
     assert!(r.flag("cold"));
     assert_eq!(r.text("shield"), "broken", "cold surroundings and nothing warm on: the cracked shield");
+    let slowed = r.abilities().expect("abilities were said");
+    assert!((slowed.speed - 0.8).abs() < 1e-6, "the cold slow the body: {slowed:?}");
     r.world.clear();
     *r.sounds.time.lock().unwrap() = 0.5;
     println!("ok  cold stone at night chilled the body to {:.2}", r.number("temp"));
@@ -651,7 +707,18 @@ fn main() {
     r.tick(20);
     assert_eq!(r.text("shield"), "", "mild weather: no shield at all");
     r.inventory.views.lock().unwrap().remove(&format!("{MOD}:worn"));
-    println!("ok  a warm coat brought it back to {:.2}", r.number("temp"));
+    assert_eq!(r.abilities().map(|a| a.speed), Some(1.0), "warm again, full speed again");
+    println!("ok  a warm coat brought it back to {:.2}, and the body its speed", r.number("temp"));
+
+    // An empty stomach will not sprint; a meal lets it again.
+    r.say("starve 0");
+    r.tick(1);
+    assert_eq!(r.abilities().map(|a| a.sprint), Some(false), "starving: no sprint");
+    r.say("feed");
+    r.tick(1);
+    assert_eq!(r.abilities().map(|a| a.sprint), Some(true));
+    assert_eq!(r.abilities().map(|a| a.fly), Some(false), "nobody flies by this mod in a default world");
+    println!("ok  abilities: cold slows, an empty stomach walks, and the client is told both");
 
     // A fall: up in the air for a moment, then hard ground twenty blocks down.
     r.say("heal");
@@ -664,8 +731,13 @@ fn main() {
     });
     r.tick(1);
     r.entities.set_position(100.5, 64.0, 100.5);
-    r.entities.body(|b| b.on_ground = true);
+    r.entities.body(|b| {
+        b.on_ground = true;
+        b.velocity.0[1] = 0.0;
+        b.fell = 20.0;
+    });
     r.tick(1);
+    r.entities.body(|b| b.fell = 0.0);
     // (20 - 3) * 1.5 = 25.5, rounded to 26.
     assert_eq!(r.number("hp"), 1.0, "a twenty-block fall is nearly everything");
     assert!(r.plays("thud") >= 1);
@@ -680,13 +752,18 @@ fn main() {
     r.entities.body(|b| b.velocity.0[1] = -0.5);
     r.tick(1);
     r.entities.set_position(100.5, 64.0, 100.5);
-    r.entities.body(|b| b.on_ground = true);
+    r.entities.body(|b| {
+        b.on_ground = true;
+        b.velocity.0[1] = 0.0;
+        b.fell = 20.0;
+    });
     r.tick(1);
+    r.entities.body(|b| b.fell = 0.0);
     assert_eq!(r.number("hp"), 27.0, "a slow descent is flight, not a fall");
     println!("ok  a slow descent cost nothing");
 
-    // Drowning: the head's block fills with water.
-    r.world.fluids.lock().unwrap().insert((100, 65, 100), 27);
+    // Drowning: the body goes under.
+    r.entities.body(|b| b.submerged = 1.0);
     r.tick(20);
     assert!(r.flag("wet"));
     assert!(r.flag("air_show"));
@@ -694,7 +771,7 @@ fn main() {
     r.tick(13 * 27 + 20 * 3 + 10);
     assert_eq!(r.number("air"), 0.0);
     assert!(r.number("hp") <= 27.0 - 9.0, "drowning at a heart a second: {}", r.number("hp"));
-    r.world.fluids.lock().unwrap().clear();
+    r.entities.body(|b| b.submerged = 0.0);
     r.tick(20);
     assert_eq!(r.number("air"), 27.0, "air came straight back");
     assert!(r.plays("gasp") >= 1);
@@ -771,8 +848,23 @@ fn main() {
     assert_eq!(r.number("hp"), 27.0);
     assert!(r.text("fx").contains("rested"));
     assert!(r.plays("rested") >= 1);
+    assert_eq!(*r.sounds.time.lock().unwrap(), 0.25, "alone in the world, a night slept is a night ended");
+    assert!(r.text("toast").contains("morning"), "{}", r.text("toast"));
     r.world.clear();
-    println!("ok  slept at night, healed, well rested, bed set as home");
+    println!("ok  slept at night, healed, well rested, woke at dawn, bed set as home");
+
+    // X sleeps in the bed the crosshair is on, out of reach of the feet.
+    r.world.put(104, 64, 100, bed);
+    *r.world.aimed.lock().unwrap() = Some((104, 64, 100));
+    *r.sounds.time.lock().unwrap() = 0.9;
+    r.tick(120);
+    r.press("use");
+    r.tick(1);
+    let home = r.storage.get(MOD, &format!("bed:{}", PlayerUuid::from_bytes(PLAYER).to_hex()));
+    assert!(format!("{home:?}").contains("104"), "the aimed bed is home: {home:?}");
+    *r.world.aimed.lock().unwrap() = None;
+    r.world.clear();
+    println!("ok  X on a bed across the room sleeps in that bed");
 
     // An explosion nearby shoves and hurts.
     let shoves = r.entities.0.lock().unwrap().shoves.len();
@@ -845,14 +937,19 @@ fn mob_check(r: &mut Rig) {
     r.tick(100 * 12);
     let spawned = r.mobs();
     assert!(spawned.len() >= 4, "animals appeared on the grass: {}", spawned.len());
-    let mut kinds: Vec<String> = spawned.iter().filter_map(|(_, e)| e.nametag.clone()).map(|n| format!("{n:?}")).collect();
+    let mut kinds: Vec<String> = spawned.iter().filter_map(|(_, e)| kind_of(e)).collect();
     kinds.sort();
     kinds.dedup();
     assert!(kinds.len() >= 2, "more than one kind: {kinds:?}");
     for (_, mob) in &spawned {
-        assert_eq!(mob.model.as_deref(), Some("engine:humanoid"), "a stand-in body");
+        // A cow is its own model; a kind with none yet is the named stand-in.
+        if mob.model.as_deref() == Some("tiamot_default_life:cow") {
+            assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
+        } else {
+            assert_eq!(mob.model.as_deref(), Some("engine:humanoid"), "a stand-in body");
+            assert_ne!(mob.nametag, None, "a stand-in's kind rides on its nametag");
+        }
         assert!(mob.health.is_some(), "a mob has health");
-        assert_ne!(mob.nametag, None, "the kind rides on the nametag until models land");
         let [_, y, _] = mob.transform.to_world();
         assert!((y - 64.0).abs() < 0.01, "standing on the floor, not in it: {y}");
     }
@@ -932,6 +1029,7 @@ fn mob_check(r: &mut Rig) {
 /// temperate ring is comfortable, the Glass Waste hot, the Crown frozen.
 fn climate_check() {
     let mut r = rig_with("");
+    r.huds.op(PLAYER);
     r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
     let grass = r.material("tiamot_default_world:grass");
     *r.world.floor.lock().unwrap() = Some((63, grass));
@@ -962,7 +1060,7 @@ fn climate_check() {
     // is underfoot; crows and bats keep to their own rings too.
     r.entities.set_position(26500.5, 64.0, 0.5);
     r.tick(100 * 8);
-    let there: Vec<String> = r.mobs().iter().filter_map(|(_, e)| e.nametag.clone()).map(|n| format!("{n:?}")).collect();
+    let there: Vec<String> = r.mobs().iter().filter_map(|(_, e)| kind_of(e)).collect();
     assert!(there.is_empty(), "nothing of ours lives on the Glass Waste: {there:?}");
     // And on the spawn plain they do.
     r.entities.set_position(15300.5, 64.0, 0.5);
@@ -972,6 +1070,14 @@ fn climate_check() {
 }
 
 const BOB: [u8; 32] = [9; 32];
+
+/// A mob's kind: its model, if it has one of its own, else its nametag.
+fn kind_of(e: &Entity) -> Option<String> {
+    match e.model.as_deref() {
+        Some(m) if m != "engine:humanoid" => Some(m.rsplit(':').next().unwrap_or(m).to_owned()),
+        _ => e.nametag.as_ref().map(|n| format!("{n:?}")),
+    }
+}
 
 fn dig(r: &mut Rig) -> bool {
     r.vm
@@ -986,17 +1092,19 @@ fn dig(r: &mut Rig) -> bool {
 
 /// Admins, and the three kinds of world.
 fn modes_check() {
-    // A default world. Whoever joins first runs it; the second does not.
+    // A default world. Admins are the server's operators: Alice is one, Bob
+    // is not, and the answers come back in chat.
     let mut r = rig();
+    r.huds.op(PLAYER);
     r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
     r.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into() });
     r.tick(1);
     r.say_as(BOB, "god");
     r.tick(1);
-    assert!(r.text_of(BOB, "toast").contains("admins"), "Bob is refused: {}", r.text_of(BOB, "toast"));
+    assert!(r.huds.said_to(BOB).contains("admins"), "Bob is refused: {}", r.huds.said_to(BOB));
     r.say_as(BOB, "hurt 5");
     r.tick(1);
-    assert!(r.text_of(BOB, "toast").contains("admins"), "the testing words are admin words too");
+    assert!(r.huds.said_to(BOB).contains("admins"), "the testing words are admin words too");
 
     r.tick(60);
     r.say("god");
@@ -1012,33 +1120,45 @@ fn modes_check() {
     r.say("tp 10 70 -4");
     assert_eq!(r.entities.0.lock().unwrap().moved_to.last().copied(), Some([10.0, 70.0, -4.0]));
 
-    r.say("op Bob");
+    // The engine's `/op` makes Bob one, and he is at once.
+    r.huds.op(BOB);
     r.say_as(BOB, "god");
     r.tick(1);
-    assert!(r.text_of(BOB, "toast").contains("Nothing can hurt you"), "Bob was made an admin");
-    println!("ok  admins: the first to join runs the world; god, tp and op work, and are refused to others");
+    assert!(r.huds.said_to(BOB).contains("Nothing can hurt you"), "Bob was made an admin");
+    r.say("admins");
+    assert!(r.said().contains("Alice") && r.said().contains("Bob"), "{}", r.said());
+    // And `/deop` takes it all back, god included.
+    r.huds.deop(BOB);
+    r.say_as(BOB, "hurt 5");
+    r.tick(1);
+    assert!(r.huds.said_to(BOB).contains("admins"), "Bob is refused again");
+    assert!(!matches!(r.huds.of(BOB).get("god"), Some(Value::Flag(true))), "a deopped god is mortal");
+    println!("ok  admins: the server's operators; god, tp and admins work, are refused to others, and end at deop");
 
     // A creative world: nothing hurts, nothing drains, the kit is everybody's.
     let mut c = rig_with("tdl_overrides = { climate = false, world_radius = 500, mode = 'Creative' }\n");
+    c.huds.op(PLAYER);
     c.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
     c.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into() });
     c.tick(70);
     c.say("hurt 9");
-    c.world.fluids.lock().unwrap().insert((100, 65, 100), 27);
+    c.entities.body(|b| b.submerged = 1.0);
     c.tick(2000);
     assert_eq!(c.number("hp"), 27.0);
     assert_eq!(c.number("food"), 18.0);
     assert_eq!(c.number("air"), 27.0, "nobody drowns in a creative world");
     assert!(c.flag("creative"));
+    assert_eq!(c.abilities().map(|a| a.fly), Some(true), "everybody flies in a creative world");
     c.say_as(BOB, "kit");
     assert!(c.inventory.units_of("player:main", c.material("tiamot_default_life:apple")) > 0, "anyone may take the kit");
     c.say_as(BOB, "boom");
     c.tick(1);
-    assert!(c.text_of(BOB, "toast").contains("admins"), "but not the rest");
-    println!("ok  creative: no harm, no hunger, no drowning; the kit is open to all");
+    assert!(c.huds.said_to(BOB).contains("admins"), "but not the rest");
+    println!("ok  creative: no harm, no hunger, no drowning, flight for all; the kit is open to all");
 
     // An adventure world: one life.
     let mut a = rig_with("tdl_overrides = { climate = false, world_radius = 500, mode = 'Adventure' }\n");
+    a.huds.op(PLAYER);
     a.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
     a.tick(70);
     assert!(a.text("toast").contains("one life"));

@@ -136,7 +136,7 @@ settings screen.
 
 | Key | Action |
 |---|---|
-| **X** | Use what you are holding: eat food, take medicine. With an empty hand beside a bed: sleep. |
+| **X** | Use what you are holding: eat food, take medicine. With an empty hand, at the bed you look at or one beside you: sleep. |
 | **Right mouse** on a bed | Sleep in it. |
 | **O** | Wardrobe: four worn slots. Clothing there keeps you warm or cool. |
 
@@ -155,12 +155,13 @@ fixed for its life:
   carried, and you stay as a ghost who may walk and watch and touch nothing,
   for good, until an admin says `revive`.
 
-Whoever first joins a world is its admin, as the engine makes whoever hosts
-a world its operator. Admins may be indestructible (`god`), go anywhere
-(`tp <x> <y> <z>`, `tp <name>`, `tp home`), raise the dead (`revive`), make
-more admins (`op`, `deop`, `admins`), and use the testing words. Flight is
-the engine's own power and stays with its operators. Say `mode` to hear
-what kind of world you are in.
+Admins are the server's operators: in a world you host, you, and whoever
+the engine's own `/op` names. Admins may be indestructible (`god`), go
+anywhere (`tp <x> <y> <z>`, `tp <name>`, `tp home`), raise the dead
+(`revive`), see who else is one (`admins`), and use the testing words.
+Operators fly in any mode; in a creative world everybody does. Say `mode`
+to hear what kind of world you are in. Answers to chat words come back in
+chat.
 
 ## What the numbers mean
 
@@ -168,20 +169,22 @@ what kind of world you are in.
 - **Hunger**: 9 cookies of 2 points, 18 visible, and 9 more hidden points
   of saturation on top. With saturation you heal a point a second; with the
   cookies nearly full, a point every four seconds; below that, not at all.
-  Empty cookies drain health slowly, never past your last heart.
+  Empty cookies drain health slowly, never past your last heart, and an
+  empty stomach cannot sprint.
 - **Air**: 9 bubbles of 3 points, shown only when your head is under. About
   eighteen seconds of breath, then a heart a second. Surfacing refills it at
   once.
 - **Body temperature**: a thermometer appears when you drift from
-  comfortable. Cold and hot burn food faster and nothing else; freezing and
-  overheating, at the extremes, cost a point every five seconds. The world's
-  own climate comes first: the Spindle's temperature is radial, comfortable
-  on the plain where you start, hotter out toward the Ember Ridge and the
-  Glass Waste, colder in toward Frostmoor and the Crown and again at the
-  Hem. On top of that, nights under the open sky are cold, caves are cool,
-  water is cold, midday is warm, magma and campfires are hot, snow,
-  permafrost and dream stone are cold. A warm coat or a cool cloak shifts
-  it; so does a hot stew or a cool melon, for a minute.
+  comfortable. Cold and hot burn food faster, and cold slows you to four
+  fifths of your speed; freezing and overheating, at the extremes, cost a
+  point every five seconds. The world's own climate comes first: the
+  Spindle's temperature is radial, comfortable on the plain where you start,
+  hotter out toward the Ember Ridge and the Glass Waste, colder in toward
+  Frostmoor and the Crown and again at the Hem. On top of that, nights under
+  the open sky are cold, caves are cool, water is cold, midday is warm,
+  magma and campfires are hot, snow, permafrost and dream stone are cold. A
+  warm coat or a cool cloak shifts it; so does a hot stew or a cool melon,
+  for a minute.
 
 ## The world it lives in
 
@@ -197,8 +200,9 @@ feet.
 ## Damage
 
 Physical (punches; a `core_gear:sword` does six), falls (past three blocks,
-one and a half points a block, measured from the highest point since the
-feet left the ground, and only if the body was actually falling), fire and
+one and a half points a block, as far as the engine measured the fall, and
+only if the body was actually falling fast, so flying down is not one; none
+landing in water), fire and
 lava (standing on the world's magma or in a campfire, and burning for a
 while after), poison (to your last heart), wither (all the way), starvation
 (to your last heart), drowning, freezing and overheating, explosions
@@ -230,7 +234,7 @@ happened.
 | Bandage | A heart at once and three more over a few seconds; puts a fire out. The one healing item. |
 | Antidote | Clears poison, wither and radiation. |
 | Warm coat, cool cloak | Worn in the wardrobe. |
-| Bed | Sleep in it at night (X beside it) to heal fully and make it home. Standing by it any time sets home. |
+| Bed | Sleep in it at night (X on it or beside it) to heal fully and make it home. When everyone here has slept, it is morning. Using it any time sets home. |
 | Campfire | Warm within three blocks. Burns if you stand in it. |
 
 Digging one of the world's brambles also gives berries.
@@ -241,7 +245,7 @@ everything while `config.dev_commands` is on.
 ## Chat words
 
 Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
-`god`, `tp`, `revive`, `op`, `deop`, `admins`, and the testing words `hurt
+`god`, `tp`, `revive`, `admins`, and the testing words `hurt
 [n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
 `choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]`,
 `mobs`, `cull`. The testing words vanish altogether when `dev_commands =
@@ -293,10 +297,11 @@ engine's own skinning would, textured, at rest and through every clip.
 Originals live in `assets/source/`, outside the mod, because the engine
 serves everything inside a mod's folder to clients.
 
-**Bodies.** The engine draws only its own white humanoid today, so every
-creature is one, with its kind as a nametag (`placeholder_models` in
-`config.lua`). Flip it off once the engine loads models a mod ships
-(item 0 in `docs/engine-asks.md`), and each kind names its own model. A
+**Bodies.** A kind that names a `model` is drawn as it, registered with
+`game.register_model`: the cow is a cow, animated by its own clips, and
+matte white until the engine can put a texture on a model (item 0 in
+`docs/engine-asks.md`). A kind with no model yet is the engine's white
+humanoid with its kind as a nametag (`placeholder_models` in `config.lua`). A
 creature's kind is read back off the entity, so it survives the world being
 closed and reopened.
 

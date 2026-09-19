@@ -102,6 +102,16 @@ local function unsafe_reason(uuid, v)
     return nil
 end
 
+--- Whether every living player here has slept lately: the night ends then.
+local function everyone_slept()
+    for other, w in pairs(tdl.online()) do
+        if not (w.dead or tdl.is_ghost(other)) then
+            if w.slept_at == nil or tdl.now - w.slept_at > C.sleep_window then return false end
+        end
+    end
+    return true
+end
+
 local function sleep(uuid, v, bed)
     tdl.set_bed(uuid, bed)
     if not (is_night() or C.sleep_any_time) then
@@ -119,8 +129,16 @@ local function sleep(uuid, v, bed)
     v.temp = 0
     E.clear_harmful(v)
     E.apply(v, "rested", C.rested_ticks)
+    v.slept_at = tdl.now
     tdl.cue(uuid, "rested")
-    tdl.toast(uuid, "You slept well. This bed is home.", 80)
+    if everyone_slept() and game.set_time_of_day(C.wake_time) then
+        for other in pairs(tdl.online()) do
+            tdl.toast(other, other == uuid and "You slept well, and it is morning. This bed is home."
+                or "Everyone slept. It is morning.", 100)
+        end
+        return
+    end
+    tdl.toast(uuid, "You slept well. This bed is home. The night ends when everyone sleeps.", 100)
 end
 
 -- The use key ---------------------------------------------------------------------
@@ -148,13 +166,18 @@ tdl.on_action(USE, function(event)
         return
     end
 
-    local body = U.body(uuid)
-    local bed = body and bed_near(body.pos)
+    -- The bed being aimed at, or else one within reach of the feet.
+    local at = game.looking_at(uuid)
+    local bed = at and at.material == I.bed and { x = at.x // 3, y = at.y // 3, z = at.z // 3 }
+    if bed == nil then
+        local body = U.body(uuid)
+        bed = body and bed_near(body.pos)
+    end
     if bed then
         sleep(uuid, v, bed)
         return
     end
-    tdl.toast(uuid, "Nothing to use. Hold food, or stand by a bed.")
+    tdl.toast(uuid, "Nothing to use. Hold food, or look at a bed.")
 end)
 
 -- Using a bed with the place control: the same as X beside it, aimed. The
@@ -272,7 +295,7 @@ if C.dev_commands then
         end
         game.give(uuid, { material = game.mod_id .. ":bed", count = 2 })
         game.give(uuid, { material = game.mod_id .. ":campfire", count = 4 })
-        tdl.toast(uuid, "A kit: every food, medicine and garment, two beds, four campfires.", 100)
+        tdl.say(uuid, "A kit: every food, medicine and garment, two beds, four campfires.")
     end
 
     tdl.command("kit", "creative", kit)
@@ -286,7 +309,7 @@ if C.dev_commands then
             v.temp, v.env.ambient, v.env.heat or 0, v.env.cold or 0, v.warmth,
             E.hud_string(v), tostring(v.env.submerged), tostring(v.env.wet), tostring(v.env.fire ~= nil), v.deaths)
         game.log("tiamot_default_life vitals " .. tdl.name(uuid) .. ": " .. line)
-        tdl.toast(uuid, string.format("hp %d food %d air %d temp %.2f", v.hp, v.food, v.air, v.temp), 100)
+        tdl.say(uuid, string.format("hp %d food %d air %d temp %.2f", v.hp, v.food, v.air, v.temp))
     end)
 
     tdl.command("hurt", "admin", function(uuid, rest)

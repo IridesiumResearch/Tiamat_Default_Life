@@ -7,9 +7,9 @@
 -- state record kept here, keyed on the entity id. The engine persists the
 -- entity with its chunk; the record is rebuilt when the mob is next seen
 -- (`adopt`), so a cow that was there when the world closed is a cow when it
--- opens. Its KIND is read back off the entity: the model name once the
--- engine draws models a mod ships, and until then the nametag, which also
--- tells a white humanoid cow from a white humanoid bat.
+-- opens. Its KIND is read back off the entity: the model name for a kind
+-- with a model of its own, and the nametag for one still drawn as the
+-- engine's white humanoid.
 --
 --   tdl.register_mob(def)          a kind; see creatures.lua for the fields
 --   tdl.spawn_mob(kind, pos, n)    puts some in the world now
@@ -64,13 +64,14 @@ function tdl.register_mob(def)
     def.drops = def.drops or {}
     def.spawn = def.spawn or {}
     def.ground = U.materials(def.spawn.ground or {})
-    -- A body of its own, the day the engine will draw one. `register_model`
-    -- does not exist yet (docs/engine-asks.md, item 0); asked for in the
-    -- shape that file proposes, behind a pcall, so a different shape when it
-    -- lands is a log line here and not a mod that fails to load.
+    -- A body of its own. The engine draws it untextured (matte white) until
+    -- a model can name its texture (docs/engine-asks.md, item 0 step 2), so
+    -- `texture` waits in the creature's definition and is not passed: an
+    -- unknown field is an error. Behind a pcall, so a model the engine
+    -- refuses is a log line here and a stand-in body, not a mod that fails.
     def.has_model = false
     if def.model and game.register_model then
-        local ok, why = pcall(game.register_model, { id = def.id, file = def.model, texture = def.texture })
+        local ok, why = pcall(game.register_model, { id = def.id, file = def.model })
         def.has_model = ok
         if not ok then
             game.log("tiamot_default_life: " .. def.id .. " keeps its stand-in body: " .. tostring(why))
@@ -601,13 +602,13 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.toast(uuid, "spawn <cow|sheep|pig|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),
                      z = body.pos.z + body.facing.z * 4 }
         local ids = tdl.spawn_mob(kind, at, tonumber(n) or 1)
-        tdl.toast(uuid, #ids .. " " .. kind .. (#ids == 1 and "" or "s") .. " spawned.")
+        tdl.say(uuid, #ids .. " " .. kind .. (#ids == 1 and "" or "s") .. " spawned.")
     end)
     tdl.command("mobs", "admin", function(uuid)
         local body = U.body(uuid)
@@ -621,7 +622,7 @@ if C.dev_commands then
         local parts = {}
         for name, n in pairs(counts) do parts[#parts + 1] = n .. " " .. name end
         table.sort(parts)
-        tdl.toast(uuid, #parts > 0 and table.concat(parts, ", ") or "nothing about", 100)
+        tdl.say(uuid, #parts > 0 and table.concat(parts, ", ") or "nothing about")
     end)
     tdl.command("cull", "admin", function(uuid)
         local body = U.body(uuid)
@@ -632,7 +633,7 @@ if C.dev_commands then
             M.live[id] = nil
             n = n + 1
         end
-        tdl.toast(uuid, n .. " gone.")
+        tdl.say(uuid, n .. " gone.")
     end)
 end
 

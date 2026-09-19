@@ -57,7 +57,7 @@ local function fresh()
         toast = nil, toast_until = 0, flash_until = 0, low_air_gasp = false,
         env = { submerged = false, wet = false, swimming = false, fire = nil, radiation = false,
                 ambient = 0, on_ground = true, speed2 = 0 },
-        pos = nil, fall_peak = nil, was_ground = true, last_vy = 0,
+        pos = nil, last_vy = 0,
         safe_recent = nil, safe_old = nil,
         warmth = 0, armour = 0,
     }
@@ -113,6 +113,12 @@ function tdl.toast(uuid, text, ticks)
     if v == nil then return end
     v.toast = U.hud_text(text)
     v.toast_until = now + (ticks or 60)
+end
+
+--- A line in one player's chat: the answer to a chat word, a refusal, a
+--- notice meant to be read back later. Toasts are for the moment-to-moment.
+function tdl.say(uuid, text)
+    game.chat_to(uuid, text)
 end
 
 --- Spends food in fractions; a point comes off when a whole one is owed.
@@ -383,6 +389,22 @@ local function push_hud(uuid, v)
     })
 end
 
+--- What the body may do, which the client predicts with: cold slows you, an
+--- empty stomach will not sprint, and everybody flies in a creative world.
+--- Said only when it changes; the engine forgets it when the player leaves,
+--- and a rejoin loads a fresh record, which says it again.
+local function push_abilities(uuid, v)
+    local whole = tdl.is_invulnerable(uuid) or v.dead
+    local cold = not whole and v.temp <= -C.temp_uncomfortable
+    local speed = cold and C.cold_speed or 1
+    local sprint = whole or v.food > 0
+    local fly = tdl.mode == "Creative"
+    local said = string.format("%s %s %s", speed, sprint, fly)
+    if said == v.abilities then return end
+    v.abilities = said
+    game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly })
+end
+
 tdl.on_join(function(event)
     names[event.player] = event.name
     local v = load(event.player)
@@ -428,6 +450,7 @@ tdl.on_tick(function(dt)
         end
         if now % SAFE_EVERY == 0 then sample_safe(v) end
         push_hud(uuid, v)
+        push_abilities(uuid, v)
         if now % SAVE_EVERY == 0 then save(uuid, v) end
     end
 end)

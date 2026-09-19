@@ -80,7 +80,8 @@ C.drown_damage = 3
 C.temp_sample_ticks = 10
 C.temp_drift = 0.04            -- fraction of the gap closed per sample (about 12 s to settle)
 C.temp_show = 0.35             -- the thermometer appears past this
-C.temp_uncomfortable = 0.55    -- "cold" / "hot": hunger burns faster, nothing else
+C.temp_uncomfortable = 0.55    -- "cold" / "hot": hunger burns faster, and cold slows you
+C.cold_speed = 0.8             -- a body this cold or colder moves at this share of its speed
 C.temp_extreme = 0.90          -- "freezing" / "overheating": slow damage
 C.temp_damage_ticks = 100      -- a point every five seconds at an extreme
 C.temp_damage = 1
@@ -138,6 +139,8 @@ C.burn_after_campfire = 40
 C.fall_safe_blocks = 3.0       -- no damage up to this
 C.fall_damage_per_block = 1.5  -- past that
 C.fall_min_speed = 1.2         -- cells per tick downward at impact, or it was not a fall (flying lands slower)
+C.submerged_head = 0.9         -- share of the body in fluid that puts the eyes under (1.62 of 1.8)
+C.submerged_swimming = 0.35    -- share that is swimming rather than wading
 
 -- Damage bookkeeping --------------------------------------------------------
 
@@ -155,6 +158,8 @@ C.respawn_above_bed = 1.0
 
 C.sleep_any_time = false       -- nights only, like the classics; a bed sets your respawn any time
 C.bed_reach = 2                -- blocks
+C.sleep_window = 20 * 30       -- ticks: everyone who slept within this has slept tonight
+C.wake_time = 0.25             -- the time of day a slept-through night ends at: dawn
 C.rested_ticks = 20 * 60 * 5   -- five minutes of well-rested
 C.well_fed_ticks = 20 * 60 * 3 -- three minutes after a proper meal
 
@@ -165,9 +170,10 @@ C.explosion_push_up = 0.8
 
 -- Mobs ---------------------------------------------------------------------
 
--- Until the engine draws a model a mod ships, every creature is the
--- engine's white humanoid with its kind as a nametag. Set false once
--- `register_model` exists and the creatures carry their own models.
+-- A creature with a model of its own (`model` in creatures.lua) is drawn as
+-- it. One without is the engine's white humanoid with its kind as a
+-- nametag while this is true, and invisible when it is false: the engine
+-- draws nothing for a model name nobody registered.
 C.placeholder_models = true
 C.mob_spawn_every = 100        -- ticks between spawning passes, per player
 C.mob_spawn_tries = 6          -- ground spots tried per pass

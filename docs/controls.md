@@ -24,10 +24,9 @@ it under `[world_options]` in `server.toml`.
 
 ## Admins
 
-The engine has operators (its `server.toml` list; in a world you host, you)
-and gives them one power, flight. It cannot yet tell a mod who they are, so
-this mod keeps its own list, begun the same way: **whoever first joins a
-world is its admin.** Admins make more.
+**Admins are the engine's operators** (its `server.toml` list; in a world
+you host, you), read with `game.is_operator`. The engine's own `/op` and
+`/deop` make and unmake them, and this mod keeps no list of its own.
 
 | Word | Who | Does |
 |---|---|---|
@@ -37,16 +36,17 @@ world is its admin.** Admins make more.
 | `god` | admin | Indestructible, on and off. Nothing hurts, nothing drains, hunters ignore you. |
 | `tp <x> <y> <z>` / `tp <name>` / `tp home` | admin | Goes there. |
 | `revive [name]` | admin | Raises a ghost, yourself included. |
-| `op <name>` / `deop <name>` / `admins` | admin | The list. A world keeps at least one. |
+| `admins` | admin | Who here is one. Making more is the engine's `/op`. |
 | `hurt`, `heal`, `feed`, `starve`, `poison`, `wither`, `burn`, `choke`, `freeze`, `roast`, `boom`, `die`, `spawn`, `mobs`, `cull` | admin | The testing words. `dev_commands = false` in `config.lua` removes them altogether. |
 
-Flight stays the engine's: its operators fly, in any mode, and nobody else.
+Operators fly, in any mode. In a creative world this mod lets everybody
+fly (`game.set_player_abilities`), which is not making anybody an operator.
 
 ## This mod's keys
 
 | Key | Action | Notes |
 |---|---|---|
-| **X** | Use what you hold: eat, bandage, antidote. Empty-handed beside a bed: sleep. | |
+| **X** | Use what you hold: eat, bandage, antidote. Empty-handed, at the bed you look at or one beside you: sleep. | |
 | **Right mouse** on a bed | Sleep in it. | The engine's place control, with nothing placeable in hand. |
 | **O** | Wardrobe: the worn slots. | Was G, which is the engine's debug block row. O for outfit. |
 
@@ -98,14 +98,10 @@ lighting and third person reconsidered, **L** and **V** as well.
 
 ### What a mod needs from the engine to finish the job
 
-Filed in `engine-asks.md`:
+Filed in `engine-asks.md` (item 10), and still open:
 
-- `game.is_operator(uuid)`, so this mod's admins ARE the engine's operators
-  and the two lists cannot disagree.
-- `game.set_player_abilities(uuid, { fly = true, speed = ..., sprint = ... })`,
-  so a creative world can let everybody fly without making everybody an
-  operator, and cold and hunger can slow a player. It has to travel to the
-  client, which predicts its own movement: an ability the client does not
-  know about is rubber-banding for as long as it lasts.
 - A server permission on the sky keys, and the debug keys moved off the
   letters, as in the table above.
+
+`game.is_operator` and `game.set_player_abilities` landed on 2026-09-19 and
+are in use: admins are operators, and a creative world flies.

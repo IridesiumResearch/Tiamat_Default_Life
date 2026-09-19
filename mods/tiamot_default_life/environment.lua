@@ -5,7 +5,11 @@
 -- Written into `v.env` for vitals.lua to act on, and nothing is acted on
 -- here except falls, which are an event rather than a state.
 --
--- Cost, per player: one entity read a tick; a handful of block reads every
+-- Water and falls are the engine's own answers, read off the body every
+-- tick: `submerged` is the share of the body in fluid, the number the physics
+-- moved it by, and `fell` is the blocks it fell, on the tick it lands.
+--
+-- Cost, per player: one entity read a tick; a few block reads every
 -- fourth tick; a 7x3x7 scan for heat and cold every tenth; the worn view
 -- every fortieth. Staggered by tick so they do not all land together.
 
@@ -22,11 +26,6 @@ local R = C.temp_source_radius
 
 local now = 0
 
-local function has_fluid(pos)
-    local f = game.get_fluid(pos)
-    return f and f.volume or 0
-end
-
 --- Whether a block holds one of the materials in `set`, returning the entry.
 local function material_in(set, pos)
     local at = game.get_block(pos)
@@ -40,20 +39,20 @@ local function material_in(set, pos)
     return set[at.material]
 end
 
+--- How deep in fluid the body is, from the engine's own measure.
+local function sample_fluid(v, body)
+    local env = v.env
+    local share = body.submerged or 0
+    env.submerged = share >= C.submerged_head
+    env.wet = share > 0
+    env.swimming = share >= C.submerged_swimming
+end
+
 local function sample_blocks(v, body)
     local env = v.env
     local pos = body.pos
     local feet = U.block_at(pos)
     local head = U.block_at(pos, EYE)
-
-    -- Fluid fills a block from the floor up, so the head is under when the
-    -- fluid's depth in its block reaches above the eyes.
-    local head_y = pos.y + EYE
-    local depth = has_fluid(head) / 27
-    env.submerged = depth > (head_y - math.floor(head_y))
-    local at_feet = has_fluid(feet)
-    env.wet = at_feet > 0 or env.submerged
-    env.swimming = at_feet >= 18 or env.submerged
 
     -- Fire: the block the feet are in, the one they stand on, the head.
     local below = { x = feet.x, y = feet.y - 1, z = feet.z }
@@ -129,29 +128,17 @@ local function sample_worn(uuid, v)
     v.warmth, v.armour = warmth, armour
 end
 
---- Falls: the height is measured from the highest point since the feet last
---- left the ground, and it only counts as a fall if the body was actually
---- moving down fast when it landed; drifting down while flying is not one.
+--- Falls: the engine says how far, on the tick the body lands. It counts a
+--- flight down to the ground as a fall too, so a landing only hurts if the
+--- body was moving down fast the tick before; drifting down is flying. And
+--- nothing hurts landing in water.
 local function track_fall(uuid, v, body)
-    local pos = body.pos
-    if body.on_ground then
-        if not v.was_ground and v.fall_peak and v.last_vy <= -C.fall_min_speed then
-            local fall = v.fall_peak - pos.y
-            if fall > C.fall_safe_blocks and not v.env.wet then
-                local damage = (fall - C.fall_safe_blocks) * C.fall_damage_per_block
-                tdl.cue(uuid, "thud")
-                tdl.damage(uuid, damage, "fall")
-            end
-        end
-        v.fall_peak = nil
-    elseif v.env.swimming then
-        v.fall_peak = nil
-    else
-        if v.fall_peak == nil or pos.y > v.fall_peak then
-            v.fall_peak = pos.y
-        end
+    local fall = body.fell or 0
+    if fall > C.fall_safe_blocks and (v.last_vy or 0) <= -C.fall_min_speed and not v.env.wet then
+        local damage = (fall - C.fall_safe_blocks) * C.fall_damage_per_block
+        tdl.cue(uuid, "thud")
+        tdl.damage(uuid, damage, "fall")
     end
-    v.was_ground = body.on_ground
     v.last_vy = body.velocity.y
 end
 
@@ -167,6 +154,7 @@ tdl.on_tick(function(dt)
             local vx, vz = body.velocity.x, body.velocity.z
             v.env.speed2 = vx * vx + vz * vz
 
+            sample_fluid(v, body)
             if (now + slot) % BLOCKS_EVERY == 0 then sample_blocks(v, body) end
             if (now + slot) % SOURCES_EVERY == 0 then sample_sources(v, body) end
             if (now + slot) % WORN_EVERY == 0 then sample_worn(uuid, v) end

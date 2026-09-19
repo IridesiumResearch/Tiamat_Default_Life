@@ -170,7 +170,7 @@ function tdl.die(uuid, kind, cause)
     v.fx = {}
     v.invuln = C.respawn_invulnerable_ticks
     v.hurt_cd, v.last_hit = 0, 0
-    v.fall_peak, v.was_ground, v.last_vy = nil, true, 0
+    v.last_vy = 0
     v.last_damage = tdl.now
     v.env.fire = nil
     v.dead = false
