@@ -14,6 +14,8 @@
 --   sight             blocks it notices a player from
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
 --   sound, sound_death, voice_min, voice_max
+--   model, texture    files in this mod, for the day the engine draws them
+--   grazes            idles with its head down now and then (the `sneak` clip)
 --   drops             { { item, min, max } }, items of this mod
 --   spawn             { ground = { block ids }, rings = { ring ids }, time = "day" | "night" | "any",
 --                       sun_min, sun_max, group = { min, max }, weight, cap }
@@ -26,9 +28,14 @@
 
 local G = "tiamot_default_world:"
 
+-- The cow has a body of its own: models/cow.glb, made by tools/skin_glb.py
+-- from the modeller's export. Six cells long, 2.4 wide, 4.6 tall, feet on
+-- y = 0, facing +Z. Clips: idle, walk, run, swing, and the grazing clip under
+-- the engine's spare `sneak` tag, since the engine plays six names and no more.
 tdl.register_mob{
     id = "cow", name = "Cow", health = 10,
-    collider = { width = 2.4, height = 3.6 },
+    collider = { width = 2.4, height = 4.5 },
+    model = "models/cow.glb", texture = "models/cow.jpg", grazes = true,
     shy = 1.5, sight = 10, wander_radius = 10, pause_min = 60, pause_max = 240,
     sound = "moo", sound_death = "moo", voice_min = 300, voice_max = 1200,
     drops = { { "raw_meat", 1, 3 } },

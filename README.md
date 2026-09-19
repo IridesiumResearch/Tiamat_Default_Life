@@ -268,6 +268,31 @@ and a cap overall. Say `spawn cow 3`, `mobs` or `cull` in chat while
 A fist does a point to a mob and the reference sword six. Hurt animals run;
 hurt hunters turn on you. Nothing keeps you from sleeping: a bed is a bed.
 
+**Models.** A creature's body is a `.glb` in `models/` with its texture
+beside it. The cow has one. Getting a modeller's export into the shape the
+engine reads is three tools, none of which launch the game:
+
+```
+python tools/skin_glb.py "assets/source/Tiamot Life AI Cow.glb" mods/tiamot_default_life/models/cow.glb --length 6.0 --rename Eating=sneak
+cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
+MODEL_POSE_DUMP=out/poses cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
+python tools/render_model.py out/poses mods/tiamot_default_life/models/cow.jpg out/cow.png
+```
+
+`skin_glb.py` exists because modelling tools export a blocky creature as
+separate parts PARENTED to bones, with no joint weights. The engine's reader
+accepts that and then draws every part piled on the origin, since it reads
+an unweighted vertex as "joint 0, where it lies" and ignores node
+transforms. The tool rewrites it as one mesh weighted to its bones, bakes
+away the armature's Z-up turn and scale, sizes it in cells (three to a
+block) with its feet on the ground facing +Z, lowercases the clip names the
+engine matches on (`idle`, `walk`, `run`, `swing`, `swim`, `sneak`), and
+writes no images, which the engine refuses inside a model. `model_check` is
+the engine's own reader saying yes or no; `render_model.py` draws what the
+engine's own skinning would, textured, at rest and through every clip.
+Originals live in `assets/source/`, outside the mod, because the engine
+serves everything inside a mod's folder to clients.
+
 **Bodies.** The engine draws only its own white humanoid today, so every
 creature is one, with its kind as a nametag (`placeholder_models` in
 `config.lua`). Flip it off once the engine loads models a mod ships

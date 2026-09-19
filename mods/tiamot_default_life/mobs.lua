@@ -28,6 +28,7 @@ local M = { kinds = {}, order = {}, live = {} }
 tdl.mobs = M
 
 local ANIM_IDLE, ANIM_WALK, ANIM_RUN = 0, 1, 2
+local ANIM_SNEAK = 5    -- the engine's sixth tag; a grazer's head-down clip rides on it
 local PERCEIVE_EVERY = 10
 local now = 0
 
@@ -63,6 +64,18 @@ function tdl.register_mob(def)
     def.drops = def.drops or {}
     def.spawn = def.spawn or {}
     def.ground = U.materials(def.spawn.ground or {})
+    -- A body of its own, the day the engine will draw one. `register_model`
+    -- does not exist yet (docs/engine-asks.md, item 0); asked for in the
+    -- shape that file proposes, behind a pcall, so a different shape when it
+    -- lands is a log line here and not a mod that fails to load.
+    def.has_model = false
+    if def.model and game.register_model then
+        local ok, why = pcall(game.register_model, { id = def.id, file = def.model, texture = def.texture })
+        def.has_model = ok
+        if not ok then
+            game.log("tiamot_default_life: " .. def.id .. " keeps its stand-in body: " .. tostring(why))
+        end
+    end
     M.kinds[def.id] = def
     M.order[#M.order + 1] = def.id
     return def
@@ -130,11 +143,12 @@ function tdl.spawn_mob(kind_id, pos, count)
             health = kind.health,
             collider = kind.collider,
         }
-        if C.placeholder_models then
+        -- Its own body if the engine took one; else the stand-in, named.
+        if kind.has_model or not C.placeholder_models then
+            spec.model = kind.qualified
+        else
             spec.model = "engine:humanoid"
             spec.nametag = kind.name
-        else
-            spec.model = kind.qualified
         end
         local id = game.spawn_entity(spec)
         if id then
@@ -425,7 +439,8 @@ end
 
 local function stand(id, m)
     if not m.kind.flyer then
-        game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = ANIM_IDLE })
+        local anim = (m.grazing and m.state == "idle") and ANIM_SNEAK or ANIM_IDLE
+        game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = anim })
     end
 end
 
@@ -551,6 +566,8 @@ local function step(id, dt)
         if not going or m.timer <= 0 then
             m.state = "idle"
             m.timer = between(kind.pause_min or 40, kind.pause_max or 160)
+            -- A grazer spends about half its pauses with its head down.
+            m.grazing = kind.grazes and below(2) == 0
             if kind.flyer then pick_wander(m, entity) end
         end
         return
