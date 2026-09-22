@@ -479,26 +479,34 @@ local function walk_to(id, m, entity, target, gait)
         end
         jump = true
     end
-    -- A slow walker's pace. The engine gives a mob a player's gaits and no
-    -- speed of its own, and ignores how long the drive is, so a kind with a
-    -- `pace` under 1 pushes on only that share of its ticks and coasts on the
-    -- rest: half is a steady half the walk, and the body barely wavers.
-    local push = true
-    local pace = gait == "walk" and m.kind.pace or 1
-    if pace < 1 and not jump then
-        m.pace_acc = (m.pace_acc or 0) + pace
-        push = m.pace_acc >= 1
-        if push then m.pace_acc = m.pace_acc - 1 end
-    end
     local length = math.sqrt(flat)
+    local ux, uz = dx / length, dz / length
     local anim = ANIM_IDLE
     if speed2 >= 0.0025 then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
-    local walk = push and { x = dx / length, z = dz / length } or { x = 0, z = 0 }
-    game.set_entity(id, {
-        drive = { walk = walk, jump = jump, gait = gait },
-        yaw = game.heading(dx, dz),
-        anim = anim,
-    })
+    local spec = { yaw = game.heading(dx, dz), anim = anim }
+
+    -- A kind's own speed, in blocks a second. The engine gives a mob a
+    -- player's gaits and nothing else (engine ask 14), so a kind that names
+    -- its speeds drives nothing and sets its horizontal velocity instead: the
+    -- speed it wants times a gain, the gain nudged each tick by what the body
+    -- actually did last tick. It settles on the speed asked for, on any
+    -- ground, with no knowledge of the engine's friction; the physics still
+    -- collides it, steps it up a lip, and makes it fall.
+    local own = gait == "sprint" and m.kind.run_speed or m.kind.walk_speed
+    if own then
+        local want = own * 3 / 20      -- cells a tick
+        local seen = math.sqrt(speed2)
+        m.gain = m.gain or 1.5
+        if entity.on_ground and seen > 0.01 and m.driving then
+            m.gain = U.clamp(m.gain * U.clamp(want / seen, 0.9, 1.1), 1, 4)
+        end
+        m.driving = true
+        spec.velocity = { x = ux * want * m.gain, y = entity.velocity.y, z = uz * want * m.gain }
+        spec.drive = { walk = { x = 0, z = 0 }, jump = jump }
+    else
+        spec.drive = { walk = { x = ux, z = uz }, jump = jump, gait = gait }
+    end
+    game.set_entity(id, spec)
     return true
 end
 
@@ -534,6 +542,7 @@ local function move_to(id, m, entity, target, fast)
 end
 
 local function stand(id, m)
+    m.driving = false
     if not m.kind.flyer then
         local anim = (m.grazing and m.state == "idle") and ANIM_SNEAK or ANIM_IDLE
         game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = anim })
@@ -718,6 +727,24 @@ if C.dev_commands then
         for name, n in pairs(counts) do parts[#parts + 1] = n .. " " .. name end
         table.sort(parts)
         tdl.say(uuid, #parts > 0 and table.concat(parts, ", ") or "nothing about")
+    end)
+    --- The nearest mob as the server sees it: what it is doing, which clip it
+    --- is told to play, and how fast it is going. For checking in play.
+    local ANIM_NAMES = { [0] = "idle", "walk", "run", "swing", "swim", "sneak" }
+    tdl.command("mob", "admin", function(uuid)
+        local body = U.body(uuid)
+        local id = body and tdl.mobs_near(body.pos, C.mob_count_radius)[1]
+        local entity = id and game.entity(id)
+        if entity == nil then
+            tdl.say(uuid, "No mob near.")
+            return
+        end
+        local m = M.live[id]
+        local v = entity.velocity
+        local speed = math.sqrt(v.x * v.x + v.z * v.z) * 20 / 3
+        tdl.say(uuid, string.format("%s #%d: %s, clip %s, %.2f blocks/s%s",
+            m and m.kind.id or "?", id, m and m.state or "?", ANIM_NAMES[entity.anim] or tostring(entity.anim),
+            speed, entity.on_ground and "" or ", in the air"))
     end)
     tdl.command("cull", "admin", function(uuid)
         local body = U.body(uuid)

@@ -929,7 +929,7 @@ fn main() {
     println!("ok  the wardrobe and the death screen are valid dialog trees");
 
     mob_check(&mut r);
-    pace_check();
+    speed_check();
     climate_check();
     modes_check();
 
@@ -1049,6 +1049,16 @@ fn mob_check(r: &mut Rig) {
         r.tick(1);
         assert!(!jumping(&r), "a cow on the move does not jump");
     }
+    // Fleeing, it is told to play its run, and driven at its own run speed:
+    // 2.8 blocks a second, 0.42 cells a tick before the physics' friction.
+    {
+        let store = r.entities.0.lock().unwrap();
+        let cow_now = &store.entities[&cow];
+        assert_eq!(cow_now.anim, tiamot_core::ent::AnimTag::RUN, "a fleeing cow plays its run");
+        assert!(cow_now.drive.walk == [0.0, 0.0], "its speed is its own, not a gait");
+    }
+    r.say("mob");
+    assert!(r.said().contains("flee") && r.said().contains("clip run"), "{}", r.said());
     let mut jumped = false;
     for _ in 0..12 {
         set_cow(&r, 0.0);
@@ -1132,10 +1142,11 @@ fn climate_check() {
 
 const BOB: [u8; 32] = [9; 32];
 
-/// A walker at `pace = 0.5` pushes on every other tick and coasts on the rest,
-/// through the engine's own physics on flat ground: it should settle at about
-/// half the walk, and not lurch.
-fn pace_check() {
+/// A walker at its own speed, through the engine's own physics on flat
+/// ground and the same rule mobs.lua applies: set the horizontal velocity to
+/// the wanted speed times a gain, drive nothing, and nudge the gain by what the
+/// body actually did. It should settle on the speed asked for, smoothly.
+fn speed_check() {
     use tiamot_core::phys::{Body, Intent, Solid, Tuning, step};
     struct Ground;
     impl Solid for Ground {
@@ -1143,32 +1154,32 @@ fn pace_check() {
             y < 0
         }
     }
-    let walk = |push: bool| Intent { walk: if push { [1.0, 0.0] } else { [0.0, 0.0] }, ..Intent::default() };
-    let run = |pace: f32| {
+    for blocks_per_second in [1.1f32, 2.8] {
+        let want = blocks_per_second * 3.0 / 20.0;
         let mut body = Body { position: [0.0, 0.0, 0.0], velocity: [0.0; 3], on_ground: true, jump_cooldown: 0 };
-        let (mut acc, mut lo, mut hi) = (0.0f32, f32::MAX, 0.0f32);
+        let mut gain = 1.5f32;
+        let (mut lo, mut hi, mut travelled) = (f32::MAX, 0.0f32, 0.0f32);
         for tick in 0..200 {
-            acc += pace;
-            let push = acc >= 1.0;
-            if push {
-                acc -= 1.0;
+            // What the mod reads: the velocity the last step left.
+            let seen = body.velocity[0];
+            if seen > 0.01 {
+                gain = (gain * (want / seen).clamp(0.9, 1.1)).clamp(1.0, 4.0);
             }
+            body.velocity[0] = want * gain;
             let before = body.position[0];
-            body = step(&Ground, body, walk(push), &Tuning::DEFAULT);
-            if tick >= 100 {
-                let moved = body.position[0] - before;
+            body = step(&Ground, body, Intent::default(), &Tuning::DEFAULT);
+            let moved = body.position[0] - before;
+            if tick >= 60 {
                 lo = lo.min(moved);
                 hi = hi.max(moved);
+                travelled += moved;
             }
         }
-        (body.position[0], lo, hi)
-    };
-    let (full, _, _) = run(1.0);
-    let (half, lo, hi) = run(0.5);
-    let ratio = half / full;
-    assert!((ratio - 0.5).abs() < 0.08, "half pace covers half the ground: {ratio:.2}");
-    assert!(lo > 0.0 && hi / lo < 1.8, "and never stops between pushes: {lo:.3}..{hi:.3} cells a tick");
-    println!("ok  pace 0.5: {ratio:.2} of the walk, {lo:.3} to {hi:.3} cells a tick");
+        let got = travelled / 140.0 * 20.0 / 3.0;
+        assert!((got - blocks_per_second).abs() < 0.05 * blocks_per_second, "asked {blocks_per_second}, got {got:.2} blocks a second");
+        assert!(hi - lo < 0.02 * want.max(0.05) + 1e-4, "steady: {lo:.4}..{hi:.4} cells a tick");
+        println!("ok  a walker asked for {blocks_per_second} blocks a second makes {got:.2}, steady (gain {gain:.2})");
+    }
 }
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
