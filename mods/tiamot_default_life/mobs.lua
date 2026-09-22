@@ -16,9 +16,10 @@
 --   tdl.hurt_mob(id, amount, by)   damage, and death, drops and fleeing
 --   tdl.mobs_near(pos, radius)     ids of ours, nearest first
 --
--- Everything that moves goes through the engine's physics: a walker's drive
--- is set toward a point and the body walks it, stepping up a cell on its
--- own; a flyer has its velocity set every tick. Nothing here teleports.
+-- Everything that moves goes through the engine: `game.steer_entity` walks a
+-- body toward a point and decides the jumping, a kind's own pace is `speed`
+-- on the entity, and a flyer has its velocity set every tick. Nothing here
+-- teleports.
 
 local C = tdl.config
 local U = tdl.util
@@ -289,55 +290,23 @@ end
 --- Hurts one of ours. `by` is the UUID of whoever did it, or nil.
 -- Hearts over a hurt mob --------------------------------------------------------------
 --
--- The engine can put no picture over an entity, but a particle with no spread,
--- no speed and no gravity stays exactly where it is put. So the row of hearts
--- is drawn in pixels, one particle each, for the player who struck the blow
--- and nobody else, turned square to them. Red is what
--- is left, a white flash is what that hit took, dark is what was gone before.
+-- `game.show_over` hangs a row of pictures over an entity and follows it, so
+-- the hearts are the HUD's own heart, one icon each, shown to the player who
+-- struck the blow and nobody else. Latest state per entity: the next blow
+-- replaces the row rather than stacking one on it.
 
-local HEART = { "XX.XX", "XXXXX", ".XXX.", "..X.." }
-
-local function show_hearts(entity, kind, before, after, viewer)
-    local body = viewer and U.body(viewer)
-    if body == nil or not C.mob_hearts then return end
-    local dx, dz = entity.pos.x - body.pos.x, entity.pos.z - body.pos.z
-    local length = math.sqrt(dx * dx + dz * dz)
-    if length < 0.001 then return end
-    -- Across the viewer's line of sight: their right, as they face the mob.
-    local rx, rz = -dz / length, dx / length
-    local px = C.mob_heart_pixel
+local function show_hearts(id, kind, after, viewer)
+    if not C.mob_hearts or viewer == nil or I.icons.heart_full == nil then return end
     -- Two points a heart, and never more than ten hearts: a bear's thirty
     -- points are ten hearts of three.
     local per = math.max(2, (kind.health + 9) // 10)
-    local hearts = (kind.health + per - 1) // per
-    local width = hearts * 6 - 1
-    local top = entity.pos.y + (kind.collider and kind.collider.height or 3) / 3 + C.mob_hearts_above
-    for h = 0, hearts - 1 do
-        for row = 1, #HEART do
-            local line = HEART[row]
-            for col = 1, 5 do
-                if string.sub(line, col, col) == "X" then
-                    -- Which point of the mob's health this pixel stands for:
-                    -- a heart's points run left to right across its columns.
-                    local point = h * per + math.max(1, math.ceil(col * per / 5 - 0.01))
-                    local colour, life
-                    if point <= after then
-                        colour, life = { r = 0.86, g = 0.1, b = 0.12 }, C.mob_hearts_seconds
-                    elseif point <= before then
-                        colour, life = { r = 1, g = 1, b = 1 }, C.mob_hearts_seconds / 3
-                    else
-                        colour, life = { r = 0.18, g = 0.14, b = 0.14 }, C.mob_hearts_seconds
-                    end
-                    local across = (h * 6 + col - 1 - width / 2) * px
-                    game.emit_particles{
-                        pos = { x = entity.pos.x + rx * across, y = top - (row - 1) * px, z = entity.pos.z + rz * across },
-                        count = 1, size = px * 1.15, lifetime = life, colour = colour,
-                        gravity = 0, collide = false, player = viewer,
-                    }
-                end
-            end
-        end
-    end
+    game.show_over(id, {
+        picture = I.icons.heart_full,
+        count = (after + per - 1) // per,
+        seconds = C.mob_hearts_seconds,
+        size = C.mob_heart_size,
+        player = viewer,
+    })
 end
 
 function tdl.hurt_mob(id, amount, by)
@@ -350,7 +319,7 @@ function tdl.hurt_mob(id, amount, by)
 
     local left = entity.health - U.round(amount)
     game.cue{ cue = "hurt", pos = entity.pos, radius = 16, gain = 0.6 }
-    show_hearts(entity, m.kind, entity.health, math.max(left, 0), by)
+    show_hearts(id, m.kind, math.max(left, 0), by)
     if left <= 0 then
         -- What it leaves behind, then gone.
         for _, drop in ipairs(m.kind.drops) do
@@ -449,69 +418,46 @@ local function pick_wander(m, entity)
     m.target = { x = x, y = y, z = z }
 end
 
---- Walks a walker toward a point, facing where it goes and animating from
---- what the body did last tick. Returns false once it has arrived, or has
---- given up.
+--- Walks a walker toward a point through the engine's steering, facing where
+--- it goes and animating from what the body did last tick. Returns false once
+--- it has arrived, or has given up on getting there.
 ---
---- It drives the body itself rather than through `game.steer_entity`, which
---- jumps at any block with floor in it: on smooth ground that is every
---- third-of-a-block rise, which the physics climbs anyway, so animals hopped
---- across every slope. Here a walker jumps only when it is STUCK, trying to
---- walk and not moving, which is a hole or a full block in the way. If a
---- few jumps do not free it, it gives up and picks somewhere else to go.
+--- How fast is the ENTITY's, not the drive's: `speed` is a multiple of the
+--- ordinary pace, kept with the entity, so a kind that names its speeds in
+--- blocks a second gets them by scaling the gait it is using. The engine
+--- steers and decides the jumping: it walks a one-cell lip and jumps only
+--- what the step cannot take.
 local function walk_to(id, m, entity, target, gait)
-    local dx, dz = target.x - entity.pos.x, target.z - entity.pos.z
-    local flat = dx * dx + dz * dz
-    if flat <= C.mob_arrival * C.mob_arrival then
-        m.stuck, m.hops = 0, 0
-        return false
+    local kind = m.kind
+    local want = gait == "sprint" and kind.run_speed or kind.walk_speed
+    local spec = {}
+    if want then
+        local scale = want / (gait == "sprint" and C.player_sprint or C.player_walk)
+        if m.speed ~= scale then
+            m.speed, spec.speed = scale, scale
+        end
     end
+    local going = game.steer_entity(id, target, gait)
+
+    -- Given up: a body that has not moved for a while is against something the
+    -- engine cannot jump, and standing there is worse than going elsewhere.
     local speed2 = entity.velocity.x * entity.velocity.x + entity.velocity.z * entity.velocity.z
     if speed2 >= C.mob_moving_speed2 or not entity.on_ground then
-        if speed2 >= C.mob_moving_speed2 then m.hops = 0 end
         m.stuck = 0
     else
         m.stuck = (m.stuck or 0) + 1
-    end
-    local jump = false
-    if m.stuck >= C.mob_stuck_ticks then
-        m.stuck = 0
-        m.hops = (m.hops or 0) + 1
-        if m.hops > C.mob_stuck_hops then
-            m.hops = 0
+        if m.stuck >= C.mob_stuck_ticks then
+            m.stuck = 0
             return false
         end
-        jump = true
     end
-    local length = math.sqrt(flat)
-    local ux, uz = dx / length, dz / length
+
     local anim = ANIM_IDLE
     if speed2 >= 0.0025 then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
-    local spec = { yaw = game.heading(dx, dz), anim = anim }
-
-    -- A kind's own speed, in blocks a second. The engine gives a mob a
-    -- player's gaits and nothing else (engine ask 14), so a kind that names
-    -- its speeds drives nothing and sets its horizontal velocity instead: the
-    -- speed it wants times a gain, the gain nudged each tick by what the body
-    -- actually did last tick. It settles on the speed asked for, on any
-    -- ground, with no knowledge of the engine's friction; the physics still
-    -- collides it, steps it up a lip, and makes it fall.
-    local own = gait == "sprint" and m.kind.run_speed or m.kind.walk_speed
-    if own then
-        local want = own * 3 / 20      -- cells a tick
-        local seen = math.sqrt(speed2)
-        m.gain = m.gain or 1.5
-        if entity.on_ground and seen > 0.01 and m.driving then
-            m.gain = U.clamp(m.gain * U.clamp(want / seen, 0.9, 1.1), 1, 4)
-        end
-        m.driving = true
-        spec.velocity = { x = ux * want * m.gain, y = entity.velocity.y, z = uz * want * m.gain }
-        spec.drive = { walk = { x = 0, z = 0 }, jump = jump }
-    else
-        spec.drive = { walk = { x = ux, z = uz }, jump = jump, gait = gait }
-    end
+    spec.anim = anim
+    spec.yaw = game.heading(target.x - entity.pos.x, target.z - entity.pos.z)
     game.set_entity(id, spec)
-    return true
+    return going ~= false
 end
 
 --- Flies a flyer toward a point: velocity set every tick, lift added to
@@ -546,7 +492,6 @@ local function move_to(id, m, entity, target, fast)
 end
 
 local function stand(id, m)
-    m.driving = false
     if not m.kind.flyer then
         local anim = (m.grazing and m.state == "idle") and ANIM_SNEAK or ANIM_IDLE
         -- A blow just struck: its swing clip, for as long as the swing lasts.

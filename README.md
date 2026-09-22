@@ -270,10 +270,12 @@ and a cap overall. Say `spawn cow 3`, `mobs` or `cull` in chat while
 `dev_commands` is on.
 
 A fist does a point to a mob and the reference sword six. Hurt animals run;
-hurt hunters, and a hurt bear, turn on you. A blow shows the mob's hearts
-over it for a second, to whoever struck it: two points a heart, up to ten.
-Cows and pigs amble at 1.1 blocks a second and run at 2.8 (`walk_speed`,
-`run_speed`); say `mob` to see what the nearest one is doing. Nothing keeps you from sleeping: a bed is a bed.
+hurt hunters, and a hurt bear, turn on you. A blow hangs a row of hearts
+over the mob for a second, for whoever struck it (`game.show_over`): two
+points a heart, up to ten, following it as it runs. Cows and pigs amble at
+1.1 blocks a second and run at 2.8, bears at 1.3 and 4.6 (`walk_speed`,
+`run_speed` on a kind, which become `speed` on the entity); say `mob` to
+see what the nearest one is doing. Nothing keeps you from sleeping: a bed is a bed.
 
 **Models.** A creature's body is a `.glb` in `models/` with its PNG
 skin beside it. The cow, the pig and the bear have one. Getting a

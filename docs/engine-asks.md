@@ -7,7 +7,7 @@ the record; the open ones are copied to the engine repo (see below).
 
 ## Where these stand (2026-09-22)
 
-Every ask up to 11 landed, and the mod uses every answer. Open asks are
+**Nothing is open.** Every ask landed, and the mod uses every answer. Open asks are
 copied, without the history, to the engine's
 `docs/engine-asks/tiamot_default_life.md`, so the engine side finds every
 mod's open asks in one place. This file keeps everything, landed items
@@ -15,10 +15,10 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
-| 15 a picture over an entity | **Open**, new. | hearts over a hurt mob, drawn in particle pixels. |
-| 14 a mob's own speed | **Open**, new. | `walk_speed` and `run_speed` on a kind, held by setting velocity. |
-| 13 a mod's model casts no shadow | **Open**, new. | nothing it can do. |
-| 12 `steer_entity` jumps at one-cell rises | **Open**, new. | walkers drive themselves and jump only when stuck. |
+| 15 a picture over an entity | Landed, engine e5c0394 and 9c4e120. | `game.show_over`: one row of hearts, not sixty-five particles. |
+| 14 a mob's own speed | Landed, engine 033f4e6. | `speed` on the entity, scaled off the gait it walks in. |
+| 13 a mod's model casts no shadow | Landed, engine 7c0679c. | nothing to do; the cow has a shadow. |
+| 12 `steer_entity` jumps at one-cell rises | Landed, engine aa77731. | walkers are steered by the engine again. |
 | 11 `fell` counts a flight down | Landed, engine 990bf8a. | the landing-speed gate is gone; `fell` alone decides. |
 | 10 key gates | Landed, engine 990bf8a: `wind_sky`, and the debug keys on F-keys. | admins and creative worlds may wind the sky; nobody else. |
 | 0 models, step 2 (a texture) | Landed, engine adf6547, with the drawing of mod models at all. | the cow wears `models/cow.png`. |
@@ -32,7 +32,7 @@ included.
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 15. A picture over an entity (2026-09-22)
+## 15. A picture over an entity (2026-09-22): LANDED, engine e5c0394 (a picture on a particle) and 9c4e120 (`game.show_over`)
 
 **Wanted.** Hit a cow and a row of hearts shows over it for a second,
 draining. The designer asked for exactly that.
@@ -53,7 +53,7 @@ count, seconds, player })`, a row of icons billboarded over an entity that
 follows it. The first is general; the second is what health bars, "!"
 over a startled animal and quest markers all are.
 
-## 14. A mob's own speed (2026-09-22)
+## 14. A mob's own speed (2026-09-22): LANDED, engine 033f4e6, as `speed` on the entity
 
 **Seen.** Cows and pigs walked at a player's walk, 4.3 yards a second, and
 fled at a player's sprint, 5.6: two to four times what an animal should. A mob's `drive` has gaits and nothing
@@ -71,7 +71,7 @@ bypasses the gaits a mob was meant to use.
 **Smallest change.** `speed` on `drive` (or on the entity), the multiplier
 `Abilities::speed` already is for players, through `Abilities::tuning`.
 
-## 13. A mod's model casts no shadow (2026-09-22)
+## 13. A mod's model casts no shadow (2026-09-22): LANDED, engine 7c0679c
 
 **Seen, in play.** "The 3d models do not cast shadows." The cow and the pig
 float on the ground while the players beside them are anchored by theirs.
@@ -84,7 +84,7 @@ says why it matters: a mob with no shadow floats.
 **Smallest change.** Draw each pass in `figures.passes` into the cascades
 with `skinned_shadow`, as `self.skinned` is. Nothing for a mod to do.
 
-## 12. `steer_entity` jumps at every rise the physics would climb (2026-09-22)
+## 12. `steer_entity` jumps at every rise the physics would climb (2026-09-22): LANDED, engine aa77731
 
 **Seen, in play.** Cows and pigs hop across ordinary ground. The designer:
 "cows and pigs should really not jump unless they are stuck in a hole."
