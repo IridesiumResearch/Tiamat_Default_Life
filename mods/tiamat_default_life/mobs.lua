@@ -405,9 +405,14 @@ local function hunts_now(kind, entity)
     return false
 end
 
---- A wander point around home, on the ground or in the air.
+--- A wander point around home, on the ground or in the air. A flyer that
+--- has landed goes a few steps from where it stands, not across its range.
 local function pick_wander(m, entity)
     local kind = m.kind
+    if m.landed then
+        m.target = { x = entity.pos.x + between(-3, 3), y = entity.pos.y, z = entity.pos.z + between(-3, 3) }
+        return
+    end
     local r = kind.wander_radius or 8
     local x = m.home.x + between(-r, r)
     local z = m.home.z + between(-r, r)
@@ -460,10 +465,27 @@ local function walk_to(id, m, entity, target, gait)
     return going ~= false
 end
 
+--- Which wing clip a flyer plays this tick: `swing` is the wingbeat and `run`
+--- the glide with its wings held out. It beats them to climb, to hurry and to
+--- lift off, for at least one beat at a time, and now and then in a long
+--- glide to hold its height; the rest of the time it soars.
+local function wings(m, beat)
+    if beat then
+        m.flap = math.max(m.flap or 0, C.fly_flap_ticks)
+    elseif (m.flap or 0) <= 0 and below(C.fly_flap_chance) == 0 then
+        m.flap = C.fly_flap_ticks
+    end
+    if (m.flap or 0) > 0 then
+        m.flap = m.flap - 1
+        return ANIM_SWING
+    end
+    return ANIM_RUN
+end
+
 --- Flies a flyer toward a point: velocity set every tick, lift added to
 --- cancel the tick of gravity the physics is about to apply, and a rise
 --- when the way ahead is solid.
-local function fly_to(id, entity, target, speed)
+local function fly_to(id, m, entity, target, speed, fast)
     local dx, dy, dz = target.x - entity.pos.x, target.y - entity.pos.y, target.z - entity.pos.z
     local flat = math.sqrt(dx * dx + dz * dz)
     local vx, vz = 0, 0
@@ -478,21 +500,47 @@ local function fly_to(id, entity, target, speed)
     game.set_entity(id, {
         velocity = { x = vx, y = vy + C.fly_lift, z = vz },
         yaw = game.heading(dx, dz),
-        anim = ANIM_RUN,
+        anim = wings(m, fast or vy > speed * 0.3),
     })
     return flat > 1.0 or math.abs(dy) > 1.5
 end
 
+--- Brings a flyer down onto a spot: gliding in with only half the lift, so
+--- gravity does the descending, and a few wingbeats to brake over the last
+--- two blocks.
+local function glide_down(id, m, entity, target, speed)
+    local dx, dy, dz = target.x - entity.pos.x, target.y - entity.pos.y, target.z - entity.pos.z
+    local flat = math.sqrt(dx * dx + dz * dz)
+    local vx, vz = 0, 0
+    local along = math.min(speed * 0.6, flat * 0.2)
+    if flat > 0.01 then vx, vz = dx / flat * along, dz / flat * along end
+    game.set_entity(id, {
+        velocity = { x = vx, y = U.clamp(dy * 0.15, -speed, 0) + C.fly_lift * 0.5, z = vz },
+        yaw = flat > 0.3 and game.heading(dx, dz) or nil,
+        anim = wings(m, dy > -2),
+    })
+end
+
+--- Lifts a landed flyer off: it stops walking and the next flight's first
+--- tick, finding it on the ground, climbs.
+local function take_off(id, m)
+    m.landed = false
+    m.speed = nil
+    game.set_entity(id, { drive = { walk = { x = 0, z = 0 } } })
+end
+
 local function move_to(id, m, entity, target, fast)
     local kind = m.kind
-    if kind.flyer then
-        return fly_to(id, entity, target, fast and (kind.speed_fast or 0.5) or (kind.speed or 0.3))
+    if kind.flyer and not m.landed then
+        return fly_to(id, m, entity, target, fast and (kind.speed_fast or 0.5) or (kind.speed or 0.3), fast)
     end
     return walk_to(id, m, entity, target, fast and "sprint" or "walk")
 end
 
+--- Stands still, on the ground. A flyer in the air has nothing to stand on
+--- and is left to its last velocity.
 local function stand(id, m)
-    if not m.kind.flyer then
+    if not m.kind.flyer or m.landed then
         local anim = (m.grazing and m.state == "idle") and ANIM_SNEAK or ANIM_IDLE
         -- A blow just struck: its swing clip, for as long as the swing lasts.
         if (m.swing or 0) > 0 then
@@ -537,6 +585,9 @@ local function step(id, dt)
             m.state, m.threat, m.timer = "flee", m.seen.uuid, C.mob_flee_ticks // 2
         end
     end
+
+    -- A bird on the ground that is frightened or angry takes to the air.
+    if m.landed and (m.state == "flee" or m.state == "hunt") then take_off(id, m) end
 
     if m.state == "flee" then
         local from = U.body(m.threat)
@@ -589,31 +640,71 @@ local function step(id, dt)
 
     -- Flocking: a follower keeps its place beside the leader; a leader
     -- wanders like anybody else. A leader that is gone leaves the follower
-    -- to lead itself.
+    -- to lead itself. When the leader comes down the flock comes down too,
+    -- each bird on the ground under itself, and they keep their own company
+    -- there (`stay`: walking and eating, never flying off alone) until the
+    -- leader lifts off again.
+    m.stay = false
     if kind.flock and m.flock and m.flock ~= id then
         local leader = game.entity(m.flock)
         if leader and not leader.item then
             local lm = M.live[m.flock]
-            local at = { x = leader.pos.x + m.offset.x, y = leader.pos.y + m.offset.y, z = leader.pos.z + m.offset.z }
             if lm and lm.state == "hunt" and hunts_now(kind, entity) and m.seen then
                 m.state, m.threat, m.timer = "hunt", lm.threat, C.mob_hunt_ticks
-            elseif U.dist2(at, entity.pos) > 2 then
-                move_to(id, m, entity, at, false)
-            else
-                stand(id, m)
+                return
             end
-            return
+            if lm and (lm.landed or lm.state == "land") then
+                m.stay = true
+                if not m.landed and m.state ~= "land" then
+                    m.state, m.target, m.timer = "land", nil, C.fly_land_ticks
+                end
+            else
+                if m.landed then take_off(id, m) end
+                local at = { x = leader.pos.x + m.offset.x, y = leader.pos.y + m.offset.y, z = leader.pos.z + m.offset.z }
+                if U.dist2(at, entity.pos) > 2 then
+                    move_to(id, m, entity, at, false)
+                else
+                    stand(id, m)
+                end
+                return
+            end
         else
             m.flock = nil
         end
     end
 
+    -- Coming down: find the ground under it, glide onto it, and it has landed.
+    -- Water or nothing below, or too long about it, and it flies on instead.
+    if m.state == "land" then
+        if entity.on_ground then
+            m.landed, m.target = true, nil
+            m.state = "idle"
+            m.timer = between(kind.pause_min or 40, kind.pause_max or 160)
+            m.grazing = kind.grazes and below(2) == 0
+            stand(id, m)
+            return
+        end
+        if m.target == nil then
+            m.target = ground_at(math.floor(entity.pos.x), math.floor(entity.pos.z), math.floor(entity.pos.y))
+        end
+        if m.target == nil or m.timer <= 0 then
+            m.state, m.timer = "wander", between(60, 200)
+            pick_wander(m, entity)
+            return
+        end
+        glide_down(id, m, entity, m.target, kind.speed or 0.3)
+        return
+    end
+
     if m.state == "idle" then
         if m.timer <= 0 then
+            -- On the ground, half its pauses end in the air again, unless its
+            -- flock is still down; the rest in a few steps on foot.
+            if m.landed and not m.stay and below(2) == 0 then take_off(id, m) end
             m.state = "wander"
-            m.timer = between(60, 200)
+            m.timer = m.landed and between(40, 100) or between(60, 200)
             pick_wander(m, entity)
-        elseif kind.flyer then
+        elseif kind.flyer and not m.landed then
             -- A flyer never idles on the ground: it circles.
             if m.target == nil then pick_wander(m, entity) end
             move_to(id, m, entity, m.target, false)
@@ -630,7 +721,14 @@ local function step(id, dt)
             m.timer = between(kind.pause_min or 40, kind.pause_max or 160)
             -- A grazer spends about half its pauses with its head down.
             m.grazing = kind.grazes and below(2) == 0
-            if kind.flyer then pick_wander(m, entity) end
+            if kind.flyer and not m.landed then
+                -- A bird that lands spends about half its pauses on the ground.
+                if kind.lands and below(2) == 0 then
+                    m.state, m.target, m.timer = "land", nil, C.fly_land_ticks
+                else
+                    pick_wander(m, entity)
+                end
+            end
         end
         return
     end

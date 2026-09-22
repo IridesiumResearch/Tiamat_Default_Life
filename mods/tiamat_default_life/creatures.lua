@@ -7,6 +7,8 @@
 --   collider          { width, height } in CELLS (three to a block)
 --   speed, speed_fast flyers only, cells per tick; walkers use the engine's gaits
 --   flyer             velocity-controlled rather than steered on the ground
+--   lands             a flyer that comes down now and then to walk and eat, and
+--                     flies again when its pause is over or anyone comes near
 --   flock             spawns and moves as a group behind a leader
 --   shy               blocks: a player nearer than this is fled from
 --   hostile           { when = "night" | "dark" | "always", sun_max }
@@ -19,6 +21,9 @@
 --   walk_speed, run_speed  a walker's own speeds, blocks a second (default: the engine's
 --                     walk and sprint, 4.3 and 5.6, which is a player's)
 --   grazes            idles with its head down now and then (the `sneak` clip)
+--
+-- A flyer with a model plays `swing` for a wingbeat and `run` for a glide
+-- with its wings out; on the ground, `walk`, `idle` and `sneak` as a walker.
 --   drops             { { item, min, max } }, items of this mod
 --   spawn             { ground = { block ids }, rings = { ring ids }, time = "day" | "night" | "any",
 --                       sun_min, sun_max, group = { min, max }, weight, cap }
@@ -58,8 +63,9 @@ tdl.register_mob{
               time = "day", sun_min = 12, group = { 3, 6 }, weight = 4, cap = 8 },
 }
 
--- The pig too: models/pig.glb, the same way. Four and a half cells long,
--- 1.9 wide, 2.5 tall, the same rig and the same five clips as the cow.
+-- The pig: models/pig.glb, from an export that was already skinned, as the
+-- bear's was. Four and a half cells long, 1.9 wide, 2.6 tall; its eating
+-- clip under `sneak`.
 tdl.register_mob{
     id = "pig", name = "Pig", health = 10,
     collider = { width = 2.4, height = 2.5 },
@@ -95,10 +101,19 @@ tdl.register_mob{
 
 -- Crows: a flock by day, wheeling over the fields and keeping their
 -- distance; after dark they mob whoever is out, pecking and wheeling away.
+-- Now and then the flock comes down behind its leader to walk about and
+-- peck at the ground, and goes up again together. Its body is
+-- models/crow.glb, from an export that was already skinned and exported
+-- with its wings spread, so sized along its body (`--axis z`): two cells
+-- beak to tail, a block across the wings. Clips: `run` is the glide, wings
+-- out; `swing` the wingbeat; `walk` and `idle` on the ground, and its
+-- pecking under `sneak`.
 tdl.register_mob{
     id = "crow", name = "Crow", health = 3,
-    collider = { width = 1.0, height = 1.0 },
-    flyer = true, flock = true, speed = 0.35, speed_fast = 0.6,
+    collider = { width = 1.2, height = 1.2 },
+    model = "models/crow.glb", texture = "models/crow.png", grazes = true,
+    flyer = true, lands = true, flock = true, speed = 0.35, speed_fast = 0.6,
+    walk_speed = 0.8,
     shy = 4, sight = 20, wander_radius = 14, fly_low = 4, fly_high = 12,
     hostile = { when = "night" },
     bite = { damage = 1, range = 1.6, cooldown = 40, cause = "were pecked to death by crows" },

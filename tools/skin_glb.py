@@ -26,7 +26,7 @@ and follows the body. This rewrites such a file as the engine wants it:
 
 Standard library only:
 
-    python tools/skin_glb.py <in.glb> <out.glb> --length 6.0 [--rename Eating=sneak] [--speed walk=2]
+    python tools/skin_glb.py <in.glb> <out.glb> --length 6.0 [--rename Eating=sneak] [--speed walk=2] [--axis z]
 """
 import argparse
 import json
@@ -179,7 +179,7 @@ class Writer:
         return len(self.accessors) - 1
 
 
-def convert(source, target, length_cells, renames, flip, speeds=None):
+def convert(source, target, length_cells, renames, flip, speeds=None, axis=None):
     speeds = speeds or {}
     g = Glb(source)
     j = g.json
@@ -306,7 +306,11 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
     lo = [min(p[a] for p in positions) for a in range(3)]
     hi = [max(p[a] for p in positions) for a in range(3)]
     span = [hi[a] - lo[a] for a in range(3)]
+    # The longer of the two flat spans is nose to tail, unless told otherwise:
+    # a bird exported with its wings spread is wider than it is long.
     long_axis = 2 if span[2] >= span[0] else 0
+    if axis is not None:
+        long_axis = "xyz".index(axis)
     heads = [n for n in joints if "head" in nodes[n].get("name", "").lower()]
     rest = world_with(identity())
     facing_back = False
@@ -461,9 +465,10 @@ if __name__ == "__main__":
     ap.add_argument("--length", type=float, default=6.0, help="nose to tail, in cells (three to a block)")
     ap.add_argument("--rename", action="append", default=[], metavar="Old=new", help="rename a clip")
     ap.add_argument("--flip", action="store_true", help="turn it round, if the head was guessed wrong")
+    ap.add_argument("--axis", choices=("x", "z"), help="nose to tail along this axis, if the wider span is not it")
     ap.add_argument("--speed", action="append", default=[], metavar="clip=factor",
                     help="play a clip (by its final name) this many times faster")
     args = ap.parse_args()
     convert(args.source, args.target, args.length,
             dict(pair.split("=", 1) for pair in args.rename), args.flip,
-            {k.lower(): float(v) for k, v in (pair.split("=", 1) for pair in args.speed)})
+            {k.lower(): float(v) for k, v in (pair.split("=", 1) for pair in args.speed)}, args.axis)

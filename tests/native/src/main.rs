@@ -964,9 +964,17 @@ fn mob_check(r: &mut Rig) {
     kinds.dedup();
     assert!(kinds.len() >= 2, "more than one kind: {kinds:?}");
     for (_, mob) in &spawned {
-        // The cow and the pig are their own models; a kind with none yet is
-        // the named stand-in.
-        if matches!(mob.model.as_deref(), Some("tiamat_default_life:cow" | "tiamat_default_life:pig")) {
+        // The cow, the pig, the bear and the crow are their own models; a
+        // kind with none yet is the named stand-in.
+        if matches!(
+            mob.model.as_deref(),
+            Some(
+                "tiamat_default_life:cow"
+                    | "tiamat_default_life:pig"
+                    | "tiamat_default_life:bear"
+                    | "tiamat_default_life:crow"
+            )
+        ) {
             assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
         } else {
             assert_eq!(mob.model.as_deref(), Some("engine:humanoid"), "a stand-in body");
@@ -1117,6 +1125,54 @@ fn mob_check(r: &mut Rig) {
     println!("ok  a bat bit at night and left off by day");
     r.say("cull");
     r.tick(1);
+
+    // A crow, by day: wings in the air, feet on the ground. The fake world
+    // has no physics, so it is held where the test wants it, well away from
+    // the player, and its own dice decide when it glides, beats its wings and
+    // comes down.
+    let grass = r.material("tiamat_default_world:grass");
+    *r.world.floor.lock().unwrap() = Some((63, grass));
+    r.say("spawn crow 1");
+    r.tick(1);
+    let (crow, body) = r.mobs()[0].clone();
+    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:crow"), "a crow is its own model");
+    let hold = |r: &Rig, y: f64, ground: bool| {
+        r.put_mob(crow, 85.5, y, 85.5);
+        r.entities.0.lock().unwrap().entities.get_mut(&crow).unwrap().on_ground = ground;
+    };
+    let clip = |r: &Rig| r.entities.0.lock().unwrap().entities[&crow].anim;
+    // High over the field, every clip it plays is a wing clip, and it plays both.
+    let (mut soared, mut flapped) = (false, false);
+    for _ in 0..600 {
+        hold(&r, 80.0, false);
+        r.tick(1);
+        let anim = clip(&r);
+        assert!(anim == tiamat_core::ent::AnimTag::RUN || anim == tiamat_core::ent::AnimTag::SWING,
+            "a crow in the air soars or flaps: {anim:?}");
+        soared |= anim == tiamat_core::ent::AnimTag::RUN;
+        flapped |= anim == tiamat_core::ent::AnimTag::SWING;
+    }
+    assert!(soared && flapped, "it glides with its wings out, and beats them now and then");
+    // On the ground, sooner or later it lands, and stands or pecks there.
+    let mut landed = false;
+    for _ in 0..4000 {
+        hold(&r, 64.0, true);
+        r.tick(1);
+        let anim = clip(&r);
+        if anim == tiamat_core::ent::AnimTag::IDLE || anim == tiamat_core::ent::AnimTag::SNEAK {
+            landed = true;
+            break;
+        }
+    }
+    assert!(landed, "a crow comes down to the ground now and then");
+    // And a player walking up puts it back in the air, beating its wings.
+    r.put_mob(crow, 101.5, 64.0, 100.5);
+    r.tick(12);
+    assert_eq!(clip(&r), tiamat_core::ent::AnimTag::SWING, "startled, it flaps off");
+    r.say("cull");
+    r.tick(1);
+    *r.world.floor.lock().unwrap() = None;
+    println!("ok  a crow soars, flaps, lands, and takes off when you come near");
     *r.world.floor.lock().unwrap() = None;
 }
 

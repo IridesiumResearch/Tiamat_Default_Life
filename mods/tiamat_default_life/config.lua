@@ -192,6 +192,9 @@ C.mob_cap_total = 32           -- of everything, per player
 C.mob_flee_ticks = 100         -- five seconds of running from a hit
 C.mob_hunt_ticks = 400         -- twenty seconds of chasing before losing interest
 C.fly_lift = 0.24              -- cells per tick, the tick of gravity a flyer cancels
+C.fly_flap_ticks = 12          -- one wingbeat's worth of the `swing` clip, at least
+C.fly_flap_chance = 60         -- one tick in this many, a glider beats its wings to hold its height
+C.fly_land_ticks = 200         -- how long a flyer spends coming down before it thinks better of it
 
 -- The world's blocks, by name. Every id is looked up with pcall at load, so
 -- a world without these still loads this mod; it just has no lava.
