@@ -126,6 +126,7 @@ for _, sound in ipairs({
     { id = "oink", gain = 0.7, pitch_variance = 0.15 },
     { id = "caw", gain = 0.6, pitch_variance = 0.20 },
     { id = "squeak", gain = 0.5, pitch_variance = 0.25 },
+    { id = "growl", gain = 0.9, pitch_variance = 0.12 },
 }) do
     game.register_sound{ id = sound.id, file = "sounds/" .. sound.id .. ".wav",
         gain = sound.gain, pitch_variance = sound.pitch_variance }

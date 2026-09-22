@@ -8,7 +8,9 @@ where it lies", and it ignores node transforms: every part lands on the origin
 and follows the body. This rewrites such a file as the engine wants it:
 
 - one mesh, every vertex weighted wholly to the bone its part hung from,
-  with positions in rest space and proper inverse bind matrices;
+  with positions in rest space and proper inverse bind matrices. A mesh
+  that is ALREADY skinned keeps its own weights, and is placed by its bind
+  pose, which must be the rig's rest pose (the tool checks);
 - the armature above the root bone baked away (its Z-up turn and scale go
   into the root bone and into the root bone's animation keys), since the
   reader builds the skeleton from the joints alone;
@@ -236,6 +238,10 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
     for index, node in enumerate(nodes):
         if "mesh" not in node:
             continue
+        if "skin" in node:
+            # Already skinned: its own weights, slot None.
+            parts.append((index, None))
+            continue
         bone = index
         while bone is not None and bone not in joint_slot:
             bone = parent.get(bone)
@@ -243,10 +249,31 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
             bone = root
         parts.append((index, joint_slot[bone]))
 
+    ibms = []
+    if "inverseBindMatrices" in skin:
+        for flat in g.read(skin["inverseBindMatrices"]):
+            ibms.append([[flat[c * 4 + r] for c in range(4)] for r in range(4)])
+
+    def bind_space(world):
+        """Where a skinned mesh's vertices stand at rest: joint world times its
+        inverse bind, the same for every joint when the bind pose is the rest
+        pose. Anything else would need re-skinning, so it is refused."""
+        if not ibms:
+            raise SystemExit("a skinned mesh with no inverse bind matrices")
+        first = matmul(world(joints[0]), ibms[0])
+        scale = max(abs(first[r][c]) for r in range(3) for c in range(4)) or 1.0
+        for slot, joint in enumerate(joints):
+            m = matmul(world(joint), ibms[slot])
+            worst = max(abs(m[r][c] - first[r][c]) for r in range(3) for c in range(4))
+            if worst > 1e-3 * scale:
+                raise SystemExit(f"joint {nodes[joint].get('name')} is not at its bind pose in the rest pose; "
+                                 "apply the pose as rest in the modelling tool")
+        return first
+
     def gather(world):
-        positions, normals, uvs, bones, indices = [], [], [], [], []
+        positions, normals, uvs, bones, weights, indices = [], [], [], [], [], []
         for index, slot in parts:
-            m = world(index)
+            m = bind_space(world) if slot is None else world(index)
             m_inv = invert(m)
             for prim in j["meshes"][nodes[index]["mesh"]]["primitives"]:
                 a = prim["attributes"]
@@ -257,10 +284,21 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
                 positions += [apply(m, v) for v in pos]
                 normals += [apply_normal(m_inv, v) for v in nor]
                 uvs += [tuple(t) for t in tex]
-                bones += [slot] * len(pos)
+                if slot is None:
+                    if "JOINTS_0" not in a or "WEIGHTS_0" not in a:
+                        raise SystemExit("a skinned mesh with no JOINTS_0 / WEIGHTS_0")
+                    js = [tuple(int(x) for x in v) for v in g.read(a["JOINTS_0"])]
+                    ws = [tuple(float(x) for x in v) for v in g.read(a["WEIGHTS_0"])]
+                    for jv, wv in zip(js, ws):
+                        total = sum(wv) or 1.0
+                        bones.append(jv)
+                        weights.append(tuple(x / total for x in wv))
+                else:
+                    bones += [(slot, 0, 0, 0)] * len(pos)
+                    weights += [(1.0, 0.0, 0.0, 0.0)] * len(pos)
                 idx = g.read(prim["indices"]) if "indices" in prim else list(range(len(pos)))
                 indices += [base + i for i in idx]
-        return positions, normals, uvs, bones, indices
+        return positions, normals, uvs, bones, weights, indices
 
     # First pass, as exported, to measure it: how long, where the feet are,
     # and which end the head is on.
@@ -305,7 +343,7 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
         return (tuple(over_t[a] + rotated[a] for a in range(3)),
                 quat_norm(quat_mul(over_q, q)), tuple(c * over_s for c in s))
 
-    positions, normals, uvs, bones, indices = gather(world_with(stand))
+    positions, normals, uvs, bones, weights, indices = gather(world_with(stand))
 
     # The new skeleton: the bones alone, the root carrying what stood above it.
     new_index = {old: new for new, old in enumerate(joints)}
@@ -333,8 +371,8 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
     a_pos = w.add(positions, "VEC3", 5126, 34962, minmax=True)
     a_nor = w.add(normals, "VEC3", 5126, 34962)
     a_uv = w.add(uvs, "VEC2", 5126, 34962)
-    a_joint = w.add([(b, 0, 0, 0) for b in bones], "VEC4", 5121, 34962)
-    a_weight = w.add([(1.0, 0.0, 0.0, 0.0)] * len(bones), "VEC4", 5126, 34962)
+    a_joint = w.add(bones, "VEC4", 5121, 34962)
+    a_weight = w.add(weights, "VEC4", 5126, 34962)
     wide = len(positions) > 65535
     a_index = w.add(indices, "SCALAR", 5125 if wide else 5123, 34963)
     # Column-major, as glTF stores a matrix.
@@ -406,7 +444,7 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
 
     lo2 = [min(p[a] for p in positions) for a in range(3)]
     hi2 = [max(p[a] for p in positions) for a in range(3)]
-    print(f"parts {len(parts)} -> one mesh: {len(positions)} vertices, {len(indices) // 3} triangles, {len(joints)} bones")
+    print(f"parts {len(parts)} ({sum(1 for _, slot in parts if slot is None)} already skinned) -> one mesh: {len(positions)} vertices, {len(indices) // 3} triangles, {len(joints)} bones")
     print(f"as exported: {span[0]:.2f} x {span[1]:.2f} x {span[2]:.2f}; long axis {'xyz'[long_axis]}, "
           f"head toward {'-' if facing_back else '+'}; turned {turn:.0f} degrees, scaled x{k:.2f}")
     print("in cells: " + " x ".join(f"{hi2[a] - lo2[a]:.2f}" for a in range(3))

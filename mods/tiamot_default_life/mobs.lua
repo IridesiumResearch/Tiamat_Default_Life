@@ -27,7 +27,7 @@ local I = tdl.items
 local M = { kinds = {}, order = {}, live = {} }
 tdl.mobs = M
 
-local ANIM_IDLE, ANIM_WALK, ANIM_RUN = 0, 1, 2
+local ANIM_IDLE, ANIM_WALK, ANIM_RUN, ANIM_SWING = 0, 1, 2, 3
 local ANIM_SNEAK = 5    -- the engine's sixth tag; a grazer's head-down clip rides on it
 local PERCEIVE_EVERY = 10
 local now = 0
@@ -292,7 +292,7 @@ end
 -- The engine can put no picture over an entity, but a particle with no spread,
 -- no speed and no gravity stays exactly where it is put. So the row of hearts
 -- is drawn in pixels, one particle each, for the player who struck the blow
--- and nobody else, turned square to them. Two points to a heart: red is what
+-- and nobody else, turned square to them. Red is what
 -- is left, a white flash is what that hit took, dark is what was gone before.
 
 local HEART = { "XX.XX", "XXXXX", ".XXX.", "..X.." }
@@ -306,7 +306,10 @@ local function show_hearts(entity, kind, before, after, viewer)
     -- Across the viewer's line of sight: their right, as they face the mob.
     local rx, rz = -dz / length, dx / length
     local px = C.mob_heart_pixel
-    local hearts = (kind.health + 1) // 2
+    -- Two points a heart, and never more than ten hearts: a bear's thirty
+    -- points are ten hearts of three.
+    local per = math.max(2, (kind.health + 9) // 10)
+    local hearts = (kind.health + per - 1) // per
     local width = hearts * 6 - 1
     local top = entity.pos.y + (kind.collider and kind.collider.height or 3) / 3 + C.mob_hearts_above
     for h = 0, hearts - 1 do
@@ -315,8 +318,8 @@ local function show_hearts(entity, kind, before, after, viewer)
             for col = 1, 5 do
                 if string.sub(line, col, col) == "X" then
                     -- Which point of the mob's health this pixel stands for:
-                    -- the left three columns of a heart are its first point.
-                    local point = h * 2 + (col <= 3 and 1 or 2)
+                    -- a heart's points run left to right across its columns.
+                    local point = h * per + math.max(1, math.ceil(col * per / 5 - 0.01))
                     local colour, life
                     if point <= after then
                         colour, life = { r = 0.86, g = 0.1, b = 0.12 }, C.mob_hearts_seconds
@@ -379,8 +382,9 @@ function tdl.hurt_mob(id, amount, by)
                     x = dx / length * C.knockback, y = C.knockback_up, z = dz / length * C.knockback } })
             end
         end
-        if m.kind.hostile then
+        if m.kind.hostile or m.kind.provoked then
             m.state, m.threat, m.timer = "hunt", by, C.mob_hunt_ticks
+            m.angry = true
         else
             m.state, m.threat, m.timer = "flee", by, C.mob_flee_ticks
         end
@@ -405,7 +409,7 @@ local function perceive(m, entity)
     local best, best_d2, best_pos = nil, math.huge, nil
     for _, pid in ipairs(game.entities_in_radius(entity.pos, m.kind.sight or 12, "engine:player")) do
         local p = game.entity(pid)
-        if p and p.owner and not (m.kind.hostile and tdl.is_invulnerable(p.owner)) then
+        if p and p.owner and not ((m.kind.hostile or m.kind.provoked) and tdl.is_invulnerable(p.owner)) then
             local d2 = U.dist2(p.pos, entity.pos)
             if d2 < best_d2 then best, best_d2, best_pos = p.owner, d2, p.pos end
         end
@@ -545,6 +549,11 @@ local function stand(id, m)
     m.driving = false
     if not m.kind.flyer then
         local anim = (m.grazing and m.state == "idle") and ANIM_SNEAK or ANIM_IDLE
+        -- A blow just struck: its swing clip, for as long as the swing lasts.
+        if (m.swing or 0) > 0 then
+            m.swing = m.swing - 1
+            anim = ANIM_SWING
+        end
         game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = anim })
     end
 end
@@ -598,7 +607,8 @@ local function step(id, dt)
     if m.state == "hunt" then
         local prey = U.body(m.threat)
         local v = m.threat and tdl.get(m.threat)
-        if prey and v and not v.dead and not tdl.is_invulnerable(m.threat) and m.timer > 0 and hunts_now(kind, entity) then
+        if prey and v and not v.dead and not tdl.is_invulnerable(m.threat) and m.timer > 0
+            and (m.angry or hunts_now(kind, entity)) then
             -- Reach is measured to the body's middle, not its feet: a flyer
             -- hovers at chest height and would otherwise never be close.
             local middle = { x = prey.pos.x, y = prey.pos.y + 0.9, z = prey.pos.z }
@@ -612,6 +622,7 @@ local function step(id, dt)
                     local push = length > 0.001 and { x = dx / length * 0.4, y = 0.3, z = dz / length * 0.4 } or nil
                     tdl.damage(m.threat, bite.damage, "physical", { push = push, cause = bite.cause })
                     game.cue{ cue = "bite", pos = entity.pos, radius = 16 }
+                    m.swing = C.mob_swing_ticks
                     -- Hit and run: a flyer wheels away after a bite.
                     if kind.flyer then
                         m.state, m.timer = "flee", 30
@@ -625,6 +636,7 @@ local function step(id, dt)
             end
         else
             m.state, m.threat, m.timer = "idle", nil, between(20, 60)
+            m.angry = false
             stand(id, m)
         end
         return
@@ -706,7 +718,7 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|bear|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),

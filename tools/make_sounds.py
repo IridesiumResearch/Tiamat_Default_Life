@@ -124,6 +124,9 @@ def main():
     write("oink", mix(noise(0.16, 0.7, 0.25, seed=41), tone(200, 90, 0.16, 0.5, "square", release=0.08)))
     write("caw", mix(tone(700, 500, 0.22, 0.5, "saw", attack=0.01, release=0.1), noise(0.2, 0.35, 0.6, seed=43)))
     write("squeak", tone(2600, 3400, 0.09, 0.3, release=0.04))
+    # A growl: a low rough rumble that swells and shakes.
+    growl = mix(tone(95, 70, 0.9, 0.55, "saw", attack=0.12, release=0.4), noise(0.9, 0.45, 0.12, attack=0.1, release=0.4, seed=47))
+    write("growl", [s * (1 + 0.45 * math.sin(i / RATE * 2 * math.pi * 23)) for i, s in enumerate(growl)])
 
 
 if __name__ == "__main__":

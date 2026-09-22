@@ -252,13 +252,14 @@ false` in `config.lua`.
 
 ## Creatures
 
-Five so far, in `creatures.lua` as data over the system in `mobs.lua`:
+Six so far, in `creatures.lua` as data over the system in `mobs.lua`:
 
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
 | Cow | Grass, by day, in twos to fours | Wanders, shies from you, runs when hit | 1 to 3 raw meat |
 | Sheep | Grass, by day, in threes to sixes | The same | 1 to 2 raw meat |
 | Pig | Woodland soil and grass, by day | The same | 1 to 2 raw meat |
+| Bear | Woodland soil and snow, in the Frostmoor, temperate and verdant rings, alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Crow | Open ground, any time, in flocks of 3 to 6 | Wheels over the fields behind a leader by day; after dark the flock mobs you, pecking for a point and wheeling away | nothing |
 | Bat | The dark: caves by day, anywhere by night | Hunts you in darkness, bites for a point, flutters off, comes back | nothing |
 
@@ -269,12 +270,16 @@ and a cap overall. Say `spawn cow 3`, `mobs` or `cull` in chat while
 `dev_commands` is on.
 
 A fist does a point to a mob and the reference sword six. Hurt animals run;
-hurt hunters turn on you. Nothing keeps you from sleeping: a bed is a bed.
+hurt hunters, and a hurt bear, turn on you. A blow shows the mob's hearts
+over it for a second, to whoever struck it: two points a heart, up to ten.
+Cows and pigs amble at 1.1 blocks a second and run at 2.8 (`walk_speed`,
+`run_speed`); say `mob` to see what the nearest one is doing. Nothing keeps you from sleeping: a bed is a bed.
 
 **Models.** A creature's body is a `.glb` in `models/` with its PNG
-skin beside it. The cow and the pig have one. Getting a modeller's export
-into the shape the engine reads is three tools, none of which launch the
-game (the pig went through the same steps, at `--length 4.5`):
+skin beside it. The cow, the pig and the bear have one. Getting a
+modeller's export into the shape the engine reads is three tools, none of
+which launch the game (the pig at `--length 4.5`; the bear at `--length
+6.0 --rename eating=sneak`, its walk already quick enough):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamot Life AI Cow.glb" mods/tiamot_default_life/models/cow.glb --length 6.0 --rename Eating=sneak --speed walk=2
@@ -287,7 +292,9 @@ python tools/render_model.py out/poses mods/tiamot_default_life/models/cow.png o
 separate parts PARENTED to bones, with no joint weights. The engine's reader
 accepts that and then draws every part piled on the origin, since it reads
 an unweighted vertex as "joint 0, where it lies" and ignores node
-transforms. The tool rewrites it as one mesh weighted to its bones, bakes
+transforms. An export that is already skinned, like the bear, keeps its
+own weights; the tool checks its bind pose is its rest pose and refuses it
+otherwise. Either way the tool writes one mesh weighted to its bones, bakes
 away the armature's Z-up turn and scale, sizes it in cells (three to a
 block) with its feet on the ground facing +Z, lowercases the clip names the
 engine matches on (`idle`, `walk`, `run`, `swing`, `swim`, `sneak`), and
@@ -298,9 +305,10 @@ Originals live in `assets/source/`, outside the mod, because the engine
 serves everything inside a mod's folder to clients.
 
 **Bodies.** A kind that names a `model` is drawn as it, registered with
-`game.register_model` with its PNG skin: the cow is a cow and the pig a
-pig, painted and animated by their own clips. A kind with no model yet is the engine's white
-humanoid with its kind as a nametag (`placeholder_models` in `config.lua`). A
+`game.register_model` with its PNG skin: the cow, the pig and the bear
+are themselves, painted and animated by their own clips. A kind with no
+model yet is the engine's white humanoid with its kind as a nametag
+(`placeholder_models` in `config.lua`). A
 creature's kind is read back off the entity, so it survives the world being
 closed and reopened.
 

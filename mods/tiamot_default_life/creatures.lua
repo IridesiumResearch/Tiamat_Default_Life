@@ -10,6 +10,7 @@
 --   flock             spawns and moves as a group behind a leader
 --   shy               blocks: a player nearer than this is fled from
 --   hostile           { when = "night" | "dark" | "always", sun_max }
+--   provoked          leaves you be until you hurt it, then hunts you (a bear)
 --   bite              { damage, range (blocks), cooldown (ticks), cause }
 --   sight             blocks it notices a player from
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
@@ -69,6 +70,27 @@ tdl.register_mob{
     drops = { { "raw_meat", 1, 2 } },
     spawn = { ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "mud", G .. "dirt" },
               rings = { "temperate", "verdant", "shore" }, time = "day", sun_min = 6, group = { 1, 3 }, weight = 3, cap = 6 },
+}
+
+-- The bear: the woods' own, and nobody's quarry. It ambles, forages with
+-- its head down and leaves you be; hurt it and it comes for you, faster
+-- than you can walk and slower than you can sprint, and swipes hard. Its
+-- body is models/bear.glb, from an export that was already skinned: two
+-- blocks long, nearly a block and a half tall, its forage clip under
+-- `sneak` and its swipe under `swing`.
+tdl.register_mob{
+    id = "bear", name = "Bear", health = 30,
+    collider = { width = 2.8, height = 4.4 },
+    model = "models/bear.glb", texture = "models/bear.png", grazes = true,
+    walk_speed = 1.3, run_speed = 4.6,
+    provoked = true,
+    bite = { damage = 7, range = 2.2, cooldown = 30, cause = "were mauled by a bear" },
+    sight = 12, wander_radius = 16, pause_min = 80, pause_max = 300,
+    sound = "growl", sound_death = "growl", voice_min = 400, voice_max = 1600,
+    drops = { { "raw_meat", 2, 4 } },
+    spawn = { ground = { G .. "loam", G .. "leaf_litter", G .. "snow" },
+              rings = { "frost", "temperate", "verdant" },
+              time = "any", sun_min = 4, group = { 1, 1 }, weight = 1, cap = 2 },
 }
 
 -- Crows: a flock by day, wheeling over the fields and keeping their

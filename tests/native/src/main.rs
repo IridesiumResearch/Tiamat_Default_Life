@@ -1070,6 +1070,39 @@ fn mob_check(r: &mut Rig) {
     r.tick(1);
     println!("ok  a cow jumps only when it is stuck");
 
+    // A bear leaves you be, standing right beside it. Hurt it and it turns:
+    // ten hearts of three over it, then it comes for you and swipes, playing
+    // its swing clip, for seven points a blow.
+    r.say("heal");
+    r.say("spawn bear 1");
+    r.tick(1);
+    let (bear, body) = r.mobs()[0].clone();
+    assert_eq!(body.model.as_deref(), Some("tiamot_default_life:bear"), "a bear is its own model");
+    r.put_mob(bear, 102.0, 64.0, 100.5);
+    r.tick(60);
+    assert_eq!(r.number("hp"), 27.0, "an unprovoked bear harms nobody");
+    r.say("mob");
+    assert!(!r.said().contains("hunt"), "and hunts nobody: {}", r.said());
+    r.particles.0.lock().unwrap().clear();
+    r.hold_nothing();
+    r.vm.punch(&tiamot_core::script::PunchEvent { attacker: PLAYER, target: EntityId(bear), owner: None });
+    r.tick(1);
+    assert_eq!(r.particles.0.lock().unwrap().len(), 10 * 13, "ten hearts over a bear");
+    r.say("mob");
+    assert!(r.said().contains("hunt"), "a hurt bear hunts: {}", r.said());
+    let mut swiped = false;
+    for _ in 0..40 {
+        r.put_mob(bear, 101.5, 64.0, 100.5);
+        r.tick(1);
+        swiped |= r.entities.0.lock().unwrap().entities[&bear].anim == tiamot_core::ent::AnimTag::SWING;
+    }
+    assert!(r.number("hp") <= 27.0 - 7.0, "mauled: {}", r.number("hp"));
+    assert!(swiped, "and the blow plays its swing");
+    r.say("cull");
+    r.say("heal");
+    r.tick(1);
+    println!("ok  a bear ignores you until hurt, then hunts and mauls you, swinging");
+
     // A bat at night: it hunts the player, bites, and wheels away.
     *r.sounds.time.lock().unwrap() = 0.9;
     r.say("heal");
