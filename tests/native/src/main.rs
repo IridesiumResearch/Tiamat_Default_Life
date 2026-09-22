@@ -942,8 +942,9 @@ fn mob_check(r: &mut Rig) {
     kinds.dedup();
     assert!(kinds.len() >= 2, "more than one kind: {kinds:?}");
     for (_, mob) in &spawned {
-        // A cow is its own model; a kind with none yet is the named stand-in.
-        if mob.model.as_deref() == Some("tiamot_default_life:cow") {
+        // The cow and the pig are their own models; a kind with none yet is
+        // the named stand-in.
+        if matches!(mob.model.as_deref(), Some("tiamot_default_life:cow" | "tiamot_default_life:pig")) {
             assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
         } else {
             assert_eq!(mob.model.as_deref(), Some("engine:humanoid"), "a stand-in body");

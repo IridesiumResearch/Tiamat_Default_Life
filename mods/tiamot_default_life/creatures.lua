@@ -54,9 +54,12 @@ tdl.register_mob{
               time = "day", sun_min = 12, group = { 3, 6 }, weight = 4, cap = 8 },
 }
 
+-- The pig too: models/pig.glb, the same way. Four and a half cells long,
+-- 1.9 wide, 2.5 tall, the same rig and the same five clips as the cow.
 tdl.register_mob{
     id = "pig", name = "Pig", health = 10,
-    collider = { width = 2.4, height = 2.4 },
+    collider = { width = 2.4, height = 2.5 },
+    model = "models/pig.glb", texture = "models/pig.png", grazes = true,
     shy = 1.5, sight = 8, wander_radius = 8, pause_min = 40, pause_max = 200,
     sound = "oink", sound_death = "oink", voice_min = 200, voice_max = 800,
     drops = { { "raw_meat", 1, 2 } },

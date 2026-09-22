@@ -271,9 +271,10 @@ and a cap overall. Say `spawn cow 3`, `mobs` or `cull` in chat while
 A fist does a point to a mob and the reference sword six. Hurt animals run;
 hurt hunters turn on you. Nothing keeps you from sleeping: a bed is a bed.
 
-**Models.** A creature's body is a `.glb` in `models/` with its texture
-beside it. The cow has one. Getting a modeller's export into the shape the
-engine reads is three tools, none of which launch the game:
+**Models.** A creature's body is a `.glb` in `models/` with its PNG
+skin beside it. The cow and the pig have one. Getting a modeller's export
+into the shape the engine reads is three tools, none of which launch the
+game (the pig went through the same steps, at `--length 4.5`):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamot Life AI Cow.glb" mods/tiamot_default_life/models/cow.glb --length 6.0 --rename Eating=sneak
@@ -297,8 +298,8 @@ Originals live in `assets/source/`, outside the mod, because the engine
 serves everything inside a mod's folder to clients.
 
 **Bodies.** A kind that names a `model` is drawn as it, registered with
-`game.register_model` with its PNG skin: the cow is a cow, painted and
-animated by its own clips. A kind with no model yet is the engine's white
+`game.register_model` with its PNG skin: the cow is a cow and the pig a
+pig, painted and animated by their own clips. A kind with no model yet is the engine's white
 humanoid with its kind as a nametag (`placeholder_models` in `config.lua`). A
 creature's kind is read back off the entity, so it survives the world being
 closed and reopened.
