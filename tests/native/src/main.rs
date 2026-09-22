@@ -1000,6 +1000,37 @@ fn mob_check(r: &mut Rig) {
     assert!(r.inventory.units_of("player:main", meat) > meat_before, "and in the bag");
     println!("ok  a cow punched, run off, slain by sword, and its meat picked up");
 
+    // A walker jumps only when it is stuck. A punched cow runs; while its
+    // body is moving it never jumps, whatever the ground ahead. Held still
+    // (a hole, a wall), it jumps after half a second of trying.
+    r.say("spawn cow 1");
+    r.tick(1);
+    let (cow, _) = r.mobs()[0].clone();
+    r.hold_nothing();
+    r.vm.punch(&tiamot_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
+    let set_cow = |r: &Rig, vx: f32| {
+        let mut store = r.entities.0.lock().unwrap();
+        let body = store.entities.get_mut(&cow).unwrap();
+        body.on_ground = true;
+        body.velocity.0 = [vx, 0.0, 0.0];
+    };
+    let jumping = |r: &Rig| r.entities.0.lock().unwrap().entities[&cow].drive.jump;
+    for _ in 0..30 {
+        set_cow(&r, 0.4);
+        r.tick(1);
+        assert!(!jumping(&r), "a cow on the move does not jump");
+    }
+    let mut jumped = false;
+    for _ in 0..12 {
+        set_cow(&r, 0.0);
+        r.tick(1);
+        jumped |= jumping(&r);
+    }
+    assert!(jumped, "a cow going nowhere jumps to get out");
+    r.say("cull");
+    r.tick(1);
+    println!("ok  a cow jumps only when it is stuck");
+
     // A bat at night: it hunts the player, bites, and wheels away.
     *r.sounds.time.lock().unwrap() = 0.9;
     r.say("heal");

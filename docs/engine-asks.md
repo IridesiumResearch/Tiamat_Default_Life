@@ -7,14 +7,15 @@ the record; the open ones are copied to the engine repo (see below).
 
 ## Where these stand (2026-09-22)
 
-**Nothing is open.** Every ask landed, and the mod uses every answer. Open
-asks are copied, without the history, to the engine's
+Every ask up to 11 landed, and the mod uses every answer. Open asks are
+copied, without the history, to the engine's
 `docs/engine-asks/tiamot_default_life.md`, so the engine side finds every
-mod's open asks in one place; that sheet is empty now. This file keeps
-everything, landed items included.
+mod's open asks in one place. This file keeps everything, landed items
+included.
 
 | Item | State | In this mod |
 |---|---|---|
+| 12 `steer_entity` jumps at one-cell rises | **Open**, new. | walkers drive themselves and jump only when stuck. |
 | 11 `fell` counts a flight down | Landed, engine 990bf8a. | the landing-speed gate is gone; `fell` alone decides. |
 | 10 key gates | Landed, engine 990bf8a: `wind_sky`, and the debug keys on F-keys. | admins and creative worlds may wind the sky; nobody else. |
 | 0 models, step 2 (a texture) | Landed, engine adf6547, with the drawing of mod models at all. | the cow wears `models/cow.png`. |
@@ -27,6 +28,32 @@ everything, landed items included.
 | 7 `submerged` and `fell` | Landed, engine a3db9fa. | the head-block probe and the peak tracker are gone. |
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
+
+## 12. `steer_entity` jumps at every rise the physics would climb (2026-09-22)
+
+**Seen, in play.** Cows and pigs hop across ordinary ground. The designer:
+"cows and pigs should really not jump unless they are stuck in a hole."
+
+**Why.** `path::steer` jumps when the block half a block ahead is not
+`passable` and the block over it is standable. `passable` is "no floor
+cells", so a block of smooth terrain holding a single cell of floor, a
+third-of-a-block lip, counts as an obstacle and is jumped. But the physics
+already climbs exactly that: `step_height` is one cell, and
+`a_step_up_of_one_subnode_succeeds_and_two_does_not`. On the Spindle's
+smooth ground nearly every rise is one cell, so a steered mob jumps at
+nearly every rise.
+
+**What the mod does now.** Walkers no longer use `steer_entity`. They set
+`drive` toward the target themselves, and jump only when stuck: trying to
+walk and not moving for half a second (a hole, a full block ahead). If
+three jumps do not free them, they give up on that target. That works, and
+it is a second copy of steering the engine meant every mod not to write.
+
+**Smallest change.** Jump only for a rise the step cannot take: the height
+of the floor ahead above the feet, in cells, greater than
+`tuning.step_height`. A one-cell lip is walked; two cells or a full block
+is jumped, as now. Optionally a `jump = "stuck"` mode, for mods that want
+the calmer rule.
 
 ## 11. `fell` counts a flight down to the ground (2026-09-19): LANDED, engine 990bf8a
 

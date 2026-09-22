@@ -175,6 +175,10 @@ C.explosion_push_up = 0.8
 -- nametag while this is true, and invisible when it is false: the engine
 -- draws nothing for a model name nobody registered.
 C.placeholder_models = true
+C.mob_arrival = 0.6            -- blocks from a target that counts as there
+C.mob_moving_speed2 = 0.0025   -- (cells per tick)^2; slower than this, a walker trying to go is not going
+C.mob_stuck_ticks = 10         -- ticks of trying and not going before a walker jumps
+C.mob_stuck_hops = 3           -- jumps that do not free it before it gives up on where it was going
 C.mob_spawn_every = 100        -- ticks between spawning passes, per player
 C.mob_spawn_tries = 6          -- ground spots tried per pass
 C.mob_spawn_min = 20           -- blocks from the player, at least

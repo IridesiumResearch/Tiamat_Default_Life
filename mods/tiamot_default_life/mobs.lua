@@ -16,9 +16,9 @@
 --   tdl.hurt_mob(id, amount, by)   damage, and death, drops and fleeing
 --   tdl.mobs_near(pos, radius)     ids of ours, nearest first
 --
--- Everything that moves goes through the engine: `game.steer_entity` walks a
--- body toward a point and jumps for it; a flyer has its velocity set every
--- tick and the physics carries it. Nothing here teleports.
+-- Everything that moves goes through the engine's physics: a walker's drive
+-- is set toward a point and the body walks it, stepping up a cell on its
+-- own; a flyer has its velocity set every tick. Nothing here teleports.
 
 local C = tdl.config
 local U = tdl.util
@@ -394,15 +394,49 @@ local function pick_wander(m, entity)
     m.target = { x = x, y = y, z = z }
 end
 
---- Walks a walker toward a point through the engine's steering, facing
---- where it goes and animating from what the body did last tick.
-local function walk_to(id, entity, target, gait)
-    local going = game.steer_entity(id, target, gait)
+--- Walks a walker toward a point, facing where it goes and animating from
+--- what the body did last tick. Returns false once it has arrived, or has
+--- given up.
+---
+--- It drives the body itself rather than through `game.steer_entity`, which
+--- jumps at any block with floor in it: on smooth ground that is every
+--- third-of-a-block rise, which the physics climbs anyway, so animals hopped
+--- across every slope. Here a walker jumps only when it is STUCK, trying to
+--- walk and not moving, which is a hole or a full block in the way. If a
+--- few jumps do not free it, it gives up and picks somewhere else to go.
+local function walk_to(id, m, entity, target, gait)
+    local dx, dz = target.x - entity.pos.x, target.z - entity.pos.z
+    local flat = dx * dx + dz * dz
+    if flat <= C.mob_arrival * C.mob_arrival then
+        m.stuck, m.hops = 0, 0
+        return false
+    end
     local speed2 = entity.velocity.x * entity.velocity.x + entity.velocity.z * entity.velocity.z
+    if speed2 >= C.mob_moving_speed2 or not entity.on_ground then
+        if speed2 >= C.mob_moving_speed2 then m.hops = 0 end
+        m.stuck = 0
+    else
+        m.stuck = (m.stuck or 0) + 1
+    end
+    local jump = false
+    if m.stuck >= C.mob_stuck_ticks then
+        m.stuck = 0
+        m.hops = (m.hops or 0) + 1
+        if m.hops > C.mob_stuck_hops then
+            m.hops = 0
+            return false
+        end
+        jump = true
+    end
+    local length = math.sqrt(flat)
     local anim = ANIM_IDLE
     if speed2 >= 0.0025 then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
-    game.set_entity(id, { yaw = game.heading(target.x - entity.pos.x, target.z - entity.pos.z), anim = anim })
-    return going
+    game.set_entity(id, {
+        drive = { walk = { x = dx / length, z = dz / length }, jump = jump, gait = gait },
+        yaw = game.heading(dx, dz),
+        anim = anim,
+    })
+    return true
 end
 
 --- Flies a flyer toward a point: velocity set every tick, lift added to
@@ -433,7 +467,7 @@ local function move_to(id, m, entity, target, fast)
     if kind.flyer then
         return fly_to(id, entity, target, fast and (kind.speed_fast or 0.5) or (kind.speed or 0.3))
     end
-    return walk_to(id, entity, target, fast and "sprint" or "walk")
+    return walk_to(id, m, entity, target, fast and "sprint" or "walk")
 end
 
 local function stand(id, m)
