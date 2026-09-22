@@ -12,7 +12,7 @@ Who may do what, on which key, in which kind of world. Two layers:
 
 ## The three modes
 
-Chosen on the new-world screen (a world option, `tiamot_default_life:mode`)
+Chosen on the new-world screen (a world option, `tiamat_default_life:mode`)
 and fixed for the life of the world, as the seed is. A dedicated server sets
 it under `[world_options]` in `server.toml`.
 

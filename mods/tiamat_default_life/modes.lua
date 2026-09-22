@@ -190,6 +190,6 @@ tdl.command("admins", "admin", function(uuid)
     tdl.say(uuid, "Admins here: " .. table.concat(names, ", ") .. ". Make more with /op.")
 end)
 
-game.log("tiamot_default_life: a " .. tdl.mode .. " world")
+game.log("tiamat_default_life: a " .. tdl.mode .. " world")
 
 return {}

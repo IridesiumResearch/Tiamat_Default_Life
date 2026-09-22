@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Generates the cue sounds for mods/tiamot_default_life/sounds.
+"""Generates the cue sounds for mods/tiamat_default_life/sounds.
 
 Short synthesised WAVs: a hurt grunt, a chew, a gulp, a chime for healing, a
 bubble, a crackle and a low tone for dying. Placeholders in the classic
@@ -15,7 +15,7 @@ import struct
 import wave
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "mods" / "tiamot_default_life" / "sounds"
+OUT = Path(__file__).resolve().parent.parent / "mods" / "tiamat_default_life" / "sounds"
 RATE = 22050
 
 

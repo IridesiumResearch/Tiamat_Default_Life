@@ -130,7 +130,7 @@ function tdl.die(uuid, kind, cause)
     tdl.cue(uuid, "death")
 
     local line = "You " .. (cause or CAUSES[kind] or "died") .. "."
-    game.log(string.format("tiamot_default_life: %s %s (%s)", tdl.name(uuid), cause or CAUSES[kind] or kind, kind))
+    game.log(string.format("tiamat_default_life: %s %s (%s)", tdl.name(uuid), cause or CAUSES[kind] or kind, kind))
 
     -- One life: everything falls, worn and carried, and the player stays
     -- where they fell as a ghost. There is no waking up.

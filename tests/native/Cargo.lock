@@ -494,7 +494,7 @@ dependencies = [
 name = "life-native-check"
 version = "0.1.0"
 dependencies = [
- "tiamot-core",
+ "tiamat-core",
 ]
 
 [[package]]
@@ -925,7 +925,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tiamot-core"
+name = "tiamat-core"
 version = "0.1.0"
 dependencies = [
  "bip39",

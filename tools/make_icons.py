@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Generates the HUD icons in mods/tiamot_default_life/icons.
+"""Generates the HUD icons in mods/tiamat_default_life/icons.
 
 Clean, simple drawings, 64 pixels square, drawn on the screen at about 30:
 hearts that lose a pie wedge for every third, cookies for hunger with a bite
@@ -17,7 +17,7 @@ from pathlib import Path
 from draw import (box, capsule, circle, ellipse, heart, intersect, outlined, png, render,
                   rgba, shade, shrink, subtract, union, wedge_from_top)
 
-OUT = Path(__file__).resolve().parent.parent / "mods" / "tiamot_default_life" / "icons"
+OUT = Path(__file__).resolve().parent.parent / "mods" / "tiamat_default_life" / "icons"
 SIZE = 64
 
 RED = rgba(220, 44, 52)

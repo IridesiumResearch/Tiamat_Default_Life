@@ -29,7 +29,7 @@
 -- biome within the ring is made of (loam and litter are woodland; dirt
 -- under grass is grassland; snow is the highlands).
 
-local G = "tiamot_default_world:"
+local G = "tiamat_default_world:"
 
 -- The cow has a body of its own: models/cow.glb, made by tools/skin_glb.py
 -- from the modeller's export. Six cells long, 2.4 wide, 4.6 tall, feet on

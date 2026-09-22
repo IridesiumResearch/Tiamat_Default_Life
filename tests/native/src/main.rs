@@ -15,7 +15,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use tiamot_core::{
+use tiamat_core::{
     BlockPos, MaterialId,
     ent::{self, Entity, EntityId, Owner, Transform},
     fluid::{self, Fluid, FluidId},
@@ -35,7 +35,7 @@ use tiamot_core::{
     ui::host::{self as uihost, ShowRequest},
 };
 
-const MOD: &str = "tiamot_default_life";
+const MOD: &str = "tiamat_default_life";
 const PLAYER: [u8; 32] = [7; 32];
 
 // --- Fakes -------------------------------------------------------------------
@@ -391,7 +391,7 @@ impl sight::Access for World {
         let Reading::Single { material, occupancy } = self.block_at("", BlockPos { x, y, z }) else { return None };
         (occupancy != 0).then(|| Looked {
             domain: "overworld".into(),
-            cell: tiamot_core::SubNodePos { x: x * 3 + 1, y: y * 3 + 2, z: z * 3 + 1 },
+            cell: tiamat_core::SubNodePos { x: x * 3 + 1, y: y * 3 + 2, z: z * 3 + 1 },
             material,
             face: [0, 1, 0],
         })
@@ -596,7 +596,7 @@ fn rig_with(prelude: &str) -> Rig {
 
     // A stand-in for the world mod, so the lava and the bramble exist.
     vm.load_mod(
-        "tiamot_default_world",
+        "tiamat_default_world",
         "for _, id in ipairs({ 'magma', 'bramble', 'dream_stone', 'grass', 'loam', 'leaf_litter', 'mud', 'dirt', 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'fern', 'tall_grass', 'ladys_mantle', 'ladys_mantle_bloom' }) do game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass' or id == 'ladys_mantle' or id == 'ladys_mantle_bloom') } end",
         &dir,
     )
@@ -655,11 +655,11 @@ fn main() {
     assert!(r.text("fx").contains("poison"));
     r.tick(25 * 40);
     assert_eq!(r.number("hp"), 1.0, "poison never kills");
-    r.hold("tiamot_default_life:antidote");
+    r.hold("tiamat_default_life:antidote");
     r.press("use");
     r.tick(1);
     assert!(!r.text("fx").contains("poison"), "the antidote cleared it");
-    assert_eq!(r.inventory.units_of("player:main", r.material("tiamot_default_life:antidote")), 27 * 3);
+    assert_eq!(r.inventory.units_of("player:main", r.material("tiamat_default_life:antidote")), 27 * 3);
     println!("ok  poison to one point, antidote cured it and was spent");
 
     // Eating: starve, then an apple is two cookies and a bite of buffer.
@@ -668,7 +668,7 @@ fn main() {
     r.tick(1);
     assert_eq!(r.number("food"), 4.0);
     assert!(r.flag("hungry"));
-    r.hold("tiamot_default_life:apple");
+    r.hold("tiamat_default_life:apple");
     r.tick(16);
     r.press("use");
     r.tick(1);
@@ -679,16 +679,16 @@ fn main() {
     // out BEFORE the feed, so the press lands on exactly full cookies.
     r.tick(16);
     r.say("feed");
-    let before = r.inventory.units_of("player:main", r.material("tiamot_default_life:apple"));
+    let before = r.inventory.units_of("player:main", r.material("tiamat_default_life:apple"));
     r.press("use");
     r.tick(1);
-    assert_eq!(r.inventory.units_of("player:main", r.material("tiamot_default_life:apple")), before);
+    assert_eq!(r.inventory.units_of("player:main", r.material("tiamat_default_life:apple")), before);
     assert!(r.text("toast").contains("full"));
     println!("ok  eating an apple, and being too full to");
 
     // A hot stew warms: the warmth effect shows and the body drifts warm.
     r.say("starve 10");
-    r.hold("tiamot_default_life:hot_stew");
+    r.hold("tiamat_default_life:hot_stew");
     r.tick(16);
     r.press("use");
     r.tick(1);
@@ -701,7 +701,7 @@ fn main() {
 
     // Cold: a cold source beside the feet, at night, drives the body cold.
     r.say("heal");
-    let dream = r.material("tiamot_default_world:dream_stone");
+    let dream = r.material("tiamat_default_world:dream_stone");
     r.world.put(101, 63, 100, dream);
     r.world.put(102, 63, 100, dream);
     *r.sounds.time.lock().unwrap() = 0.05;
@@ -717,7 +717,7 @@ fn main() {
 
     // A coat, worn, brings it back.
     r.say("kit");
-    let coat = Stack::new(r.material("tiamot_default_life:warm_coat"), 27).unwrap();
+    let coat = Stack::new(r.material("tiamat_default_life:warm_coat"), 27).unwrap();
     r.inventory.views.lock().unwrap().entry(format!("{MOD}:worn")).or_default().push(coat);
     r.tick(900);
     assert!(r.number("temp") > -0.3, "the coat warmed things to {}", r.number("temp"));
@@ -802,7 +802,7 @@ fn main() {
     // Lava under the feet: contact damage and burning after.
     r.say("heal");
     r.tick(1);
-    let magma = r.material("tiamot_default_world:magma");
+    let magma = r.material("tiamat_default_world:magma");
     let chilled = r.number("temp");
     r.world.put(100, 63, 100, magma);
     r.tick(45);
@@ -817,7 +817,7 @@ fn main() {
     // Death: a scatter on the ground, a move, a screen, everything reset.
     r.say("heal");
     r.tick(1);
-    let apples_before = r.inventory.units_of("player:main", r.material("tiamot_default_life:apple"));
+    let apples_before = r.inventory.units_of("player:main", r.material("tiamat_default_life:apple"));
     let dialogs_before = r.dialogs.0.lock().unwrap().len();
     r.say("die");
     r.tick(1);
@@ -829,12 +829,12 @@ fn main() {
     assert!(r.entities.0.lock().unwrap().moved_to.len() >= 1, "the player was moved");
     let dropped = r.entities.items(MOD);
     assert!(!dropped.is_empty(), "something was scattered");
-    let apples_after = r.inventory.units_of("player:main", r.material("tiamot_default_life:apple"));
+    let apples_after = r.inventory.units_of("player:main", r.material("tiamat_default_life:apple"));
     assert!(apples_after < apples_before, "a share of the apples was dropped");
     assert!(r.plays("death") >= 1);
     // And the scatter is picked back up by walking over it.
     r.tick(90);
-    let apples_back = r.inventory.units_of("player:main", r.material("tiamot_default_life:apple"));
+    let apples_back = r.inventory.units_of("player:main", r.material("tiamat_default_life:apple"));
     assert_eq!(apples_back, apples_before, "walked over the drops and picked them all back up");
     println!("ok  died, dropped a third, respawned shielded, picked it back up");
 
@@ -842,7 +842,7 @@ fn main() {
     r.tick(70);
     let attacker = PlayerUuid::from_bytes([9; 32]);
     let target = r.entities.0.lock().unwrap().player;
-    r.vm.punch(&tiamot_core::script::PunchEvent {
+    r.vm.punch(&tiamat_core::script::PunchEvent {
         attacker: *attacker.as_bytes(),
         target: EntityId(target),
         owner: Some(PLAYER),
@@ -854,7 +854,7 @@ fn main() {
     // Sleep: beside a bed, at night, everything comes back and the bed is home.
     r.say("hurt 9");
     r.tick(1);
-    let bed = r.material("tiamot_default_life:bed");
+    let bed = r.material("tiamat_default_life:bed");
     r.world.put(101, 64, 100, bed);
     r.hold_nothing();
     *r.sounds.time.lock().unwrap() = 0.5;
@@ -898,13 +898,13 @@ fn main() {
     println!("ok  boom");
 
     // Foraging: digging a bramble yields berries.
-    let berries = r.material("tiamot_default_life:berries");
+    let berries = r.material("tiamat_default_life:berries");
     let before = r.inventory.units_of("player:main", berries);
-    r.vm.dig_complete(&tiamot_core::script::DigEvent {
+    r.vm.dig_complete(&tiamat_core::script::DigEvent {
         player: PLAYER,
-        target: tiamot_core::SubNodePos { x: 300, y: 190, z: 300 },
-        material: r.material("tiamot_default_world:bramble"),
-        brush: tiamot_core::dig::Brush::Block,
+        target: tiamat_core::SubNodePos { x: 300, y: 190, z: 300 },
+        material: r.material("tiamat_default_world:bramble"),
+        brush: tiamat_core::dig::Brush::Block,
     });
     assert_eq!(r.inventory.units_of("player:main", berries), before + 27);
     println!("ok  a bramble dug is berries in the bag");
@@ -928,10 +928,10 @@ fn main() {
         player: PLAYER,
         mod_id: MOD.into(),
         form: format!("{MOD}:wardrobe"),
-        event: tiamot_core::proto::DialogEvent::Closed,
+        event: tiamat_core::proto::DialogEvent::Closed,
     });
     for request in r.dialogs.0.lock().unwrap().iter() {
-        tiamot_core::ui::check(&request.tree, tiamot_core::ui::Limits::default()).expect("a valid tree");
+        tiamat_core::ui::check(&request.tree, tiamat_core::ui::Limits::default()).expect("a valid tree");
     }
     println!("ok  the wardrobe and the death screen are valid dialog trees");
 
@@ -942,12 +942,12 @@ fn main() {
     // The HUD script, drawn by the client's own VM, on several states.
     hud_check(&r);
 
-    println!("PASS: tiamot_default_life runs through the engine VM end to end");
+    println!("PASS: tiamat_default_life runs through the engine VM end to end");
 }
 
 fn mob_check(r: &mut Rig) {
     // A grass plain under everything, at noon, and nothing about yet.
-    let grass = r.material("tiamot_default_world:grass");
+    let grass = r.material("tiamat_default_world:grass");
     *r.world.floor.lock().unwrap() = Some((63, grass));
     *r.sounds.time.lock().unwrap() = 0.5;
     r.say("cull");
@@ -966,7 +966,7 @@ fn mob_check(r: &mut Rig) {
     for (_, mob) in &spawned {
         // The cow and the pig are their own models; a kind with none yet is
         // the named stand-in.
-        if matches!(mob.model.as_deref(), Some("tiamot_default_life:cow" | "tiamot_default_life:pig")) {
+        if matches!(mob.model.as_deref(), Some("tiamat_default_life:cow" | "tiamat_default_life:pig")) {
             assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
         } else {
             assert_eq!(mob.model.as_deref(), Some("engine:humanoid"), "a stand-in body");
@@ -992,7 +992,7 @@ fn mob_check(r: &mut Rig) {
     let (cow, _) = cows[0].clone();
     r.hold_nothing();
     r.particles.badges.lock().unwrap().clear();
-    r.vm.punch(&tiamot_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
     r.tick(1);
     assert_eq!(r.mobs()[0].1.health.unwrap().current, 9, "a fist is one point");
     // One badge over it, for the one who hit it: nine points left of ten, two
@@ -1005,12 +1005,12 @@ fn mob_check(r: &mut Rig) {
         assert_eq!(badge.badge.count, 5, "five hearts");
         assert_eq!(badge.player, Some(PlayerUuid::from_bytes(PLAYER)), "for the hitter only");
     }
-    let meat = r.material("tiamot_default_life:raw_meat");
+    let meat = r.material("tiamat_default_life:raw_meat");
     let meat_before = r.inventory.units_of("player:main", meat);
     r.hold("core_gear:sword");
     for _ in 0..2 {
         r.tick(12);
-        r.vm.punch(&tiamot_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
+        r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
     }
     r.tick(1);
     assert!(r.mobs().is_empty(), "the cow is gone");
@@ -1044,11 +1044,11 @@ fn mob_check(r: &mut Rig) {
     let ambling = speed_of(&r);
     assert!((ambling - 1.1 / 4.3).abs() < 1e-4, "a cow ambles at 1.1 blocks a second: {ambling}");
     r.hold_nothing();
-    r.vm.punch(&tiamot_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
     r.tick(2);
     let fleeing = speed_of(&r);
     assert!((fleeing - 2.8 / 5.6).abs() < 1e-4, "and runs at 2.8: {fleeing}");
-    assert_eq!(r.entities.0.lock().unwrap().entities[&cow].anim, tiamot_core::ent::AnimTag::RUN,
+    assert_eq!(r.entities.0.lock().unwrap().entities[&cow].anim, tiamat_core::ent::AnimTag::RUN,
         "a fleeing cow plays its run");
     r.say("mob");
     assert!(r.said().contains("flee") && r.said().contains("clip run"), "{}", r.said());
@@ -1063,7 +1063,7 @@ fn mob_check(r: &mut Rig) {
     r.say("spawn bear 1");
     r.tick(1);
     let (bear, body) = r.mobs()[0].clone();
-    assert_eq!(body.model.as_deref(), Some("tiamot_default_life:bear"), "a bear is its own model");
+    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:bear"), "a bear is its own model");
     r.put_mob(bear, 102.0, 64.0, 100.5);
     r.tick(60);
     assert_eq!(r.number("hp"), 27.0, "an unprovoked bear harms nobody");
@@ -1071,7 +1071,7 @@ fn mob_check(r: &mut Rig) {
     assert!(!r.said().contains("hunt"), "and hunts nobody: {}", r.said());
     r.particles.badges.lock().unwrap().clear();
     r.hold_nothing();
-    r.vm.punch(&tiamot_core::script::PunchEvent { attacker: PLAYER, target: EntityId(bear), owner: None });
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(bear), owner: None });
     r.tick(1);
     {
         let badges = r.particles.badges.lock().unwrap();
@@ -1085,7 +1085,7 @@ fn mob_check(r: &mut Rig) {
     for _ in 0..40 {
         r.put_mob(bear, 101.5, 64.0, 100.5);
         r.tick(1);
-        swiped |= r.entities.0.lock().unwrap().entities[&bear].anim == tiamot_core::ent::AnimTag::SWING;
+        swiped |= r.entities.0.lock().unwrap().entities[&bear].anim == tiamat_core::ent::AnimTag::SWING;
     }
     assert!(r.number("hp") <= 27.0 - 7.0, "mauled: {}", r.number("hp"));
     assert!(swiped, "and the blow plays its swing");
@@ -1126,7 +1126,7 @@ fn climate_check() {
     let mut r = rig_with("");
     r.huds.op(PLAYER);
     r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
-    let grass = r.material("tiamot_default_world:grass");
+    let grass = r.material("tiamat_default_world:grass");
     *r.world.floor.lock().unwrap() = Some((63, grass));
 
     // The spawn plain, at noon: nothing to report.
@@ -1177,11 +1177,11 @@ fn kind_of(e: &Entity) -> Option<String> {
 
 fn dig(r: &mut Rig) -> bool {
     r.vm
-        .dig_complete(&tiamot_core::script::DigEvent {
+        .dig_complete(&tiamat_core::script::DigEvent {
             player: PLAYER,
-            target: tiamot_core::SubNodePos { x: 300, y: 190, z: 300 },
-            material: r.material("tiamot_default_world:grass"),
-            brush: tiamot_core::dig::Brush::Block,
+            target: tiamat_core::SubNodePos { x: 300, y: 190, z: 300 },
+            material: r.material("tiamat_default_world:grass"),
+            brush: tiamat_core::dig::Brush::Block,
         })
         .allowed
 }
@@ -1246,7 +1246,7 @@ fn modes_check() {
     assert!(c.flag("creative"));
     assert_eq!(c.abilities().map(|a| a.fly), Some(true), "everybody flies in a creative world");
     c.say_as(BOB, "kit");
-    assert!(c.inventory.units_of("player:main", c.material("tiamot_default_life:apple")) > 0, "anyone may take the kit");
+    assert!(c.inventory.units_of("player:main", c.material("tiamat_default_life:apple")) > 0, "anyone may take the kit");
     c.say_as(BOB, "boom");
     c.tick(1);
     assert!(c.huds.said_to(BOB).contains("admins"), "but not the rest");
@@ -1259,7 +1259,7 @@ fn modes_check() {
     a.tick(70);
     assert!(a.text("toast").contains("one life"));
     a.say("kit");
-    let apple = a.material("tiamot_default_life:apple");
+    let apple = a.material("tiamat_default_life:apple");
     assert!(a.inventory.units_of("player:main", apple) > 0);
     assert!(dig(&mut a), "the living dig");
     a.say("die");
@@ -1361,7 +1361,7 @@ fn hud_check(r: &Rig) {
         // With LIFE_HUD_DUMP set, write every state's resolved commands to a
         // directory, one file each, for tools/render_hud.py to rasterise.
         if let Ok(dump) = std::env::var("LIFE_HUD_DUMP") {
-            use tiamot_core::hud::Command;
+            use tiamat_core::hud::Command;
             let width = 1920.0;
             let mut lines = Vec::new();
             // Icons are named by hash on the wire; name them by file here.
@@ -1371,7 +1371,7 @@ fn hud_check(r: &Rig) {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if let Ok(bytes) = std::fs::read(&path) {
-                        by_hash.insert(tiamot_core::content::hash_bytes(&bytes), path);
+                        by_hash.insert(tiamat_core::content::hash_bytes(&bytes), path);
                     }
                 }
             }

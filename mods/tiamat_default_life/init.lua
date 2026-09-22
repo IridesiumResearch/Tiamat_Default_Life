@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-only
 --
--- Tiamot Default Life: the survival layer. This file only decides load order.
+-- Tiamat Default Life: the survival layer. This file only decides load order.
 --
 -- Every file below is loaded exactly once and hangs what it exports off the
 -- `tdl` global, which the sandbox shares between a mod's own files. The
@@ -19,7 +19,7 @@ tdl = {}
 local function load(name)
     local ok, result = pcall(require, name)
     if not ok then
-        game.log(string.format("tiamot_default_life: %s.lua failed: %s", name, tostring(result)))
+        game.log(string.format("tiamat_default_life: %s.lua failed: %s", name, tostring(result)))
         error(result, 0)
     end
     return result
@@ -53,5 +53,5 @@ if not pcall(game.register_hud_script, { file = "hud.lua", reserve = 216 }) then
     game.register_hud_script("hud.lua")
 end
 
-game.log("tiamot_default_life ready: " .. tdl.items.count .. " items, " .. tdl.effects.count .. " effects, "
+game.log("tiamat_default_life ready: " .. tdl.items.count .. " items, " .. tdl.effects.count .. " effects, "
     .. #tdl.mobs.order .. " creatures")

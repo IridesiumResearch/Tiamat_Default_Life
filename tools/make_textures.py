@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Generates the item and block textures for mods/tiamot_default_life/textures.
+"""Generates the item and block textures for mods/tiamat_default_life/textures.
 
 Clean, simple drawings, 64 pixels square: flat colours with soft edges and
 one highlight, the way the HUD icons are drawn. The engine draws an item as
@@ -16,7 +16,7 @@ from pathlib import Path
 from draw import (box, capsule, circle, ellipse, everything, halfplane, intersect, outlined, png, render,
                   rgba, rotate, shade, shrink, subtract, translate, union)
 
-OUT = Path(__file__).resolve().parent.parent / "mods" / "tiamot_default_life" / "textures"
+OUT = Path(__file__).resolve().parent.parent / "mods" / "tiamat_default_life" / "textures"
 SIZE = 64
 
 PICTURES = {}

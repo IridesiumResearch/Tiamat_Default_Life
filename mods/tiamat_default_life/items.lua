@@ -156,7 +156,7 @@ if game.register_picture then
         M.icons[name] = game.register_picture{ id = "icon_" .. name, file = "icons/" .. name .. ".png" }
     end
 else
-    game.log("tiamot_default_life: this engine has no game.register_picture; HUD pictures will not arrive")
+    game.log("tiamat_default_life: this engine has no game.register_picture; HUD pictures will not arrive")
 end
 
 -- Actions -------------------------------------------------------------------

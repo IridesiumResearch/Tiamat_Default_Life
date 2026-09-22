@@ -100,7 +100,7 @@ C.temp_source_far = 0.40       -- a source within the radius
 -- How far below the open-sky line a body is before "cave" applies.
 C.cave_sun_max = 5             -- get_light().sun at the head; 15 is open sky
 
--- The world's own climate. Tiamot Default World (the Spindle) makes its
+-- The world's own climate. Tiamat Default World (the Spindle) makes its
 -- temperature RADIAL: `T = 4t(1 - t)` in `t = r / R`, cold at the axis,
 -- hottest halfway out, cold again at the rim (its docs/spindle-mod-plan.md,
 -- C.3). This mod reads nothing of the world's; it does the same sum from
@@ -199,28 +199,28 @@ C.fly_lift = 0.24              -- cells per tick, the tick of gravity a flyer ca
 -- Standing IN one of these burns. `damage`/`ticks` are the contact hit and
 -- `after` is how long the burning status lasts once out of it.
 C.contact_fire = {
-    ["tiamot_default_world:magma"] = { damage = C.lava_damage, ticks = C.lava_ticks, after = C.burn_after_lava },
-    ["tiamot_default_life:campfire"] = { damage = C.campfire_damage, ticks = C.campfire_ticks, after = C.burn_after_campfire },
+    ["tiamat_default_world:magma"] = { damage = C.lava_damage, ticks = C.lava_ticks, after = C.burn_after_lava },
+    ["tiamat_default_life:campfire"] = { damage = C.campfire_damage, ticks = C.campfire_ticks, after = C.burn_after_campfire },
 }
 -- Heat sources, for temperature: strength 0..1 scales `temp_source_*`.
 C.heat_sources = {
-    ["tiamot_default_life:campfire"] = 1.0,
-    ["tiamot_default_world:magma"] = 1.0,
-    ["tiamot_default_world:magma_crust"] = 0.5,
-    ["tiamot_default_world:lantern_stone"] = 0.6,
+    ["tiamat_default_life:campfire"] = 1.0,
+    ["tiamat_default_world:magma"] = 1.0,
+    ["tiamat_default_world:magma_crust"] = 0.5,
+    ["tiamat_default_world:lantern_stone"] = 0.6,
 }
 C.cold_sources = {
-    ["tiamot_default_world:dream_stone"] = 0.8,
-    ["tiamot_default_world:snow"] = 0.5,
-    ["tiamot_default_world:permafrost"] = 0.3,
+    ["tiamat_default_world:dream_stone"] = 0.8,
+    ["tiamat_default_world:snow"] = 0.5,
+    ["tiamat_default_world:permafrost"] = 0.3,
 }
 -- Ground cover a body walks through. Treated as clear when looking for
 -- somewhere a creature can stand, so a meadow of tufts is not a wall.
 C.passable_cover = {
-    "tiamot_default_world:fern",
-    "tiamot_default_world:tall_grass",
-    "tiamot_default_world:ladys_mantle",
-    "tiamot_default_world:ladys_mantle_bloom",
+    "tiamat_default_world:fern",
+    "tiamat_default_world:tall_grass",
+    "tiamat_default_world:ladys_mantle",
+    "tiamat_default_world:ladys_mantle_bloom",
 }
 -- Blocks that irradiate whoever stands near them. None in the default world
 -- yet; the mechanism is here for the one that will.
@@ -260,7 +260,7 @@ end
 
 -- Digging one of these also yields food: berries from the world's brambles.
 C.forage = {
-    ["tiamot_default_world:bramble"] = { item = "berries", count = 1 },
+    ["tiamat_default_world:bramble"] = { item = "berries", count = 1 },
 }
 
 return C

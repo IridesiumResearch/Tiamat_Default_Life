@@ -3,7 +3,7 @@
 # A native check that runs the mod through the engine's real script VM with a
 # fake server around it: a player body, an inventory, blocks and fluid where
 # the test puts them. Run from the repository root, with the engine checkout
-# beside it as ../Tiamot:
+# beside it as ../Tiamat:
 #
 #     cargo run --manifest-path tests/native/Cargo.toml
 [package]
@@ -14,4 +14,4 @@ edition = "2024"
 [workspace]
 
 [dependencies]
-tiamot-core = { path = "../../../Tiamot/crates/core" }
+tiamat-core = { path = "../../../Tiamot/crates/core" }

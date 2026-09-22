@@ -73,7 +73,7 @@ function tdl.register_mob(def)
         local ok, why = pcall(game.register_model, { id = def.id, file = def.model, texture = def.texture })
         def.has_model = ok
         if not ok then
-            game.log("tiamot_default_life: " .. def.id .. " keeps its stand-in body: " .. tostring(why))
+            game.log("tiamat_default_life: " .. def.id .. " keeps its stand-in body: " .. tostring(why))
         end
     end
     M.kinds[def.id] = def
@@ -276,7 +276,7 @@ local function try_spawn_near(v)
             if n > 0 then
                 local ids = tdl.spawn_mob(chosen.id, feet, n)
                 if #ids > 0 then
-                    game.log(string.format("tiamot_default_life: %d %s appeared at %d, %d, %d",
+                    game.log(string.format("tiamat_default_life: %d %s appeared at %d, %d, %d",
                         #ids, chosen.name, x, math.floor(feet.y), z))
                 end
             end

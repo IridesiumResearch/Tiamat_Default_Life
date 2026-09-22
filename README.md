@@ -1,6 +1,6 @@
-# Tiamot Default Life
+# Tiamat Default Life
 
-The survival layer for the [Tiamot](https://github.com/IridesiumResearch/Tiamot-Voxel-Game)
+The survival layer for the [Tiamat](https://github.com/IridesiumResearch/Tiamat-Voxel-Game)
 voxel engine: hearts, cookies, bubbles when you are under, a thermometer
 only when it matters, food that heals and clothing that keeps you warm; three
 kinds of world (Default, Creative, and a one-life Adventure) with admins over
@@ -14,7 +14,7 @@ and [`stubs/game.lua`](stubs/game.lua) is the API itself.
 ## Layout
 
 ```
-mods/tiamot_default_life/   the mod (this is what the engine loads)
+mods/tiamat_default_life/   the mod (this is what the engine loads)
   mod.toml                  manifest
   init.lua                  load order only
   config.lua                every number a designer might turn
@@ -104,11 +104,11 @@ The engine reads one mods directory (`mods_path`, default `game/`). Point it
 at this mod with a directory junction so edits here are live:
 
 ```
-mklink /J <engine>\game\tiamot_default_life <this repo>\mods\tiamot_default_life
+mklink /J <engine>\game\tiamat_default_life <this repo>\mods\tiamat_default_life
 ```
 
-Then create or open a world with **Tiamot Default Life** enabled. It works
-with either **Core UI** or **Tiamot Inventory** drawing the hotbar; the
+Then create or open a world with **Tiamat Default Life** enabled. It works
+with either **Core UI** or **Tiamat Inventory** drawing the hotbar; the
 vitals sit above it.
 
 Validate without launching the game. This catches every registration error:
@@ -119,7 +119,7 @@ cargo run -p server -- --check-mods game
 
 And run the mod for real, headless, through the engine's VM with a fake
 world around it (the engine checkout must sit beside this repo as
-`../Tiamot`):
+`../Tiamat`):
 
 ```
 cargo run --offline --manifest-path tests/native/Cargo.toml
@@ -188,7 +188,7 @@ chat.
 
 ## The world it lives in
 
-This is written for **Tiamot Default World**, the Spindle, and reads three
+This is written for **Tiamat Default World**, the Spindle, and reads three
 things off it without touching its code: its block ids (grass, loam, snow,
 magma and the rest, all looked up leniently so a world without one still
 loads), its climate formula and its ring table (both copied into
@@ -284,10 +284,10 @@ which launch the game (the pig at `--length 4.5`; the bear at `--length
 6.0 --rename eating=sneak`, its walk already quick enough):
 
 ```
-python tools/skin_glb.py "assets/source/Tiamot Life AI Cow.glb" mods/tiamot_default_life/models/cow.glb --length 6.0 --rename Eating=sneak --speed walk=2
-cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
-MODEL_POSE_DUMP=out/poses cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
-python tools/render_model.py out/poses mods/tiamot_default_life/models/cow.png out/cow_sheet.png
+python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename Eating=sneak --speed walk=2
+cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamat_default_life/models/cow.glb
+MODEL_POSE_DUMP=out/poses cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamat_default_life/models/cow.glb
+python tools/render_model.py out/poses mods/tiamat_default_life/models/cow.png out/cow_sheet.png
 ```
 
 `skin_glb.py` exists because modelling tools export a blocky creature as
@@ -321,6 +321,6 @@ creature is written: a definition table, and nothing else.
 ## Licence
 
 GPL-3.0-only, like the world mod beside it. The engine's
-[`LICENSE.EXCEPTION`](https://github.com/IridesiumResearch/Tiamot-Voxel-Game/blob/main/LICENSE.EXCEPTION)
+[`LICENSE.EXCEPTION`](https://github.com/IridesiumResearch/Tiamat-Voxel-Game/blob/main/LICENSE.EXCEPTION)
 makes a mod an independent work, so this is a choice rather than an
 obligation.

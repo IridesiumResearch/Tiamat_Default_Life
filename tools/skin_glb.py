@@ -418,7 +418,7 @@ def convert(source, target, length_cells, renames, flip, speeds=None):
     mesh_node = {"name": "body", "mesh": 0, "skin": 0}
     out_nodes.append(mesh_node)
     out = {
-        "asset": {"version": "2.0", "generator": "tiamot_default_life tools/skin_glb.py"},
+        "asset": {"version": "2.0", "generator": "tiamat_default_life tools/skin_glb.py"},
         "scene": 0,
         "scenes": [{"nodes": [new_index[root], len(out_nodes) - 1]}],
         "nodes": out_nodes,

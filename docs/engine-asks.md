@@ -9,7 +9,7 @@ the record; the open ones are copied to the engine repo (see below).
 
 **Nothing is open.** Every ask landed, and the mod uses every answer. Open asks are
 copied, without the history, to the engine's
-`docs/engine-asks/tiamot_default_life.md`, so the engine side finds every
+`docs/engine-asks/tiamat_default_life.md`, so the engine side finds every
 mod's open asks in one place. This file keeps everything, landed items
 included.
 
@@ -237,7 +237,7 @@ white; a model has UVs and nothing to put on them.
 
 1. `game.register_model{ id = "cow", file = "models/cow.glb" }` at
    registration, pushed by hash like a texture, with the client loading it
-   through the existing reader and drawing `tiamot_default_life:cow` where
+   through the existing reader and drawing `tiamat_default_life:cow` where
    it now draws nothing. Clips matched to `AnimTag` by name: `idle`,
    `walk`, `run`, `swing`, `swim`, `sneak`; a missing clip falls back to
    `idle`; no clips at all is a rigid model, still drawn.
@@ -340,10 +340,10 @@ the client already computes for the dig target, or nil.
 **Wanted.** Hearts and drumsticks as PNGs drawn with `hud.image`.
 
 **Why the mod cannot do it.** `hud.image` takes a 64-hex content hash, which
-is `blake3("tiamot:content:v1" .. bytes)`. A mod has no way to compute that
+is `blake3("tiamat:content:v1" .. bytes)`. A mod has no way to compute that
 at load and no way to ask for it, so the hash has to be pasted into the
 script by hand and re-pasted whenever the picture changes (which is what
-`tiamot_inventory` does). This mod draws its icons as rectangles instead.
+`tiamat_inventory` does). This mod draws its icons as rectangles instead.
 
 **Ask.** `game.content_hash("textures/heart.png")` at registration, or a
 `hash = game.picture("textures/heart.png")` that both registers the file for

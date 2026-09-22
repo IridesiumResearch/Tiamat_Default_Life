@@ -1,10 +1,10 @@
-# Tiamot Default Life — health, hunger, air, warmth, and what ends them.
+# Tiamat Default Life — health, hunger, air, warmth, and what ends them.
 #
-# The survival layer for Tiamot: hearts and cookies, bubbles when you are
+# The survival layer for Tiamat: hearts and cookies, bubbles when you are
 # under, a thermometer only when it matters, food that heals and clothing
 # that keeps you warm; the world's modes and admins; and its creatures.
-id = "tiamot_default_life"
-name = "Tiamot Default Life"
+id = "tiamat_default_life"
+name = "Tiamat Default Life"
 version = "0.1.0"
 depends = ["core >=0.1"]
 description = "Health, hunger, air and body temperature for players, and everything that lives in the world."

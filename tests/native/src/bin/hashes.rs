@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 
 fn main() {
-    let mod_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../mods/tiamot_default_life");
+    let mod_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../mods/tiamat_default_life");
     let icons = mod_dir.join("icons");
     let hud = mod_dir.join("hud.lua");
 
@@ -30,7 +30,7 @@ fn main() {
     let mut block = String::from("local ICONS = {\n");
     for name in &names {
         let bytes = std::fs::read(icons.join(format!("{name}.png"))).expect("icon bytes");
-        let hash = tiamot_core::content::hash_bytes(&bytes);
+        let hash = tiamat_core::content::hash_bytes(&bytes);
         let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
         block.push_str(&format!("    {name} = \"{hex}\",\n"));
         println!("{name}  {hex}");

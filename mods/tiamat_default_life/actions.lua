@@ -308,7 +308,7 @@ if C.dev_commands then
             v.hp, C.max_health, v.food, C.max_food, C.visible_food, v.air, C.max_air,
             v.temp, v.env.ambient, v.env.heat or 0, v.env.cold or 0, v.warmth,
             E.hud_string(v), tostring(v.env.submerged), tostring(v.env.wet), tostring(v.env.fire ~= nil), v.deaths)
-        game.log("tiamot_default_life vitals " .. tdl.name(uuid) .. ": " .. line)
+        game.log("tiamat_default_life vitals " .. tdl.name(uuid) .. ": " .. line)
         tdl.say(uuid, string.format("hp %d food %d air %d temp %.2f", v.hp, v.food, v.air, v.temp))
     end)
 

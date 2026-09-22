@@ -11,7 +11,7 @@
 // text (`v x y z u v` lines, then `f a b c` lines) for tools/render_model.py
 // to draw. What the engine would draw, without a window.
 
-use tiamot_core::model::{self, Limits};
+use tiamat_core::model::{self, Limits};
 
 fn main() {
     let files: Vec<String> = std::env::args().skip(1).collect();
