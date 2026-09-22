@@ -175,6 +175,10 @@ C.explosion_push_up = 0.8
 -- nametag while this is true, and invisible when it is false: the engine
 -- draws nothing for a model name nobody registered.
 C.placeholder_models = true
+C.mob_hearts = true            -- a row of hearts over a mob for the player who hit it
+C.mob_hearts_seconds = 1.2     -- how long it shows
+C.mob_hearts_above = 0.35      -- blocks over the top of the mob
+C.mob_heart_pixel = 0.055      -- blocks: one pixel of a heart, five to its width
 C.mob_arrival = 0.6            -- blocks from a target that counts as there
 C.mob_moving_speed2 = 0.0025   -- (cells per tick)^2; slower than this, a walker trying to go is not going
 C.mob_stuck_ticks = 10         -- ticks of trying and not going before a walker jumps

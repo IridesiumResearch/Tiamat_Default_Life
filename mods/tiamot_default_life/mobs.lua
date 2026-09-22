@@ -287,6 +287,56 @@ end
 -- Damage and death ---------------------------------------------------------------------------
 
 --- Hurts one of ours. `by` is the UUID of whoever did it, or nil.
+-- Hearts over a hurt mob --------------------------------------------------------------
+--
+-- The engine can put no picture over an entity, but a particle with no spread,
+-- no speed and no gravity stays exactly where it is put. So the row of hearts
+-- is drawn in pixels, one particle each, for the player who struck the blow
+-- and nobody else, turned square to them. Two points to a heart: red is what
+-- is left, a white flash is what that hit took, dark is what was gone before.
+
+local HEART = { "XX.XX", "XXXXX", ".XXX.", "..X.." }
+
+local function show_hearts(entity, kind, before, after, viewer)
+    local body = viewer and U.body(viewer)
+    if body == nil or not C.mob_hearts then return end
+    local dx, dz = entity.pos.x - body.pos.x, entity.pos.z - body.pos.z
+    local length = math.sqrt(dx * dx + dz * dz)
+    if length < 0.001 then return end
+    -- Across the viewer's line of sight: their right, as they face the mob.
+    local rx, rz = -dz / length, dx / length
+    local px = C.mob_heart_pixel
+    local hearts = (kind.health + 1) // 2
+    local width = hearts * 6 - 1
+    local top = entity.pos.y + (kind.collider and kind.collider.height or 3) / 3 + C.mob_hearts_above
+    for h = 0, hearts - 1 do
+        for row = 1, #HEART do
+            local line = HEART[row]
+            for col = 1, 5 do
+                if string.sub(line, col, col) == "X" then
+                    -- Which point of the mob's health this pixel stands for:
+                    -- the left three columns of a heart are its first point.
+                    local point = h * 2 + (col <= 3 and 1 or 2)
+                    local colour, life
+                    if point <= after then
+                        colour, life = { r = 0.86, g = 0.1, b = 0.12 }, C.mob_hearts_seconds
+                    elseif point <= before then
+                        colour, life = { r = 1, g = 1, b = 1 }, C.mob_hearts_seconds / 3
+                    else
+                        colour, life = { r = 0.18, g = 0.14, b = 0.14 }, C.mob_hearts_seconds
+                    end
+                    local across = (h * 6 + col - 1 - width / 2) * px
+                    game.emit_particles{
+                        pos = { x = entity.pos.x + rx * across, y = top - (row - 1) * px, z = entity.pos.z + rz * across },
+                        count = 1, size = px * 1.15, lifetime = life, colour = colour,
+                        gravity = 0, collide = false, player = viewer,
+                    }
+                end
+            end
+        end
+    end
+end
+
 function tdl.hurt_mob(id, amount, by)
     local entity = game.entity(id)
     if entity == nil or entity.health == nil then return false end
@@ -297,6 +347,7 @@ function tdl.hurt_mob(id, amount, by)
 
     local left = entity.health - U.round(amount)
     game.cue{ cue = "hurt", pos = entity.pos, radius = 16, gain = 0.6 }
+    show_hearts(entity, m.kind, entity.health, math.max(left, 0), by)
     if left <= 0 then
         -- What it leaves behind, then gone.
         for _, drop in ipairs(m.kind.drops) do
@@ -428,11 +479,23 @@ local function walk_to(id, m, entity, target, gait)
         end
         jump = true
     end
+    -- A slow walker's pace. The engine gives a mob a player's gaits and no
+    -- speed of its own, and ignores how long the drive is, so a kind with a
+    -- `pace` under 1 pushes on only that share of its ticks and coasts on the
+    -- rest: half is a steady half the walk, and the body barely wavers.
+    local push = true
+    local pace = gait == "walk" and m.kind.pace or 1
+    if pace < 1 and not jump then
+        m.pace_acc = (m.pace_acc or 0) + pace
+        push = m.pace_acc >= 1
+        if push then m.pace_acc = m.pace_acc - 1 end
+    end
     local length = math.sqrt(flat)
     local anim = ANIM_IDLE
     if speed2 >= 0.0025 then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
+    local walk = push and { x = dx / length, z = dz / length } or { x = 0, z = 0 }
     game.set_entity(id, {
-        drive = { walk = { x = dx / length, z = dz / length }, jump = jump, gait = gait },
+        drive = { walk = walk, jump = jump, gait = gait },
         yaw = game.heading(dx, dz),
         anim = anim,
     })

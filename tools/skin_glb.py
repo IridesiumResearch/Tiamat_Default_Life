@@ -14,6 +14,9 @@ and follows the body. This rewrites such a file as the engine wants it:
   reader builds the skeleton from the joints alone;
 - sized in CELLS (three to a block) to a given length, feet on y = 0,
   centred, and facing +Z, which is the way the engine's bodies face;
+- a clip played faster or slower if asked (`--speed walk=2`), since the
+  engine plays a clip at its own pace and a modeller's walk may be timed for
+  a slower body than the one the game moves;
 - clips renamed to lower case, which is how the engine matches a clip to an
   animation tag: idle, walk, run, swing, swim, sneak;
 - no images, materials or textures: the engine refuses embedded images, and
@@ -21,7 +24,7 @@ and follows the body. This rewrites such a file as the engine wants it:
 
 Standard library only:
 
-    python tools/skin_glb.py <in.glb> <out.glb> --length 6.0 [--rename Eating=sneak]
+    python tools/skin_glb.py <in.glb> <out.glb> --length 6.0 [--rename Eating=sneak] [--speed walk=2]
 """
 import argparse
 import json
@@ -174,7 +177,8 @@ class Writer:
         return len(self.accessors) - 1
 
 
-def convert(source, target, length_cells, renames, flip):
+def convert(source, target, length_cells, renames, flip, speeds=None):
+    speeds = speeds or {}
     g = Glb(source)
     j = g.json
     nodes = j["nodes"]
@@ -354,6 +358,9 @@ def convert(source, target, length_cells, renames, flip):
             if sampler.get("interpolation", "LINEAR") == "CUBICSPLINE":
                 raise SystemExit(f"clip {name}: cubic keys; bake to linear when exporting")
             times = g.read(sampler["input"])
+            factor = speeds.get(name, 1.0)
+            if factor != 1.0:
+                times = [tuple(t / factor for t in v) if isinstance(v, (tuple, list)) else v / factor for v in times]
             keys = [tuple(v) for v in g.read(sampler["output"])]
             if node == root:
                 # The root's keys are in the armature's space; bring them along.
@@ -404,7 +411,8 @@ def convert(source, target, length_cells, renames, flip):
           f"head toward {'-' if facing_back else '+'}; turned {turn:.0f} degrees, scaled x{k:.2f}")
     print("in cells: " + " x ".join(f"{hi2[a] - lo2[a]:.2f}" for a in range(3))
           + f"  (blocks: {(hi2[0]-lo2[0])/3:.2f} wide, {(hi2[1]-lo2[1])/3:.2f} tall, {(hi2[2]-lo2[2])/3:.2f} long); feet at y = {lo2[1]:.3f}")
-    print("clips: " + ", ".join(f"{a['name']} ({len(a['channels'])} channels)" for a in animations))
+    print("clips: " + ", ".join(f"{a['name']} ({len(a['channels'])} channels"
+                                + (f", x{speeds[a['name']]:g} speed" if a['name'] in speeds else "") + ")" for a in animations))
     print(f"wrote {target} ({total} bytes)")
 
 
@@ -415,6 +423,9 @@ if __name__ == "__main__":
     ap.add_argument("--length", type=float, default=6.0, help="nose to tail, in cells (three to a block)")
     ap.add_argument("--rename", action="append", default=[], metavar="Old=new", help="rename a clip")
     ap.add_argument("--flip", action="store_true", help="turn it round, if the head was guessed wrong")
+    ap.add_argument("--speed", action="append", default=[], metavar="clip=factor",
+                    help="play a clip (by its final name) this many times faster")
     args = ap.parse_args()
     convert(args.source, args.target, args.length,
-            dict(pair.split("=", 1) for pair in args.rename), args.flip)
+            dict(pair.split("=", 1) for pair in args.rename), args.flip,
+            {k.lower(): float(v) for k, v in (pair.split("=", 1) for pair in args.speed)})

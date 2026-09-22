@@ -15,6 +15,7 @@
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
 --   sound, sound_death, voice_min, voice_max
 --   model, texture    files in this mod: a .glb, and the PNG skin it wears
+--   pace              share of the engine's walking speed a walker ambles at (default 1)
 --   grazes            idles with its head down now and then (the `sneak` clip)
 --   drops             { { item, min, max } }, items of this mod
 --   spawn             { ground = { block ids }, rings = { ring ids }, time = "day" | "night" | "any",
@@ -35,7 +36,7 @@ local G = "tiamot_default_world:"
 tdl.register_mob{
     id = "cow", name = "Cow", health = 10,
     collider = { width = 2.4, height = 4.5 },
-    model = "models/cow.glb", texture = "models/cow.png", grazes = true,
+    model = "models/cow.glb", texture = "models/cow.png", grazes = true, pace = 0.5,
     shy = 1.5, sight = 10, wander_radius = 10, pause_min = 60, pause_max = 240,
     sound = "moo", sound_death = "moo", voice_min = 300, voice_max = 1200,
     drops = { { "raw_meat", 1, 3 } },
@@ -59,7 +60,7 @@ tdl.register_mob{
 tdl.register_mob{
     id = "pig", name = "Pig", health = 10,
     collider = { width = 2.4, height = 2.5 },
-    model = "models/pig.glb", texture = "models/pig.png", grazes = true,
+    model = "models/pig.glb", texture = "models/pig.png", grazes = true, pace = 0.5,
     shy = 1.5, sight = 8, wander_radius = 8, pause_min = 40, pause_max = 200,
     sound = "oink", sound_death = "oink", voice_min = 200, voice_max = 800,
     drops = { { "raw_meat", 1, 2 } },

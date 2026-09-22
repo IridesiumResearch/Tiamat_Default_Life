@@ -277,7 +277,7 @@ into the shape the engine reads is three tools, none of which launch the
 game (the pig went through the same steps, at `--length 4.5`):
 
 ```
-python tools/skin_glb.py "assets/source/Tiamot Life AI Cow.glb" mods/tiamot_default_life/models/cow.glb --length 6.0 --rename Eating=sneak
+python tools/skin_glb.py "assets/source/Tiamot Life AI Cow.glb" mods/tiamot_default_life/models/cow.glb --length 6.0 --rename Eating=sneak --speed walk=2
 cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
 MODEL_POSE_DUMP=out/poses cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
 python tools/render_model.py out/poses mods/tiamot_default_life/models/cow.png out/cow_sheet.png

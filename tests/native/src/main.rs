@@ -23,6 +23,7 @@ use tiamot_core::{
     identity::PlayerUuid,
     inventory::{self, Shape, Stack},
     light::{Light, LightSource},
+    particle::{self, EmitRequest},
     script::{
         ActionEvent, ChatEvent, DialogEvent, EngineVm, HudLimits, HudVm, JoinEvent, LeaveEvent,
         ScriptVm, VmLimits, WorldEdit,
@@ -326,6 +327,17 @@ impl hud::Access for Huds {
     }
 }
 
+/// Every particle burst, as sent.
+#[derive(Default)]
+struct Particles(Mutex<Vec<EmitRequest>>);
+
+impl particle::Access for Particles {
+    fn emit(&self, request: &EmitRequest) -> u32 {
+        self.0.lock().unwrap().push(request.clone());
+        1
+    }
+}
+
 #[derive(Default)]
 struct Dialogs(Mutex<Vec<ShowRequest>>);
 
@@ -435,6 +447,7 @@ struct Rig {
     huds: Arc<Huds>,
     dialogs: Arc<Dialogs>,
     world: Arc<World>,
+    particles: Arc<Particles>,
     materials: HashMap<String, MaterialId>,
 }
 
@@ -560,6 +573,7 @@ fn rig_with(prelude: &str) -> Rig {
     let huds = Arc::new(Huds::default());
     let dialogs = Arc::new(Dialogs::default());
     let world = Arc::new(World::default());
+    let particles = Arc::new(Particles::default());
 
     vm.set_storage_access(storage.clone());
     vm.set_entity_access(Arc::new(entities.clone()));
@@ -571,6 +585,7 @@ fn rig_with(prelude: &str) -> Rig {
     vm.set_fluid_access(world.clone());
     vm.set_light_source(world.clone());
     vm.set_world_edit(world.clone());
+    vm.set_particle_access(particles.clone());
 
     // A stand-in for the world mod, so the lava and the bramble exist.
     vm.load_mod(
@@ -587,7 +602,7 @@ fn rig_with(prelude: &str) -> Rig {
     // Noon, so nothing is cold unless a scenario makes it so.
     *sounds.time.lock().unwrap() = 0.5;
     let materials = vm.registered_blocks().into_iter().collect();
-    Rig { vm, storage, entities, inventory, sounds, huds, dialogs, world, materials }
+    Rig { vm, storage, entities, inventory, sounds, huds, dialogs, world, particles, materials }
 }
 
 fn main() {
@@ -914,6 +929,7 @@ fn main() {
     println!("ok  the wardrobe and the death screen are valid dialog trees");
 
     mob_check(&mut r);
+    pace_check();
     climate_check();
     modes_check();
 
@@ -969,9 +985,22 @@ fn mob_check(r: &mut Rig) {
     assert_eq!(cows.len(), 1, "one cow");
     let (cow, _) = cows[0].clone();
     r.hold_nothing();
+    r.particles.0.lock().unwrap().clear();
     r.vm.punch(&tiamot_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
     r.tick(1);
     assert_eq!(r.mobs()[0].1.health.unwrap().current, 9, "a fist is one point");
+    // Five hearts over it, for the one who hit it: 9 points left in red, the
+    // one it lost flashing white, nothing dark yet. Thirteen pixels a heart.
+    {
+        let bursts = r.particles.0.lock().unwrap();
+        assert_eq!(bursts.len(), 5 * 13, "five hearts of pixels");
+        assert!(bursts.iter().all(|b| b.player == Some(PlayerUuid::from_bytes(PLAYER))), "for the hitter only");
+        let white = bursts.iter().filter(|b| b.burst.colour[1] > 200).count();
+        assert!(white > 0 && white < 13, "the point it lost flashes white: {white} pixels");
+        let top = bursts.iter().map(|b| b.burst.pos[1]).fold(f64::MIN, f64::max);
+        let cow_y = r.mobs()[0].1.transform.to_world()[1];
+        assert!(top > cow_y + 1.5, "above the cow: {top} over {cow_y}");
+    }
     let meat = r.material("tiamot_default_life:raw_meat");
     let meat_before = r.inventory.units_of("player:main", meat);
     r.hold("core_gear:sword");
@@ -998,7 +1027,7 @@ fn mob_check(r: &mut Rig) {
     }
     r.tick(5);
     assert!(r.inventory.units_of("player:main", meat) > meat_before, "and in the bag");
-    println!("ok  a cow punched, run off, slain by sword, and its meat picked up");
+    println!("ok  a cow punched showed its hearts, ran off, slain by sword, and its meat picked up");
 
     // A walker jumps only when it is stuck. A punched cow runs; while its
     // body is moving it never jumps, whatever the ground ahead. Held still
@@ -1102,6 +1131,45 @@ fn climate_check() {
 }
 
 const BOB: [u8; 32] = [9; 32];
+
+/// A walker at `pace = 0.5` pushes on every other tick and coasts on the rest,
+/// through the engine's own physics on flat ground: it should settle at about
+/// half the walk, and not lurch.
+fn pace_check() {
+    use tiamot_core::phys::{Body, Intent, Solid, Tuning, step};
+    struct Ground;
+    impl Solid for Ground {
+        fn solid(&self, _: i32, y: i32, _: i32) -> bool {
+            y < 0
+        }
+    }
+    let walk = |push: bool| Intent { walk: if push { [1.0, 0.0] } else { [0.0, 0.0] }, ..Intent::default() };
+    let run = |pace: f32| {
+        let mut body = Body { position: [0.0, 0.0, 0.0], velocity: [0.0; 3], on_ground: true, jump_cooldown: 0 };
+        let (mut acc, mut lo, mut hi) = (0.0f32, f32::MAX, 0.0f32);
+        for tick in 0..200 {
+            acc += pace;
+            let push = acc >= 1.0;
+            if push {
+                acc -= 1.0;
+            }
+            let before = body.position[0];
+            body = step(&Ground, body, walk(push), &Tuning::DEFAULT);
+            if tick >= 100 {
+                let moved = body.position[0] - before;
+                lo = lo.min(moved);
+                hi = hi.max(moved);
+            }
+        }
+        (body.position[0], lo, hi)
+    };
+    let (full, _, _) = run(1.0);
+    let (half, lo, hi) = run(0.5);
+    let ratio = half / full;
+    assert!((ratio - 0.5).abs() < 0.08, "half pace covers half the ground: {ratio:.2}");
+    assert!(lo > 0.0 && hi / lo < 1.8, "and never stops between pushes: {lo:.3}..{hi:.3} cells a tick");
+    println!("ok  pace 0.5: {ratio:.2} of the walk, {lo:.3} to {hi:.3} cells a tick");
+}
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
 fn kind_of(e: &Entity) -> Option<String> {
