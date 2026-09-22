@@ -10,8 +10,9 @@
 name = "life-native-check"
 version = "0.1.0"
 edition = "2024"
+default-run = "life-native-check"
 
 [workspace]
 
 [dependencies]
-tiamat-core = { path = "../../../Tiamot/crates/core" }
+tiamat-core = { path = "../../../Tiamat/crates/core" }
