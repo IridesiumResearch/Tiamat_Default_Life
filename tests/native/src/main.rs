@@ -718,7 +718,13 @@ fn main() {
     r.tick(1);
     assert_eq!(r.abilities().map(|a| a.sprint), Some(true));
     assert_eq!(r.abilities().map(|a| a.fly), Some(false), "nobody flies by this mod in a default world");
-    println!("ok  abilities: cold slows, an empty stomach walks, and the client is told both");
+    assert_eq!(r.abilities().map(|a| a.wind_sky), Some(true), "an admin may wind the sky");
+    r.huds.deop(PLAYER);
+    r.tick(1);
+    assert_eq!(r.abilities().map(|a| a.wind_sky), Some(false), "nobody else may, where nights are meant");
+    r.huds.op(PLAYER);
+    r.tick(1);
+    println!("ok  abilities: cold slows, an empty stomach walks, only admins wind the sky, and the client is told");
 
     // A fall: up in the air for a moment, then hard ground twenty blocks down.
     r.say("heal");
@@ -738,29 +744,23 @@ fn main() {
     });
     r.tick(1);
     r.entities.body(|b| b.fell = 0.0);
-    // (20 - 3) * 1.5 = 25.5, rounded to 26.
-    assert_eq!(r.number("hp"), 1.0, "a twenty-block fall is nearly everything");
+    // (20 - 3) * 1.15 = 19.55, rounded to 20.
+    assert_eq!(r.number("hp"), 7.0, "a twenty-block fall is most of you, and not all");
     assert!(r.plays("thud") >= 1);
-    println!("ok  a twenty-block fall took 26 points");
+    println!("ok  a twenty-block fall took 20 points");
 
-    // Flying down the same distance is not a fall.
+    // Flying down the same distance is not a fall: the engine lands the body
+    // with nothing fallen, and nothing is owed.
     r.say("heal");
     r.tick(1);
     r.entities.body(|b| b.on_ground = false);
     r.entities.set_position(100.5, 84.0, 100.5);
     r.tick(3);
-    r.entities.body(|b| b.velocity.0[1] = -0.5);
-    r.tick(1);
     r.entities.set_position(100.5, 64.0, 100.5);
-    r.entities.body(|b| {
-        b.on_ground = true;
-        b.velocity.0[1] = 0.0;
-        b.fell = 20.0;
-    });
+    r.entities.body(|b| b.on_ground = true);
     r.tick(1);
-    r.entities.body(|b| b.fell = 0.0);
-    assert_eq!(r.number("hp"), 27.0, "a slow descent is flight, not a fall");
-    println!("ok  a slow descent cost nothing");
+    assert_eq!(r.number("hp"), 27.0, "a flight down is not a fall");
+    println!("ok  a flight down cost nothing");
 
     // Drowning: the body goes under.
     r.entities.body(|b| b.submerged = 1.0);

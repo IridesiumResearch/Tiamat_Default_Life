@@ -64,14 +64,12 @@ function tdl.register_mob(def)
     def.drops = def.drops or {}
     def.spawn = def.spawn or {}
     def.ground = U.materials(def.spawn.ground or {})
-    -- A body of its own. The engine draws it untextured (matte white) until
-    -- a model can name its texture (docs/engine-asks.md, item 0 step 2), so
-    -- `texture` waits in the creature's definition and is not passed: an
-    -- unknown field is an error. Behind a pcall, so a model the engine
-    -- refuses is a log line here and a stand-in body, not a mod that fails.
+    -- A body of its own, wearing its skin. Behind a pcall, so a model the
+    -- engine refuses is a log line here and a stand-in body, not a mod that
+    -- fails to load.
     def.has_model = false
     if def.model and game.register_model then
-        local ok, why = pcall(game.register_model, { id = def.id, file = def.model })
+        local ok, why = pcall(game.register_model, { id = def.id, file = def.model, texture = def.texture })
         def.has_model = ok
         if not ok then
             game.log("tiamot_default_life: " .. def.id .. " keeps its stand-in body: " .. tostring(why))

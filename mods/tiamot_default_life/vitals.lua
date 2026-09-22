@@ -57,7 +57,7 @@ local function fresh()
         toast = nil, toast_until = 0, flash_until = 0, low_air_gasp = false,
         env = { submerged = false, wet = false, swimming = false, fire = nil, radiation = false,
                 ambient = 0, on_ground = true, speed2 = 0 },
-        pos = nil, last_vy = 0,
+        pos = nil,
         safe_recent = nil, safe_old = nil,
         warmth = 0, armour = 0,
     }
@@ -327,9 +327,10 @@ local function tick_temperature(uuid, v, dt)
         if v.temp > -0.005 and v.temp < 0.005 then v.temp = 0 end
     end
     if v.temp >= C.temp_extreme or v.temp <= -C.temp_extreme then
+        local every = v.temp < 0 and C.freeze_damage_ticks or C.temp_damage_ticks
         v.temp_dmg_acc = v.temp_dmg_acc + dt
-        while v.temp_dmg_acc >= C.temp_damage_ticks do
-            v.temp_dmg_acc = v.temp_dmg_acc - C.temp_damage_ticks
+        while v.temp_dmg_acc >= every do
+            v.temp_dmg_acc = v.temp_dmg_acc - every
             tdl.damage(uuid, C.temp_damage, v.temp > 0 and "overheating" or "freezing", { quiet = true })
         end
     else
@@ -391,6 +392,8 @@ end
 
 --- What the body may do, which the client predicts with: cold slows you, an
 --- empty stomach will not sprint, and everybody flies in a creative world.
+--- Winding the sky is refused where nights are meant: it lights the player's
+--- own night. Admins and creative worlds keep it.
 --- Said only when it changes; the engine forgets it when the player leaves,
 --- and a rejoin loads a fresh record, which says it again.
 local function push_abilities(uuid, v)
@@ -399,10 +402,11 @@ local function push_abilities(uuid, v)
     local speed = cold and C.cold_speed or 1
     local sprint = whole or v.food > 0
     local fly = tdl.mode == "Creative"
-    local said = string.format("%s %s %s", speed, sprint, fly)
+    local wind_sky = fly or tdl.is_admin(uuid)
+    local said = string.format("%s %s %s %s", speed, sprint, fly, wind_sky)
     if said == v.abilities then return end
     v.abilities = said
-    game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly })
+    game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly, wind_sky = wind_sky })
 end
 
 tdl.on_join(function(event)

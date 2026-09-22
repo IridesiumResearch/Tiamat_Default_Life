@@ -156,8 +156,6 @@ tdl.command("tp", "admin", function(uuid, rest)
         return
     end
     if game.move_player(uuid, target) then
-        local v = tdl.get(uuid)
-        if v then v.last_vy = 0 end
         tdl.say(uuid, string.format("Moved to %d, %d, %d.", math.floor(target.x), math.floor(target.y), math.floor(target.z)))
     else
         tdl.say(uuid, "The world would not have it.")

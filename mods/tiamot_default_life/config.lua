@@ -83,7 +83,8 @@ C.temp_show = 0.35             -- the thermometer appears past this
 C.temp_uncomfortable = 0.55    -- "cold" / "hot": hunger burns faster, and cold slows you
 C.cold_speed = 0.8             -- a body this cold or colder moves at this share of its speed
 C.temp_extreme = 0.90          -- "freezing" / "overheating": slow damage
-C.temp_damage_ticks = 100      -- a point every five seconds at an extreme
+C.temp_damage_ticks = 100      -- overheating: a point every five seconds
+C.freeze_damage_ticks = 200    -- freezing: a point every ten seconds, slower than heat
 C.temp_damage = 1
 -- Ambient contributions. They add.
 C.temp_night = -0.45           -- under the open sky at night
@@ -137,8 +138,7 @@ C.burn_after_campfire = 40
 -- Falls -------------------------------------------------------------------
 
 C.fall_safe_blocks = 3.0       -- no damage up to this
-C.fall_damage_per_block = 1.5  -- past that
-C.fall_min_speed = 1.2         -- cells per tick downward at impact, or it was not a fall (flying lands slower)
+C.fall_damage_per_block = 1.15 -- past that (1.5 / 1.3: a body 30% tougher than it was)
 C.submerged_head = 0.9         -- share of the body in fluid that puts the eyes under (1.62 of 1.8)
 C.submerged_swimming = 0.35    -- share that is swimming rather than wading
 

@@ -176,8 +176,8 @@ chat.
   once.
 - **Body temperature**: a thermometer appears when you drift from
   comfortable. Cold and hot burn food faster, and cold slows you to four
-  fifths of your speed; freezing and overheating, at the extremes, cost a
-  point every five seconds. The world's own climate comes first: the
+  fifths of your speed; at the extremes, overheating costs a point every
+  five seconds and freezing a point every ten. The world's own climate comes first: the
   Spindle's temperature is radial, comfortable on the plain where you start,
   hotter out toward the Ember Ridge and the Glass Waste, colder in toward
   Frostmoor and the Crown and again at the Hem. On top of that, nights under
@@ -200,9 +200,8 @@ feet.
 ## Damage
 
 Physical (punches; a `core_gear:sword` does six), falls (past three blocks,
-one and a half points a block, as far as the engine measured the fall, and
-only if the body was actually falling fast, so flying down is not one; none
-landing in water), fire and
+a little over a point a block (1.15), as far as the engine measured the fall, which
+a flight down is not; none landing in water), fire and
 lava (standing on the world's magma or in a campfire, and burning for a
 while after), poison (to your last heart), wither (all the way), starvation
 (to your last heart), drowning, freezing and overheating, explosions
@@ -280,7 +279,7 @@ engine reads is three tools, none of which launch the game:
 python tools/skin_glb.py "assets/source/Tiamot Life AI Cow.glb" mods/tiamot_default_life/models/cow.glb --length 6.0 --rename Eating=sneak
 cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
 MODEL_POSE_DUMP=out/poses cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamot_default_life/models/cow.glb
-python tools/render_model.py out/poses mods/tiamot_default_life/models/cow.jpg out/cow.png
+python tools/render_model.py out/poses mods/tiamot_default_life/models/cow.png out/cow_sheet.png
 ```
 
 `skin_glb.py` exists because modelling tools export a blocky creature as
@@ -298,9 +297,8 @@ Originals live in `assets/source/`, outside the mod, because the engine
 serves everything inside a mod's folder to clients.
 
 **Bodies.** A kind that names a `model` is drawn as it, registered with
-`game.register_model`: the cow is a cow, animated by its own clips, and
-matte white until the engine can put a texture on a model (item 0 in
-`docs/engine-asks.md`). A kind with no model yet is the engine's white
+`game.register_model` with its PNG skin: the cow is a cow, painted and
+animated by its own clips. A kind with no model yet is the engine's white
 humanoid with its kind as a nametag (`placeholder_models` in `config.lua`). A
 creature's kind is read back off the entity, so it survives the world being
 closed and reopened.

@@ -85,23 +85,15 @@ Agreed with the engine side, 2026-09-18: a permission belongs only on what
 is actually a power. A control that cannot move your body or change the
 world needs no gate, only a better key.
 
-| Key now | Action | A cheat? | Agreed |
+Both halves landed in engine 990bf8a (ask 10).
+
+| Key | Action | A cheat? | Now |
 |---|---|---|---|
-| **N** | Fly | It is a power, and it is already gated: operators only, server-enforced. | Keep. |
-| **[ ] \\** and PageDown, PageUp, Home | Wind your own sky back, on, and resync | **Yes.** Client-side only, but it turns your night into day on your own screen: seeing in the dark for free in a survival or one-life world. | A **server permission**, decided where flight is. Taking the default keys away is not enough, since anybody can bind them again. |
-| **F8, Y** / **F7, H** | "Teleport" far and home | No. It shifts the render origin for the floating-point test; your body does not move. | Off the letters: F7 and F8 only. No permission. |
-| **G** | Lay out one of every block | No. Singleplayer only already (it writes through the embedded server). | Off the letter: F9. No permission. |
-| **B** | Chunk borders | No. It draws lines. | Off the letter: F4. No permission. |
+| **N** | Fly | A power. | Operators, and everybody in a creative world (`game.set_player_abilities`). |
+| **[ ] \\** and PageDown, PageUp, Home | Wind your own sky back, on, and resync | **Yes.** Client-side only, but it turns your night into day on your own screen: seeing in the dark for free. | A server permission, `wind_sky`. This mod grants it to admins and in creative worlds, and refuses it to everybody else. Resync is never refused. |
+| **F8** / **F7** | "Teleport" far and home | No. It shifts the render origin for the floating-point test; your body does not move. | Function keys only; the Y and H twins are unbound. |
+| **F9** | Lay out one of every block | No. Singleplayer only. | Moved off G. |
+| **F4** | Chunk borders | No. It draws lines. | Moved off B. |
 
 Letters this frees for games: **B, G, H, Y**, and with the laptop twins of
 lighting and third person reconsidered, **L** and **V** as well.
-
-### What a mod needs from the engine to finish the job
-
-Filed in `engine-asks.md` (item 10), and still open:
-
-- A server permission on the sky keys, and the debug keys moved off the
-  letters, as in the table above.
-
-`game.is_operator` and `game.set_player_abilities` landed on 2026-09-19 and
-are in use: admins are operators, and a creative world flies.

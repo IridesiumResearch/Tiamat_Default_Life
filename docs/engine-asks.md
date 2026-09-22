@@ -5,18 +5,19 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-09-19)
+## Where these stand (2026-09-22)
 
-The engine answered almost all of it. What is still open is copied, without
-the history, to the engine's `docs/engine-asks/tiamot_default_life.md`, so
-the engine side finds every mod's open asks in one place. This file keeps
+**Nothing is open.** Every ask landed, and the mod uses every answer. Open
+asks are copied, without the history, to the engine's
+`docs/engine-asks/tiamot_default_life.md`, so the engine side finds every
+mod's open asks in one place; that sheet is empty now. This file keeps
 everything, landed items included.
 
 | Item | State | In this mod |
 |---|---|---|
-| 11 `fell` counts a flight down | **Open**, new. | `environment.lua` gates on the speed at landing as well. |
-| 10 key gates | **Open.** Split: only the sky keys are a cheat; the rest just move. | nothing; it is all the engine's. |
-| 0 models, step 2 (a texture) | **Open.** | the cow draws matte white; `texture` waits in `creatures.lua`. |
+| 11 `fell` counts a flight down | Landed, engine 990bf8a. | the landing-speed gate is gone; `fell` alone decides. |
+| 10 key gates | Landed, engine 990bf8a: `wind_sky`, and the debug keys on F-keys. | admins and creative worlds may wind the sky; nobody else. |
+| 0 models, step 2 (a texture) | Landed, engine adf6547, with the drawing of mod models at all. | the cow wears `models/cow.png`. |
 | 0 models, steps 1 and 3 | Landed, engine 15302d1. | the cow is a cow, with its own clips; other kinds keep the stand-in. |
 | 1 and 9 speed, sprint, flight | Landed, engine dc3b5ee and 82444e7. | cold slows, an empty stomach walks, a creative world flies. |
 | 2 time of day | Landed, engine eab4c2d. | a night everyone sleeps through ends at dawn. |
@@ -27,7 +28,7 @@ everything, landed items included.
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 11. `fell` counts a flight down to the ground (2026-09-19)
+## 11. `fell` counts a flight down to the ground (2026-09-19): LANDED, engine 990bf8a
 
 **Seen.** `fell` is the descent since the feet last left the ground,
 settled on the tick they land, and a flying body's descent is part of it.
@@ -44,7 +45,7 @@ starts when flight stops), or say `flying` on the entity table beside
 `on_ground`. The first keeps `fell` meaning "fell"; the second lets a mod
 decide.
 
-## 10. The sky keys need a permission; the debug keys only need to move (2026-09-18, revised): OPEN
+## 10. The sky keys need a permission; the debug keys only need to move (2026-09-18, revised): LANDED, engine 990bf8a
 
 *Revised after the engine's answer. The first draft asked for operator gates
 on all of these, which was plumbing for nothing: a control that cannot move
@@ -134,7 +135,7 @@ change it. Two lists that mean the same thing will one day disagree.
 
 **Ask.** `game.is_operator(uuid)`. With it the mod's list goes away.
 
-## 0. Models a mod ships (2026-09-11): steps 1 and 3 LANDED, engine 15302d1; step 2 OPEN
+## 0. Models a mod ships (2026-09-11): LANDED, engine 15302d1 (steps 1 and 3) and adf6547 (step 2)
 
 **Wanted.** Animals and mobs that look like animals and mobs. A cow, a
 wolf, a bird: each a skinned, textured model with its own idle, walk and

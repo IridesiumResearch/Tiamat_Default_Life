@@ -128,18 +128,16 @@ local function sample_worn(uuid, v)
     v.warmth, v.armour = warmth, armour
 end
 
---- Falls: the engine says how far, on the tick the body lands. It counts a
---- flight down to the ground as a fall too, so a landing only hurts if the
---- body was moving down fast the tick before; drifting down is flying. And
---- nothing hurts landing in water.
+--- Falls: the engine says how far, on the tick the body lands. A flight
+--- down is not a fall to it, so nothing here has to tell them apart. Nothing
+--- hurts landing in water.
 local function track_fall(uuid, v, body)
     local fall = body.fell or 0
-    if fall > C.fall_safe_blocks and (v.last_vy or 0) <= -C.fall_min_speed and not v.env.wet then
+    if fall > C.fall_safe_blocks and not v.env.wet then
         local damage = (fall - C.fall_safe_blocks) * C.fall_damage_per_block
         tdl.cue(uuid, "thud")
         tdl.damage(uuid, damage, "fall")
     end
-    v.last_vy = body.velocity.y
 end
 
 tdl.on_tick(function(dt)
