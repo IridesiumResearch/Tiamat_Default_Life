@@ -7,11 +7,17 @@ id = "tiamat_default_life"
 name = "Tiamat Default Life"
 version = "0.1.0"
 depends = ["core >=0.1"]
-# The interface: the wardrobe is a tab on its inventory screen and the
-# death screen is built from its widgets (screens.lua). Optional, so a
-# world without it gets plain dialogs; declared, so this mod loads after it
-# and may read its exports.
-optional_depends = ["tiamat_default_ui"]
+# Loaded AFTER both of these when they are here, which is what the
+# optional edge buys:
+#
+# - The world, whose blocks this mod looks up by name at load (magma, grass,
+#   snow, brambles, the trees crows perch in; config.lua). Without the edge
+#   the engine's alphabetical tiebreak loads Life first, every one of those
+#   lookups finds nothing, and lava does not burn.
+# - The interface: the wardrobe is a tab on its inventory screen and the
+#   death screen is built from its widgets (screens.lua). Without it, plain
+#   dialogs.
+optional_depends = ["tiamat_default_world", "tiamat_default_ui"]
 description = "Health, hunger, air and body temperature for players, and everything that lives in the world."
 license = "GPL-3.0-only"
 
