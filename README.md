@@ -278,12 +278,13 @@ points a heart, up to ten, following it as it runs. Cows and pigs amble at
 see what the nearest one is doing. Nothing keeps you from sleeping: a bed is a bed.
 
 **Models.** A creature's body is a `.glb` in `models/` with its PNG
-skin beside it. The cow, the pig, the bear and the crow have one. Getting a
+skin beside it. The cow, the pig, the bear, the crow and the bat have one. Getting a
 modeller's export into the shape the engine reads is three tools, none of
 which launch the game (the pig at `--length 4.5 --rename eating=sneak`; the
 bear at `--length 6.0 --rename eating=sneak`, its walk already quick enough;
 the crow at `--length 2.0 --axis z --rename eating=sneak`, since a bird with
-its wings spread is wider than it is long):
+its wings spread is wider than it is long; the bat at `--length 0.6 --axis z
+--rename eating=sneak`):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename Eating=sneak --speed walk=2
@@ -296,8 +297,8 @@ python tools/render_model.py out/poses mods/tiamat_default_life/models/cow.png o
 separate parts PARENTED to bones, with no joint weights. The engine's reader
 accepts that and then draws every part piled on the origin, since it reads
 an unweighted vertex as "joint 0, where it lies" and ignores node
-transforms. An export that is already skinned, like the bear, the pig and
-the crow, keeps its
+transforms. An export that is already skinned, like the bear, the pig, the
+crow and the bat, keeps its
 own weights; the tool checks its bind pose is its rest pose and refuses it
 otherwise. Either way the tool writes one mesh weighted to its bones, bakes
 away the armature's Z-up turn and scale, sizes it in cells (three to a
@@ -310,11 +311,12 @@ Originals live in `assets/source/`, outside the mod, because the engine
 serves everything inside a mod's folder to clients.
 
 **Bodies.** A kind that names a `model` is drawn as it, registered with
-`game.register_model` with its PNG skin: the cow, the pig, the bear and
-the crow are themselves, painted and animated by their own clips. A flyer's
+`game.register_model` with its PNG skin: the cow, the pig, the bear, the
+crow and the bat are themselves, painted and animated by their own clips. A flyer's
 clips mean something else in the air: `run` is its glide, wings out, and
 `swing` its wingbeat; on the ground it walks, idles and pecks (`sneak`) as
-a walker does. A kind with no
+a walker does. A bat never glides: it flutters on `run` and bites on
+`swing`. A kind with no
 model yet is the engine's white humanoid with its kind as a nametag
 (`placeholder_models` in `config.lua`). A
 creature's kind is read back off the entity, so it survives the world being

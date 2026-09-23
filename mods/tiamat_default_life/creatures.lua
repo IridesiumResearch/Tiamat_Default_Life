@@ -9,6 +9,7 @@
 --   flyer             velocity-controlled rather than steered on the ground
 --   lands             a flyer that comes down now and then to walk and eat, and
 --                     flies again when its pause is over or anyone comes near
+--   flutters          a flyer that never glides: `run` is its flight, `swing` its bite
 --   flock             spawns and moves as a group behind a leader
 --   shy               blocks: a player nearer than this is fled from
 --   hostile           { when = "night" | "dark" | "always", sun_max }
@@ -125,11 +126,16 @@ tdl.register_mob{
 }
 
 -- Bats: the dark's own. Caves by day, anywhere by night; they bite and
--- flutter off, and bite again.
+-- flutter off, and bite again. Its body is models/bat.glb, a skinned export
+-- with its wings spread, sized along its body (`--axis z`): a fifth of a
+-- block nose to tail and a block and a third across the wings. It flutters
+-- on its `run` clip and bites on `swing`. Its `idle` hangs upside down from
+-- a ceiling and its `walk` and eating clip crawl, none of which it does yet.
 tdl.register_mob{
     id = "bat", name = "Bat", health = 3,
     collider = { width = 1.0, height = 1.0 },
-    flyer = true, speed = 0.4, speed_fast = 0.65,
+    model = "models/bat.glb", texture = "models/bat.png",
+    flyer = true, flutters = true, speed = 0.4, speed_fast = 0.65,
     sight = 16, wander_radius = 10, fly_low = 2, fly_high = 6,
     hostile = { when = "dark", sun_max = 3 },
     bite = { damage = 1, range = 1.4, cooldown = 30, cause = "were bitten to death by bats" },

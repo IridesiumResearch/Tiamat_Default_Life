@@ -973,6 +973,7 @@ fn mob_check(r: &mut Rig) {
                     | "tiamat_default_life:pig"
                     | "tiamat_default_life:bear"
                     | "tiamat_default_life:crow"
+                    | "tiamat_default_life:bat"
             )
         ) {
             assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
@@ -1109,13 +1110,24 @@ fn mob_check(r: &mut Rig) {
     r.tick(1);
     let bats = r.mobs();
     assert_eq!(bats.len(), 1, "one bat");
-    let (bat, _) = bats[0].clone();
+    let (bat, body) = bats[0].clone();
+    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:bat"), "a bat is its own model");
     let bites = r.plays("bite");
     // Put it on the shoulder: the fake world has no physics to fly it there.
-    r.put_mob(bat, 101.0, 65.5, 100.5);
-    r.tick(25);
+    // It flutters on its run clip, and bites on its swing.
+    let (mut fluttered, mut swung) = (false, false);
+    for _ in 0..25 {
+        r.put_mob(bat, 101.0, 65.5, 100.5);
+        r.tick(1);
+        let anim = r.entities.0.lock().unwrap().entities[&bat].anim;
+        assert!(anim == tiamat_core::ent::AnimTag::RUN || anim == tiamat_core::ent::AnimTag::SWING,
+            "a bat in the air flutters or bites: {anim:?}");
+        fluttered |= anim == tiamat_core::ent::AnimTag::RUN;
+        swung |= anim == tiamat_core::ent::AnimTag::SWING;
+    }
     assert!(r.number("hp") < 27.0, "bitten: {}", r.number("hp"));
     assert!(r.plays("bite") > bites);
+    assert!(fluttered && swung, "it flutters, and its bite plays its swing");
     // Daylight, and it loses interest.
     *r.sounds.time.lock().unwrap() = 0.5;
     r.say("heal");

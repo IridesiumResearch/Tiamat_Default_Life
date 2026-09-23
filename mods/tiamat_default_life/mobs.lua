@@ -468,8 +468,16 @@ end
 --- Which wing clip a flyer plays this tick: `swing` is the wingbeat and `run`
 --- the glide with its wings held out. It beats them to climb, to hurry and to
 --- lift off, for at least one beat at a time, and now and then in a long
---- glide to hold its height; the rest of the time it soars.
+--- glide to hold its height; the rest of the time it soars. A kind that
+--- `flutters` never glides: `run` is its flight, and `swing` its bite.
 local function wings(m, beat)
+    if m.kind.flutters then
+        if (m.swing or 0) > 0 then
+            m.swing = m.swing - 1
+            return ANIM_SWING
+        end
+        return ANIM_RUN
+    end
     if beat then
         m.flap = math.max(m.flap or 0, C.fly_flap_ticks)
     elseif (m.flap or 0) <= 0 and below(C.fly_flap_chance) == 0 then
