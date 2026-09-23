@@ -96,29 +96,6 @@ local function scatter(uuid, v, pos, fraction, view)
     return n
 end
 
-local function death_screen(uuid, line, after)
-    game.show_dialog{
-        player = uuid,
-        form = "death",
-        compact = true,
-        tree = {
-            type = "container", direction = "column", gap = 10, padding = 16, align = "center",
-            children = {
-                { type = "label", text = "You died", style = { text_size = 28, text_colour = { 230, 70, 70 } } },
-                { type = "label", text = line, style = { text_size = 18, text_colour = { 210, 210, 210 } } },
-                { type = "label", text = after or "Some of what you carried is where you fell.", style = { text_size = 15, text_colour = { 160, 160, 160 } } },
-                { type = "button", name = "respawn", text = "Carry on" },
-            },
-        },
-    }
-end
-
-tdl.on_dialog("death", function(event)
-    if event.kind == "pressed" and event.name == "respawn" then
-        game.close_dialog{ player = event.player, form = "death" }
-    end
-end)
-
 function tdl.die(uuid, kind, cause)
     local v = tdl.get(uuid)
     if v == nil or v.dead then return end
@@ -144,7 +121,7 @@ function tdl.die(uuid, kind, cause)
         v.env.fire = nil
         local last = "You " .. (cause or CAUSES[kind] or "died") .. ". Your one life is spent."
         tdl.toast(uuid, last, 200)
-        death_screen(uuid, last, "Everything you carried is where you fell. You may walk the world and watch it.")
+        tdl.screens.death(uuid, last, "Everything you carried is where you fell. You may walk the world and watch it.")
         return
     end
 
@@ -175,7 +152,7 @@ function tdl.die(uuid, kind, cause)
     v.dead = false
 
     tdl.toast(uuid, line, 120)
-    death_screen(uuid, line)
+    tdl.screens.death(uuid, line)
 end
 
 return {}

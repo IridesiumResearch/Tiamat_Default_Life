@@ -48,7 +48,7 @@ fly (`game.set_player_abilities`), which is not making anybody an operator.
 |---|---|---|
 | **X** | Use what you hold: eat, bandage, antidote. Empty-handed, at the bed you look at or one beside you: sleep. | |
 | **Right mouse** on a bed | Sleep in it. | The engine's place control, with nothing placeable in hand. |
-| **O** | Wardrobe: the worn slots. | Was G, which is the engine's debug block row. O for outfit. |
+| **O** | Wardrobe: the inventory screen on its Wardrobe tab (Tiamat Default UI), or a plain dialog without it. | Was G, which is the engine's debug block row. O for outfit. |
 
 ## The engine's keys, as they are and as they should be
 

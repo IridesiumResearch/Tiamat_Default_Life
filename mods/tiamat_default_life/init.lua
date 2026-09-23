@@ -37,6 +37,7 @@ load("modes")                -- the world's mode, its admins, its ghosts: tdl.co
 load("environment")          -- what the world is doing to each body: v.env, falls
 load("vitals")               -- health, hunger, air, temperature: tdl.get / tdl.damage / tdl.heal
 load("drops")                -- stacks lying on the ground, and picking them up
+load("screens")              -- the wardrobe and the death screen, in Tiamat Default UI's look
 load("death")                -- dying, dropping, respawning
 load("actions")              -- eating, sleeping, the wardrobe, explosions, chat commands
 load("mobs")                 -- the mob system: spawning, behaviour, being hit, dropping

@@ -15,7 +15,6 @@ local USE_COOLDOWN = 15
 local FOOD_TEMPERATURE_TICKS = 20 * 60   -- a minute of warmth or coolness from a meal
 
 local use_cd = {}       -- uuid -> tick the next use is allowed
-local wardrobe_open = {}
 
 -- Eating and medicine ---------------------------------------------------------
 
@@ -191,43 +190,14 @@ tdl.on_use(function(event)
     return ""
 end)
 
--- The wardrobe --------------------------------------------------------------------
-
-local function wardrobe_screen()
-    return {
-        type = "container", direction = "column", gap = 8, padding = 12,
-        children = {
-            { type = "label", text = "Worn", style = { text_size = 22 } },
-            { type = "label", text = "Clothing here keeps you warm, or cool. Two layers is plenty.",
-              style = { text_size = 15, text_colour = { 170, 170, 170 } } },
-            { type = "item_grid", view = I.worn_view, columns = 4, first = 1, count = 4 },
-            { type = "spacer", size = 8 },
-            { type = "label", text = "Carried", style = { text_size = 22 } },
-            { type = "item_grid", view = "player:main", columns = 9, first = 1, count = 27 },
-        },
-    }
-end
+-- The wardrobe: a tab on Tiamat Default UI's screen, or a dialog of our own
+-- without it (screens.lua).
 
 tdl.on_action(WARDROBE, function(event)
-    if not event.pressed then return end
-    local uuid = event.player
-    if wardrobe_open[uuid] then
-        game.close_dialog{ player = uuid, form = "wardrobe" }
-        wardrobe_open[uuid] = nil
-    else
-        game.show_dialog{ player = uuid, form = "wardrobe", tree = wardrobe_screen() }
-        wardrobe_open[uuid] = true
-    end
-end)
-
-tdl.on_dialog("wardrobe", function(event)
-    if event.kind == "closed" then
-        wardrobe_open[event.player] = nil
-    end
+    if event.pressed then tdl.screens.toggle_wardrobe(event.player) end
 end)
 
 tdl.on_leave(function(event)
-    wardrobe_open[event.player] = nil
     use_cd[event.player] = nil
 end)
 

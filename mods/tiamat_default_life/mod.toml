@@ -7,6 +7,11 @@ id = "tiamat_default_life"
 name = "Tiamat Default Life"
 version = "0.1.0"
 depends = ["core >=0.1"]
+# The interface: the wardrobe is a tab on its inventory screen and the
+# death screen is built from its widgets (screens.lua). Optional, so a
+# world without it gets plain dialogs; declared, so this mod loads after it
+# and may read its exports.
+optional_depends = ["tiamat_default_ui"]
 description = "Health, hunger, air and body temperature for players, and everything that lives in the world."
 license = "GPL-3.0-only"
 
