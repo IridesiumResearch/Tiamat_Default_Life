@@ -201,14 +201,15 @@ chat.
 
 ## The world it lives in
 
-This is written for **Tiamat Default World**, the Spindle, and reads three
-things off it without touching its code: its block ids (grass, loam, snow,
+This is written for **Tiamat Default World**, the Spindle, and reads four
+things off it without touching its code: which biome a place is (its
+`biome_under` export), its block ids (grass, loam, snow,
 magma, the trees crows sit in and the rest, all looked up leniently so a
 world without one still loads), its climate formula and its ring table (both copied into
 `config.lua`, so if the Spindle's rings move, they move here by hand), and
-the day its `core_sky` dependency keeps. There is no biome in the engine's
-API, so a creature's biome is its ring by radius and the block under its
-feet.
+the day its `core_sky` dependency keeps. A creature appears only in the
+biomes its kind would really live in, by the world's own answer for the
+spot; without the world, the block underfoot stands in.
 
 Those block ids are looked up as this mod loads, so it has to load
 **after** the world. It names the world in `optional_depends` for exactly
@@ -288,22 +289,28 @@ false` in `config.lua`.
 
 ## Creatures
 
-Seven so far, in `creatures.lua` as data over the system in `mobs.lua`:
+Eight so far, in `creatures.lua` as data over the system in `mobs.lua`:
 
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
-| Cow | Grass, by day, in twos to fours | Wanders, shies from you, runs when hit | 1 to 3 raw meat |
-| Sheep | Grass and the highland snow, by day, in threes to sixes | The same | 1 to 2 raw meat |
-| Pig | Woodland soil and grass, by day | The same | 1 to 2 raw meat |
-| Horse | Grass, by day, in herds of 2 to 5 | Wanders and grazes, bolts from you at a gallop, snorts. Fifteen points. Cannot be ridden yet: the engine has no right-click on an entity and no way to seat a rider (engine asks 17 and 18) | 1 to 3 raw meat |
-| Bear | Woodland soil and snow, in the Frostmoor, temperate and verdant rings, alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
-| Crow | Comes in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
-| Bat | The dark: caves by day, anywhere by night | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
+| Cow | Rolling Grasslands, River Valleys and the Heather Moor, by day, in twos to fours | Wanders, shies from you, runs when hit | 1 to 3 raw meat |
+| Sheep | Heather Moor, Alpine Highlands, Coastal Cliffs and Rolling Grasslands, by day, in threes to sixes | The same | 1 to 2 raw meat |
+| Pig | Temperate Woodlands, Flower Forest, Silverwood, River Valleys and Peat Fen, by day | The same | 1 to 2 raw meat |
+| Horse | Rolling Grasslands, River Valleys and the Heather Moor, by day, in herds of 2 to 5 | Wanders and grazes, bolts from you at a gallop, snorts. Fifteen points. Cannot be ridden yet: the engine has no right-click on an entity and no way to seat a rider (engine asks 17 and 18) | 1 to 3 raw meat |
+| Stag | Temperate Woodlands, Flower Forest, Silverwood, Redwood Stands, Taiga, Heather Moor, River Valleys and Alpine Highlands, any time, in ones to fours | Grazes, very wary, bolts from you at eight blocks and outruns you. Fourteen points | 2 to 3 raw meat |
+| Bear | Temperate Woodlands, Taiga, Redwood Stands, Silverwood, Frostpine Coast and Alpine Highlands, alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
+| Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
+| Bat | The ordinary caves, lit and dark, where it is dark enough | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
 
-Spawning happens in passes around each player: a spot on the ground twenty
-to forty-four blocks off, checked against the kind's ground blocks (the
-stand-in for a biome), the time of day and the light, under a cap per kind
-and a cap overall. Say `spawn cow 3`, `mobs` or `cull` in chat while
+Spawning happens in passes around each player: a spot on the ground
+twenty to eighty-eight blocks off, the world asked its biome, and then a
+kind chosen by weight among those that live there, appear at that
+distance (crows far out, the rest within forty-four) and like the time of
+day and the light, under a cap per kind and a cap overall. The spot comes
+first so that a pass in a place few kinds live is not spent looking for
+one of the others. Only crows live in every land biome; the night
+monsters, when there are any, will too. The biome lists are in each
+kind's `spawn` in `creatures.lua`, and the shared ones in `config.lua`. Say `spawn cow 3`, `mobs` or `cull` in chat while
 `dev_commands` is on.
 
 A fist does a point to a mob and the reference sword six. Hurt animals run;
@@ -326,7 +333,8 @@ bear at `--length 6.0 --rename eating=sneak`, its walk already quick enough;
 the crow at `--length 2.0 --axis z --rename eating=sneak`, since a bird with
 its wings spread is wider than it is long; the bat at `--length 0.6 --axis z
 --rename eating=sneak`; the sheep at `--length 4.0 --rename eating=sneak`; the horse at `--length 7.0
---rename eating=sneak`):
+--rename eating=sneak`; the stag at `--length 5.5 --axis z --rename eating=sneak`, its antlers wider than
+it is long):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak

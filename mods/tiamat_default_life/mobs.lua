@@ -71,6 +71,12 @@ function tdl.register_mob(def)
     def.drops = def.drops or {}
     def.spawn = def.spawn or {}
     def.ground = U.materials(def.spawn.ground or {})
+    -- Where it lives, as a set of the world's biome ids.
+    local biomes = def.spawn.land and C.land_biomes or def.spawn.biomes
+    if biomes then
+        def.biomes = {}
+        for _, id in ipairs(biomes) do def.biomes[id] = true end
+    end
     -- A body of its own, wearing its skin. Behind a pcall, so a model the
     -- engine refuses is a log line here and a stand-in body, not a mod that
     -- fails to load.
@@ -222,19 +228,29 @@ local function is_night()
     return t < C.night_before or t > C.night_after
 end
 
---- Whether a kind may appear at a spot right now.
-local function may_spawn(kind, feet, material)
+--- The world's biomes, when the world is here to ask: Tiamat Default
+--- World's `biome_under(x, y, z)`, which this mod may read because mod.toml
+--- names the world in `optional_depends`. nil without it.
+local world = game.exports and game.exports("tiamat_default_world")
+local biome_under = world and type(world.biome_under) == "function" and world.biome_under or nil
+game.log("tiamat_default_life: creatures spawn by " .. (biome_under and "the world's biomes" or "the ground underfoot (no world to ask)"))
+
+--- The biome at a spot, or nil when there is no world to ask (or it did not
+--- answer, which a call across mods may not).
+local function biome_at(feet)
+    if biome_under == nil then return nil end
+    return biome_under(feet.x, feet.y, feet.z)
+end
+
+--- Whether a kind may appear at a spot right now. Where: the spot's biome
+--- is one the kind lives in; without the world to ask, the block underfoot
+--- stands in for it. When: the time of day and the light.
+local function may_spawn(kind, feet, material, biome)
     local s = kind.spawn
-    if next(kind.ground) ~= nil and not kind.ground[material] then return false end
-    -- The world's rings, by radius: a creature of the temperate ring does
-    -- not appear on the Glass Waste, whatever is underfoot.
-    if s.rings then
-        local ring = C.ring_at(feet.x, feet.z)
-        local allowed = false
-        for _, id in ipairs(s.rings) do
-            if id == ring then allowed = true end
-        end
-        if not allowed then return false end
+    if biome then
+        if kind.biomes and not kind.biomes[biome] then return false end
+    elseif next(kind.ground) ~= nil and not kind.ground[material] then
+        return false
     end
     if s.time == "day" and is_night() then return false end
     if s.time == "night" and not is_night() then return false end
@@ -265,40 +281,42 @@ local function try_spawn_near(v)
     end
     if total >= C.mob_cap_total then return end
 
-    -- A kind by weight, among those under their cap.
-    local weight_sum = 0
-    for _, kid in ipairs(M.order) do
-        local kind = M.kinds[kid]
-        if (counts[kid] or 0) < (kind.spawn.cap or 4) then
-            weight_sum = weight_sum + (kind.spawn.weight or 1)
-        end
-    end
-    if weight_sum == 0 then return end
-    local pick = below(weight_sum)
-    local chosen
-    for _, kid in ipairs(M.order) do
-        local kind = M.kinds[kid]
-        if (counts[kid] or 0) < (kind.spawn.cap or 4) then
-            pick = pick - (kind.spawn.weight or 1)
-            if pick < 0 then chosen = kind break end
-        end
-    end
-    if chosen == nil then return end
-
+    -- A spot first, then a kind that lives there: most of the world is some
+    -- kinds' home and not others', so choosing the kind first would spend
+    -- most passes looking for a place it may not be in. The spot is drawn
+    -- out to the furthest any kind appears (crows come in from far off),
+    -- and a kind is only a candidate at a distance it appears at.
     for _ = 1, C.mob_spawn_tries do
-        -- A kind may say how far off it appears: crows, far out, so they
-        -- come in over the horizon rather than out of a field beside you.
-        local range = chosen.spawn.distance
-        local dist = range and between(range[1], range[2]) or between(C.mob_spawn_min, C.mob_spawn_max)
+        local dist = between(C.mob_spawn_min, C.mob_spawn_far)
         local dx = between(-dist, dist)
         local dz = (below(2) == 0 and 1 or -1) * (dist - math.abs(dx))
         local x, z = math.floor(pos.x) + dx, math.floor(pos.z) + dz
         local feet, material = ground_at(x, z, math.floor(pos.y))
-        if feet and may_spawn(chosen, feet, material) then
-            local group = chosen.spawn.group or { 1, 1 }
-            local n = between(group[1], group[2])
-            n = math.min(n, (chosen.spawn.cap or 4) - (counts[chosen.id] or 0))
-            if n > 0 then
+        if feet then
+            local biome = biome_at(feet)
+            -- The kinds that may appear here, by weight, under their caps.
+            local weight_sum, candidates = 0, {}
+            for _, kid in ipairs(M.order) do
+                local kind = M.kinds[kid]
+                local range = kind.spawn.distance or { C.mob_spawn_min, C.mob_spawn_max }
+                if (counts[kid] or 0) < (kind.spawn.cap or 4) and dist >= range[1] and dist <= range[2]
+                    and may_spawn(kind, feet, material, biome) then
+                    candidates[#candidates + 1] = kind
+                    weight_sum = weight_sum + (kind.spawn.weight or 1)
+                end
+            end
+            local chosen
+            if weight_sum > 0 then
+                local pick = below(weight_sum)
+                for _, kind in ipairs(candidates) do
+                    pick = pick - (kind.spawn.weight or 1)
+                    if pick < 0 then chosen = kind break end
+                end
+            end
+            if chosen then
+                local group = chosen.spawn.group or { 1, 1 }
+                local n = between(group[1], group[2])
+                n = math.min(n, (chosen.spawn.cap or 4) - (counts[chosen.id] or 0))
                 -- A navigator appears already in the air, flying across the
                 -- country the player is in: toward them, a little to one side.
                 local at = feet
@@ -315,11 +333,11 @@ local function try_spawn_near(v)
                     end
                 end
                 if #ids > 0 then
-                    game.log(string.format("tiamat_default_life: %d %s appeared at %d, %d, %d",
-                        #ids, chosen.name, x, math.floor(feet.y), z))
+                    game.log(string.format("tiamat_default_life: %d %s appeared at %d, %d, %d (%s)",
+                        #ids, chosen.name, x, math.floor(feet.y), z, biome or "no biome"))
                 end
+                return
             end
-            return
         end
     end
 end
@@ -1170,7 +1188,7 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|bear|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|bear|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),

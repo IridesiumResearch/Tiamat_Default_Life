@@ -192,6 +192,7 @@ C.mob_spawn_every = 100        -- ticks between spawning passes, per player
 C.mob_spawn_tries = 6          -- ground spots tried per pass
 C.mob_spawn_min = 20           -- blocks from the player, at least
 C.mob_spawn_max = 44           -- and at most
+C.mob_spawn_far = 88           -- the furthest any kind appears (`spawn.distance`); spots are drawn out to here
 C.mob_count_radius = 64        -- how far around a player the caps count
 C.mob_cap_total = 32           -- of everything, per player
 C.mob_flee_ticks = 100         -- five seconds of running from a hit
@@ -244,6 +245,28 @@ C.cold_sources = {
     ["tiamat_default_world:snow"] = 0.5,
     ["tiamat_default_world:permafrost"] = 0.3,
 }
+-- The world's biomes, by the ids Tiamat Default World's `biome_under`
+-- answers. A creature names the ones it lives in (creatures.lua,
+-- `spawn.biomes`); these are the lists more than one kind shares.
+--
+-- Every surface biome that is dry land: what `spawn.land` means, for the
+-- creatures that live anywhere on land (crows now, night monsters later).
+C.land_biomes = {
+    "temperate_woodlands", "rolling_grasslands", "alpine_highlands", "frozen_wastes", "coastal_cliffs",
+    "sandy_shores", "dunes", "flower_forest", "heather_moor", "river_valleys", "jungle", "arid_mesa",
+    "badlands", "taiga", "icefall", "silverwood", "salt_pan", "volcanic_foothills", "obsidian_barrens",
+    "geyser_basin", "cinder_coast", "frostpine_coast", "rime_tundra", "rime_wall", "mangrove_coast",
+    "savanna", "karst_towers", "peat_fen", "redwood_stands",
+}
+-- (Not land: deep_ocean, coral_fringed_shallows, kelp_forest, abyssal_trench, pack_ice.)
+-- The ordinary caves, dark and lit: where bats live. The deep and magical
+-- ones are for what comes later.
+C.cave_biomes = {
+    "mossy_limestone", "crystal_seam", "underground_river", "fungal_grove_chambers",
+    "mineral_vein_tunnels", "stalactite_forests", "stone_labyrinth", "echoing_black_marble",
+    "shadow_pool_chambers", "blind_fish_grottoes", "whispering_crevasse", "phosphorescent_fungi_pockets",
+}
+
 -- What a crow will perch on: the top of a tree, leaves, needles or a log.
 C.perches = {}
 for _, tree in ipairs({ "oak", "birch", "apple", "cherry", "acacia", "willow", "mangrove", "kapok", "ironwood" }) do

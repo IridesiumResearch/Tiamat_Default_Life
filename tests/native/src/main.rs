@@ -621,10 +621,28 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
     vm.set_world_edit(world.clone());
     vm.set_particle_access(particles.clone());
 
-    // A stand-in for the world mod, so the lava and the bramble exist.
+    // A stand-in for the world mod, so the lava and the bramble exist, and so
+    // there is a `biome_under` to ask: it answers one biome everywhere, the
+    // grassland unless a test says `biome <id>` in chat (swallowed here).
     vm.load_mod(
         "tiamat_default_world",
-        "for _, id in ipairs({ 'magma', 'bramble', 'dream_stone', 'grass', 'loam', 'leaf_litter', 'mud', 'dirt', 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'fern', 'tall_grass', 'ladys_mantle', 'ladys_mantle_bloom' }) do game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass' or id == 'ladys_mantle' or id == 'ladys_mantle_bloom') } end",
+        r#"
+        for _, id in ipairs({ 'magma', 'bramble', 'dream_stone', 'grass', 'loam', 'leaf_litter', 'mud', 'dirt',
+                'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'fern', 'tall_grass',
+                'ladys_mantle', 'ladys_mantle_bloom' }) do
+            game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass'
+                or id == 'ladys_mantle' or id == 'ladys_mantle_bloom') }
+        end
+        local here = "rolling_grasslands"
+        game.register_on_chat(function(e)
+            local id = string.match(e.text, "^biome (%S+)$")
+            if id then
+                here = id
+                return false
+            end
+        end)
+        game.export{ version = 1, biome_under = function(x, y, z) return here end }
+        "#,
         &dir,
     )
     .unwrap();
@@ -634,8 +652,14 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
             .join("../../../Tiamat_Default_Inventory/mods/tiamat_default_ui");
         let source = std::fs::read_to_string(ui.join("init.lua")).expect("the interface mod beside this repo");
         vm.load_mod("tiamat_default_ui", &source, &ui).expect("the interface mod loads");
-        vm.note_dependencies(MOD, &["tiamat_default_ui".to_owned()]);
     }
+    // As mod.toml's `optional_depends` has it: the world always, the
+    // interface when it is here.
+    let mut after = vec!["tiamat_default_world".to_owned()];
+    if with_ui {
+        after.push("tiamat_default_ui".to_owned());
+    }
+    vm.note_dependencies(MOD, &after);
     let init = format!("{prelude}{}", std::fs::read_to_string(dir.join("init.lua")).unwrap());
     vm.load_mod(MOD, &init, &dir).expect("the mod loads");
     // A stand-in for Tiamat Weather, which loads after this mod and puts its
@@ -1588,17 +1612,45 @@ fn climate_check() {
     r.tick(900);
     assert!(r.flag("cold"), "the Crown is cold: {}", r.number("temp"));
 
-    // Spawning by ring: on the Glass Waste no farm animal appears, whatever
-    // is underfoot; crows and bats keep to their own rings too.
-    r.entities.set_position(26500.5, 64.0, 0.5);
-    r.tick(100 * 8);
-    let there: Vec<String> = r.mobs().iter().filter_map(|(_, e)| kind_of(e)).collect();
-    assert!(there.is_empty(), "nothing of ours lives on the Glass Waste: {there:?}");
-    // And on the spawn plain they do.
-    r.entities.set_position(15300.5, 64.0, 0.5);
-    r.tick(100 * 8);
-    assert!(!r.mobs().is_empty(), "the temperate ring has its animals");
-    println!("ok  climate: temperate comfortable, Glass Waste hot, Crown cold; creatures keep to their rings");
+    // Spawning by biome, the world's own answer for the spot: each kind only
+    // where it would really live, crows anywhere on dry land, nothing at sea.
+    let kinds_in = |r: &mut Rig, biome: &str| -> Vec<String> {
+        r.say(&format!("biome {biome}"));
+        r.entities.set_position(15300.5, 64.0, 0.5);
+        r.say("cull");
+        r.tick(1);
+        r.tick(100 * 12);
+        let mut kinds: Vec<String> = r
+            .mobs()
+            .iter()
+            .filter(|(_, e)| {
+                let [x, _, z] = e.transform.to_world();
+                (x - 15300.5).abs() < 120.0 && z.abs() < 120.0
+            })
+            .filter_map(|(_, e)| kind_of(e))
+            .collect();
+        kinds.sort();
+        kinds.dedup();
+        kinds
+    };
+    let grassland = kinds_in(&mut r, "rolling_grasslands");
+    assert!(grassland.iter().any(|k| k == "cow" || k == "sheep" || k == "horse"), "grassland has its herds: {grassland:?}");
+    for k in ["pig", "bear", "stag", "bat"] {
+        assert!(!grassland.iter().any(|g| g == k), "no {k} out on the open grassland: {grassland:?}");
+    }
+    let taiga = kinds_in(&mut r, "taiga");
+    assert!(!taiga.is_empty(), "the taiga has its animals");
+    for k in ["cow", "sheep", "horse", "pig", "bat"] {
+        assert!(!taiga.iter().any(|t| t == k), "no {k} in the taiga: {taiga:?}");
+    }
+    let salt = kinds_in(&mut r, "salt_pan");
+    assert_eq!(salt, vec!["crow".to_owned()], "only crows over the salt pan");
+    let sea = kinds_in(&mut r, "deep_ocean");
+    assert!(sea.is_empty(), "nothing of ours at sea: {sea:?}");
+    let cave = kinds_in(&mut r, "mossy_limestone");
+    assert!(cave.is_empty(), "a lit cave by day holds none of the surface animals: {cave:?}");
+    r.say("biome rolling_grasslands");
+    println!("ok  climate: temperate comfortable, Glass Waste hot, Crown cold; creatures keep to their own biomes, crows anywhere on land");
 }
 
 const BOB: [u8; 32] = [9; 32];

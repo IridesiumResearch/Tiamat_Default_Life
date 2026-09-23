@@ -36,15 +36,22 @@
 -- A flyer with a model plays `swing` for a wingbeat and `run` for a glide
 -- with its wings out; on the ground, `walk`, `idle` and `sneak` as a walker.
 --   drops             { { item, min, max } }, items of this mod
---   spawn             { ground = { block ids }, rings = { ring ids }, time = "day" | "night" | "any",
---                       sun_min, sun_max, group = { min, max }, weight, cap,
+--   spawn             { biomes = { biome ids } | land = true, ground = { block ids },
+--                       time = "day" | "night" | "any", sun_min, sun_max,
+--                       group = { min, max }, weight, cap,
 --                       distance = { min, max } blocks from the player, if not the usual }
 --
--- The engine has no biome to ask about, so a biome is two things here: the
--- RING of the Spindle the spot is in, by radius (config.lua carries the
--- world's ring table), and the block under the feet, which is what the
--- biome within the ring is made of (loam and litter are woodland; dirt
--- under grass is grassland; snow is the highlands).
+-- WHERE a creature appears is its biomes: the world's own answer for the
+-- spot, from Tiamat Default World's `biome_under` export, so a creature is
+-- seen only where its kind would really live. `land = true` is every
+-- surface biome that is dry land (config.lua's `land_biomes`), for what
+-- lives anywhere: crows now, night monsters later. The biome lists that
+-- several kinds share are in config.lua.
+--
+-- `ground` is the fallback for a world without that export: the blocks
+-- underfoot that stand for the biome (loam and litter are woodland, grass
+-- is grassland, snow the highlands). With the world there, the biome alone
+-- decides.
 
 local G = "tiamat_default_world:"
 
@@ -60,7 +67,8 @@ tdl.register_mob{
     shy = 1.5, sight = 10, wander_radius = 10, pause_min = 60, pause_max = 240,
     sound = "moo", sound_death = "moo", voice_min = 300, voice_max = 1200,
     drops = { { "raw_meat", 1, 3 } },
-    spawn = { ground = { G .. "grass" }, rings = { "temperate", "verdant", "shore" },
+    -- Open pasture: grassland, river meadows and the moor.
+    spawn = { biomes = { "rolling_grasslands", "river_valleys", "heather_moor" }, ground = { G .. "grass" },
               time = "day", sun_min = 12, group = { 2, 4 }, weight = 4, cap = 6 },
 }
 
@@ -75,7 +83,9 @@ tdl.register_mob{
     sound = "baa", sound_death = "baa", voice_min = 300, voice_max = 1200,
     drops = { { "raw_meat", 1, 2 } },
     -- Sheep take to the highlands too: grass in the lowlands, snow up in the frost ring.
-    spawn = { ground = { G .. "grass", G .. "snow", G .. "permafrost" }, rings = { "frost", "temperate", "verdant", "shore", "hem" },
+    -- Hill grazing: the moor, the highlands, the cliff tops, and grassland.
+    spawn = { biomes = { "heather_moor", "alpine_highlands", "coastal_cliffs", "rolling_grasslands" },
+              ground = { G .. "grass", G .. "snow", G .. "permafrost" },
               time = "day", sun_min = 12, group = { 3, 6 }, weight = 4, cap = 8 },
 }
 
@@ -90,8 +100,10 @@ tdl.register_mob{
     shy = 1.5, sight = 8, wander_radius = 8, pause_min = 40, pause_max = 200,
     sound = "oink", sound_death = "oink", voice_min = 200, voice_max = 800,
     drops = { { "raw_meat", 1, 2 } },
-    spawn = { ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "mud", G .. "dirt" },
-              rings = { "temperate", "verdant", "shore" }, time = "day", sun_min = 6, group = { 1, 3 }, weight = 3, cap = 6 },
+    -- Rooting in woodland and wet ground, as a wild pig does.
+    spawn = { biomes = { "temperate_woodlands", "flower_forest", "silverwood", "river_valleys", "peat_fen" },
+              ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "mud", G .. "dirt" },
+              time = "day", sun_min = 6, group = { 1, 3 }, weight = 3, cap = 6 },
 }
 
 -- The horse: models/horse.glb, from an export that was already skinned.
@@ -108,7 +120,8 @@ tdl.register_mob{
     shy = 3.0, sight = 12, wander_radius = 14, pause_min = 60, pause_max = 260,
     sound = "snort", sound_death = "snort", voice_min = 400, voice_max = 1600,
     drops = { { "raw_meat", 1, 3 } },
-    spawn = { ground = { G .. "grass" }, rings = { "temperate", "verdant", "shore" },
+    -- Wide open grass: grassland, river meadows, the moor.
+    spawn = { biomes = { "rolling_grasslands", "river_valleys", "heather_moor" }, ground = { G .. "grass" },
               time = "day", sun_min = 12, group = { 2, 5 }, weight = 2, cap = 6 },
 }
 
@@ -128,9 +141,29 @@ tdl.register_mob{
     sight = 12, wander_radius = 16, pause_min = 80, pause_max = 300,
     sound = "growl", sound_death = "growl", voice_min = 400, voice_max = 1600,
     drops = { { "raw_meat", 2, 4 } },
-    spawn = { ground = { G .. "loam", G .. "leaf_litter", G .. "snow" },
-              rings = { "frost", "temperate", "verdant" },
+    -- Deep woods and the cold forest, and up into the highlands.
+    spawn = { biomes = { "temperate_woodlands", "taiga", "redwood_stands", "silverwood", "frostpine_coast",
+                         "alpine_highlands" },
+              ground = { G .. "loam", G .. "leaf_litter", G .. "snow" },
               time = "any", sun_min = 4, group = { 1, 1 }, weight = 1, cap = 2 },
+}
+
+-- The stag: a red deer, antlers and all. models/stag.glb, from an export
+-- that was already skinned and is wider across the antlers than it is long,
+-- so sized along its body (`--axis z`): 5.5 cells long, 7.8 tall to the
+-- antler tips. Its grazing clip under `sneak` and an antler lunge under
+-- `swing`. Wary, quick to bolt and fast; it lives in woodland and on the moor.
+tdl.register_mob{
+    id = "stag", name = "Stag", health = 14,
+    collider = { width = 2.2, height = 5.0 },
+    model = "models/stag.glb", texture = "models/stag.png", grazes = true, jumps = "stuck",
+    walk_speed = 1.4, run_speed = 5.6,
+    shy = 8, sight = 16, wander_radius = 16, pause_min = 60, pause_max = 240,
+    drops = { { "raw_meat", 2, 3 } },
+    spawn = { biomes = { "temperate_woodlands", "flower_forest", "silverwood", "redwood_stands", "taiga",
+                         "heather_moor", "river_valleys", "alpine_highlands" },
+              ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "snow" },
+              time = "any", sun_min = 6, group = { 1, 4 }, weight = 2, cap = 5 },
 }
 
 -- Crows: a flock passing over. They come in from far off already flying,
@@ -155,8 +188,9 @@ tdl.register_mob{
     shy = 5, wary = 10, sight = 20,
     sound = "caw", voice_min = 100, voice_max = 500,
     drops = {},
-    spawn = { ground = { G .. "grass", G .. "packed_dirt", G .. "leaf_litter", G .. "dead_wood", G .. "dirt" },
-              rings = { "frost", "temperate", "ember", "verdant", "shore", "hem" },
+    -- Anywhere on dry land.
+    spawn = { land = true,
+              ground = { G .. "grass", G .. "packed_dirt", G .. "leaf_litter", G .. "dead_wood", G .. "dirt" },
               time = "any", sun_min = 8, group = { 3, 6 }, weight = 3, cap = 12, distance = { 56, 88 } },
 }
 
@@ -179,7 +213,8 @@ tdl.register_mob{
     bite = { damage = 1, range = 1.4, cooldown = 30, cause = "were bitten to death by bats" },
     sound = "squeak", voice_min = 60, voice_max = 300,
     drops = {},
-    spawn = { time = "any", sun_max = 2, group = { 2, 4 }, weight = 3, cap = 6 },
+    -- The ordinary caves, lit and dark.
+    spawn = { biomes = tdl.config.cave_biomes, time = "any", sun_max = 2, group = { 2, 4 }, weight = 3, cap = 6 },
 }
 
 return {}
