@@ -181,6 +181,32 @@ game.register_action{
 -- block the loaded world does not have is simply absent from these tables.
 local C = tdl.config
 M.contact_fire = U.materials(C.contact_fire)
+M.perches = U.materials((function()
+    local set = {}
+    for _, id in ipairs(C.perches) do set[id] = true end
+    return set
+end)())
+
+-- The world's blocks are looked up leniently, so a world without them still
+-- loads; but a world that HAS them and finds none means this mod loaded
+-- before it, which the `optional_depends` in mod.toml exists to prevent.
+-- Say so rather than let lava quietly stop burning.
+do
+    local listed, found = 0, 0
+    for id in pairs(C.contact_fire) do
+        if string.find(id, "^tiamat_default_world:") then
+            listed = listed + 1
+            if U.material(id) then found = found + 1 end
+        end
+    end
+    local world = pcall(game.get_block_id, "tiamat_default_world:grass")
+    game.log(string.format("tiamat_default_life: the world's blocks %s (%d of %d fire blocks, %d perches)",
+        world and "found" or "not here", found, listed, (function()
+            local n = 0
+            for _ in pairs(M.perches) do n = n + 1 end
+            return n
+        end)()))
+end
 M.heat_sources = U.materials(C.heat_sources)
 M.cold_sources = U.materials(C.cold_sources)
 M.radiation_blocks = U.materials(C.radiation_blocks)

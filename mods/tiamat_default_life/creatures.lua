@@ -9,6 +9,10 @@
 --   flyer             velocity-controlled rather than steered on the ground
 --   lands             a flyer that comes down now and then to walk and eat, and
 --                     flies again when its pause is over or anyone comes near
+--   navigates         a flyer that keeps a flight plan instead of wandering round a
+--                     home: crossing, circling, a tree, the ground (see mobs.lua)
+--   wary              blocks: sitting in a tree or on the ground, a player nearer
+--                     than this is fled from (in the air it is `shy`)
 --   flutters          a flyer that never glides: `run` is its flight, `swing` its bite
 --   hangs             a flyer that roosts upside down under a ceiling, on its `idle`
 --                     clip; on the ground it rests on `sneak` rather than `idle`
@@ -30,7 +34,8 @@
 -- with its wings out; on the ground, `walk`, `idle` and `sneak` as a walker.
 --   drops             { { item, min, max } }, items of this mod
 --   spawn             { ground = { block ids }, rings = { ring ids }, time = "day" | "night" | "any",
---                       sun_min, sun_max, group = { min, max }, weight, cap }
+--                       sun_min, sun_max, group = { min, max }, weight, cap,
+--                       distance = { min, max } blocks from the player, if not the usual }
 --
 -- The engine has no biome to ask about, so a biome is two things here: the
 -- RING of the Spindle the spot is in, by radius (config.lua carries the
@@ -56,9 +61,13 @@ tdl.register_mob{
               time = "day", sun_min = 12, group = { 2, 4 }, weight = 4, cap = 6 },
 }
 
+-- The sheep: models/sheep.glb, from an export that was already skinned.
+-- Four cells long, 2.1 wide, 3.8 tall; its grazing clip under `sneak`.
 tdl.register_mob{
     id = "sheep", name = "Sheep", health = 8,
-    collider = { width = 2.1, height = 2.7 },
+    collider = { width = 2.1, height = 3.6 },
+    model = "models/sheep.glb", texture = "models/sheep.png", grazes = true,
+    walk_speed = 1.0, run_speed = 2.6,
     shy = 2.0, sight = 10, wander_radius = 8, pause_min = 80, pause_max = 300,
     sound = "baa", sound_death = "baa", voice_min = 300, voice_max = 1200,
     drops = { { "raw_meat", 1, 2 } },
@@ -103,10 +112,14 @@ tdl.register_mob{
               time = "any", sun_min = 4, group = { 1, 1 }, weight = 1, cap = 2 },
 }
 
--- Crows: a flock by day, wheeling over the fields and keeping their
--- distance; after dark they mob whoever is out, pecking and wheeling away.
--- Now and then the flock comes down behind its leader to walk about and
--- peck at the ground, and goes up again together. Its body is
+-- Crows: a flock passing over. They come in from far off already flying,
+-- cross the country at their own height on a straight-ish line, wheel round
+-- a point for a while, settle in a tree (more often after dark) until
+-- somebody comes near or they take a notion to go, and now and then come
+-- down to walk and peck. Only the leader decides; the flock follows. They
+-- fly on out of the world once they are past everyone ("Crow navigation"
+-- in mobs.lua, numbers in config.lua). They do not attack: that is for
+-- later, and for magic. Its body is
 -- models/crow.glb, from an export that was already skinned and exported
 -- with its wings spread, so sized along its body (`--axis z`): two cells
 -- beak to tail, a block across the wings. Clips: `run` is the glide, wings
@@ -116,16 +129,14 @@ tdl.register_mob{
     id = "crow", name = "Crow", health = 3,
     collider = { width = 1.2, height = 1.2 },
     model = "models/crow.glb", texture = "models/crow.png", grazes = true,
-    flyer = true, lands = true, flock = true, speed = 0.35, speed_fast = 0.6,
+    flyer = true, lands = true, flock = true, navigates = true, speed = 0.35, speed_fast = 0.6,
     walk_speed = 0.8,
-    shy = 4, sight = 20, wander_radius = 14, fly_low = 4, fly_high = 12,
-    hostile = { when = "night" },
-    bite = { damage = 1, range = 1.6, cooldown = 40, cause = "were pecked to death by crows" },
+    shy = 5, wary = 10, sight = 20,
     sound = "caw", voice_min = 100, voice_max = 500,
     drops = {},
     spawn = { ground = { G .. "grass", G .. "packed_dirt", G .. "leaf_litter", G .. "dead_wood", G .. "dirt" },
               rings = { "frost", "temperate", "ember", "verdant", "shore", "hem" },
-              time = "any", sun_min = 8, group = { 3, 6 }, weight = 3, cap = 12 },
+              time = "any", sun_min = 8, group = { 3, 6 }, weight = 3, cap = 12, distance = { 56, 88 } },
 }
 
 -- Bats: the dark's own. Caves by day, anywhere by night; they bite and

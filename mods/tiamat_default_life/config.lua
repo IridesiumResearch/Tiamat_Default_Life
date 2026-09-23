@@ -198,6 +198,26 @@ C.fly_lift = 0.24              -- cells per tick, the tick of gravity a flyer ca
 C.fly_flap_ticks = 12          -- one wingbeat's worth of the `swing` clip, at least
 C.fly_flap_chance = 60         -- one tick in this many, a glider beats its wings to hold its height
 C.fly_land_ticks = 200         -- how long a flyer spends coming down, or going up to roost, before it thinks better of it
+-- Crows' flight plans (mobs.lua, "Crow navigation"). Heights are blocks
+-- over the ground, times ticks, chances out of a hundred at each change of plan.
+C.crow_cruise_min = 10         -- each bird's own cruising height, somewhere in here
+C.crow_cruise_max = 18
+C.crow_transit_min = 300       -- a straight leg: fifteen seconds to forty-five
+C.crow_transit_max = 900
+C.crow_circle_min = 6          -- a wheel's radius
+C.crow_circle_max = 12
+C.crow_circle_ticks_min = 200
+C.crow_circle_ticks_max = 600
+C.crow_tree_chance = 20        -- into a tree, by day
+C.crow_tree_chance_night = 55  -- and after dark
+C.crow_circle_chance = 30      -- of the rest: a circle
+C.crow_ground_chance = 6       -- and down to the ground: rare
+C.crow_tree_reach = 24         -- blocks around it a crow looks for a tree
+C.crow_flock_tree_reach = 4    -- and a follower, around its leader's branch
+C.crow_tree_tries = 6          -- columns looked at, one engine call each
+C.crow_treed_min = 400         -- sitting in a tree: twenty seconds to two minutes
+C.crow_treed_max = 2400
+C.crow_leave = 112             -- flown this far past every player, it leaves the world
 C.roost_reach = 8              -- blocks up a bat looks for a ceiling to hang from
 C.roost_hang = 0.1             -- blocks a roosting bat's origin sits inside the ceiling, so its hanging feet meet it
 
@@ -222,6 +242,17 @@ C.cold_sources = {
     ["tiamat_default_world:snow"] = 0.5,
     ["tiamat_default_world:permafrost"] = 0.3,
 }
+-- What a crow will perch on: the top of a tree, leaves, needles or a log.
+C.perches = {}
+for _, tree in ipairs({ "oak", "birch", "apple", "cherry", "acacia", "willow", "mangrove", "kapok", "ironwood" }) do
+    C.perches[#C.perches + 1] = "tiamat_default_world:" .. tree .. "_leaves"
+    C.perches[#C.perches + 1] = "tiamat_default_world:" .. tree .. "_log"
+end
+for _, tree in ipairs({ "fir", "redwood", "juniper" }) do
+    C.perches[#C.perches + 1] = "tiamat_default_world:" .. tree .. "_needles"
+    C.perches[#C.perches + 1] = "tiamat_default_world:" .. tree .. "_log"
+end
+C.perches[#C.perches + 1] = "tiamat_default_world:dead_log"
 -- Ground cover a body walks through. Treated as clear when looking for
 -- somewhere a creature can stand, so a meadow of tufts is not a wall.
 C.passable_cover = {

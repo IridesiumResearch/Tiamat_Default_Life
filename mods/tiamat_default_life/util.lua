@@ -45,6 +45,11 @@ function U.material(id)
     return nil
 end
 
+-- x times itself: squares without `^`, which is a platform library call.
+function U.square(x)
+    return x * x
+end
+
 -- Whether a block holds one of the materials in `set` (keyed on numeric
 -- ids), returning that material's entry. A mixed block answers for any of
 -- its cells.

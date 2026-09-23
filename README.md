@@ -203,12 +203,20 @@ chat.
 
 This is written for **Tiamat Default World**, the Spindle, and reads three
 things off it without touching its code: its block ids (grass, loam, snow,
-magma and the rest, all looked up leniently so a world without one still
-loads), its climate formula and its ring table (both copied into
+magma, the trees crows sit in and the rest, all looked up leniently so a
+world without one still loads), its climate formula and its ring table (both copied into
 `config.lua`, so if the Spindle's rings move, they move here by hand), and
 the day its `core_sky` dependency keeps. There is no biome in the engine's
 API, so a creature's biome is its ring by radius and the block under its
 feet.
+
+Those block ids are looked up as this mod loads, so it has to load
+**after** the world. It names the world in `optional_depends` for exactly
+that: without the edge the engine's alphabetical tiebreak loads Life
+first, every lookup finds nothing, and lava does not burn. It logs which
+it found at load (`the world's blocks found (1 of 1 fire blocks, 25
+perches)`); "not here" beside a world that is there means the order has
+gone wrong.
 
 ## Damage
 
@@ -274,7 +282,8 @@ Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
 `god`, `tp`, `revive`, `admins`, and the testing words `hurt
 [n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
 `choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]`,
-`mobs`, `mob`, `ignite [ticks]`, `cull`. The testing words vanish altogether when `dev_commands =
+`mobs`, `mob [kind]`, `plan <transit|circle|tree|land>` (the nearest
+crow), `ignite [ticks]`, `cull`. The testing words vanish altogether when `dev_commands =
 false` in `config.lua`.
 
 ## Creatures
@@ -284,10 +293,10 @@ Six so far, in `creatures.lua` as data over the system in `mobs.lua`:
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
 | Cow | Grass, by day, in twos to fours | Wanders, shies from you, runs when hit | 1 to 3 raw meat |
-| Sheep | Grass, by day, in threes to sixes | The same | 1 to 2 raw meat |
+| Sheep | Grass and the highland snow, by day, in threes to sixes | The same | 1 to 2 raw meat |
 | Pig | Woodland soil and grass, by day | The same | 1 to 2 raw meat |
 | Bear | Woodland soil and snow, in the Frostmoor, temperate and verdant rings, alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
-| Crow | Open ground, any time, in flocks of 3 to 6 | Wheels over the fields behind a leader by day, gliding with its wings out and beating them to climb; now and then the flock comes down to walk and peck, and goes up together when anyone comes near. After dark it mobs you, pecking for a point and wheeling away | nothing |
+| Crow | Comes in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The dark: caves by day, anywhere by night | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
 
 Spawning happens in passes around each player: a spot on the ground twenty
@@ -305,13 +314,13 @@ points a heart, up to ten, following it as it runs. Cows and pigs amble at
 see what the nearest one is doing. Nothing keeps you from sleeping: a bed is a bed.
 
 **Models.** A creature's body is a `.glb` in `models/` with its PNG
-skin beside it. The cow, the pig, the bear, the crow and the bat have one. Getting a
+skin beside it. Every creature has one. Getting a
 modeller's export into the shape the engine reads is three tools, none of
 which launch the game (the pig at `--length 4.5 --rename eating=sneak`; the
 bear at `--length 6.0 --rename eating=sneak`, its walk already quick enough;
 the crow at `--length 2.0 --axis z --rename eating=sneak`, since a bird with
 its wings spread is wider than it is long; the bat at `--length 0.6 --axis z
---rename eating=sneak`):
+--rename eating=sneak`; the sheep at `--length 4.0 --rename eating=sneak`):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak
@@ -338,8 +347,7 @@ Originals live in `assets/source/`, outside the mod, because the engine
 serves everything inside a mod's folder to clients.
 
 **Bodies.** A kind that names a `model` is drawn as it, registered with
-`game.register_model` with its PNG skin: the cow, the pig, the bear, the
-crow and the bat are themselves, painted and animated by their own clips. A flyer's
+`game.register_model` with its PNG skin: every creature is itself, painted and animated by their own clips. A flyer's
 clips mean something else in the air: `run` is its glide, wings out, and
 `swing` its wingbeat; on the ground it walks, idles and pecks (`sneak`) as
 a walker does. A bat never glides: it flutters on `run` and bites on

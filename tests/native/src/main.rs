@@ -29,7 +29,7 @@ use tiamat_core::{
         ScriptVm, VmLimits, WorldEdit,
     },
     phys::Abilities,
-    sight::{self, Looked, Reading, Sighting},
+    sight::{self, Looked, Reading, Sighting, Skip, Surface},
     sound::{self, LoopRequest, PlayRequest},
     storage::{self, Access as StorageAccess},
     ui::host::{self as uihost, ShowRequest},
@@ -399,6 +399,18 @@ impl sight::Access for World {
             face: [0, 1, 0],
         })
     }
+    /// The engine's column walk, the slow way: down from `from` to the first
+    /// occupied block. Enough for a crow looking for the ground or a tree.
+    fn surface_at(&self, domain: &str, column: [i32; 2], from: i32, depth: u32, _: Skip) -> Option<Surface> {
+        for y in (from - depth as i32..=from).rev() {
+            if let Reading::Single { material, occupancy } = self.block_at(domain, BlockPos { x: column[0], y, z: column[1] })
+                && occupancy != 0
+            {
+                return Some(Surface { y, material, occupancy, fluid: None });
+            }
+        }
+        None
+    }
     fn block_at(&self, _: &str, pos: BlockPos) -> Reading {
         match self.blocks.lock().unwrap().get(&(pos.x, pos.y, pos.z)) {
             Some((material, occupancy)) => Reading::Single { material: *material, occupancy: *occupancy },
@@ -612,7 +624,7 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
     // A stand-in for the world mod, so the lava and the bramble exist.
     vm.load_mod(
         "tiamat_default_world",
-        "for _, id in ipairs({ 'magma', 'bramble', 'dream_stone', 'grass', 'loam', 'leaf_litter', 'mud', 'dirt', 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'fern', 'tall_grass', 'ladys_mantle', 'ladys_mantle_bloom' }) do game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass' or id == 'ladys_mantle' or id == 'ladys_mantle_bloom') } end",
+        "for _, id in ipairs({ 'magma', 'bramble', 'dream_stone', 'grass', 'loam', 'leaf_litter', 'mud', 'dirt', 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'fern', 'tall_grass', 'ladys_mantle', 'ladys_mantle_bloom' }) do game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass' or id == 'ladys_mantle' or id == 'ladys_mantle_bloom') } end",
         &dir,
     )
     .unwrap();
@@ -1023,26 +1035,17 @@ fn mob_check(r: &mut Rig) {
     kinds.dedup();
     assert!(kinds.len() >= 2, "more than one kind: {kinds:?}");
     for (_, mob) in &spawned {
-        // The cow, the pig, the bear and the crow are their own models; a
-        // kind with none yet is the named stand-in.
-        if matches!(
-            mob.model.as_deref(),
-            Some(
-                "tiamat_default_life:cow"
-                    | "tiamat_default_life:pig"
-                    | "tiamat_default_life:bear"
-                    | "tiamat_default_life:crow"
-                    | "tiamat_default_life:bat"
-            )
-        ) {
-            assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
-        } else {
-            assert_eq!(mob.model.as_deref(), Some("engine:humanoid"), "a stand-in body");
-            assert_ne!(mob.nametag, None, "a stand-in's kind rides on its nametag");
-        }
+        // Every kind is its own model now; none is the named stand-in.
+        let model = mob.model.as_deref().unwrap_or("");
+        assert!(model.starts_with("tiamat_default_life:"), "its own body, not a stand-in: {model}");
+        assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
         assert!(mob.health.is_some(), "a mob has health");
         let [_, y, _] = mob.transform.to_world();
-        assert!((y - 64.0).abs() < 0.01, "standing on the floor, not in it: {y}");
+        if mob.model.as_deref() == Some("tiamat_default_life:crow") {
+            assert!(y > 70.0, "crows come in already flying: {y}");
+        } else {
+            assert!((y - 64.0).abs() < 0.01, "standing on the floor, not in it: {y}");
+        }
     }
     assert!(!kinds.iter().any(|k| k.contains("Bat")), "no bats in daylight on open grass");
     println!("ok  spawning: {} mobs of {} kinds on the grass by day", spawned.len(), kinds.len());
@@ -1291,11 +1294,11 @@ fn mob_check(r: &mut Rig) {
     *r.world.floor.lock().unwrap() = None;
     println!("ok  a bat roosts hanging under a ceiling, lets go when hurt, and crawls and eats on the ground");
 
-    // A crow, by day: wings in the air, feet on the ground. The fake world
-    // has no physics, so it is held where the test wants it, well away from
-    // the player, and its own dice decide when it glides, beats its wings and
-    // comes down.
+    // A crow, by day and by night. The fake world has no physics, so it is
+    // held where the test wants it, well away from the player, and `plan`
+    // puts it on each of its flight plans in turn.
     let grass = r.material("tiamat_default_world:grass");
+    let leaves = r.material("tiamat_default_world:oak_leaves");
     *r.world.floor.lock().unwrap() = Some((63, grass));
     r.say("spawn crow 1");
     r.tick(1);
@@ -1306,7 +1309,12 @@ fn mob_check(r: &mut Rig) {
         r.entities.0.lock().unwrap().entities.get_mut(&crow).unwrap().on_ground = ground;
     };
     let clip = |r: &Rig| r.entities.0.lock().unwrap().entities[&crow].anim;
-    // High over the field, every clip it plays is a wing clip, and it plays both.
+    let heading = |r: &mut Rig| {
+        r.say("mob crow");
+        r.said()
+    };
+    // In the air it keeps a plan, crossing or circling, and every clip it
+    // plays is a wing clip: gliding with its wings out, beating them now and then.
     let (mut soared, mut flapped) = (false, false);
     for _ in 0..600 {
         hold(&r, 80.0, false);
@@ -1318,9 +1326,35 @@ fn mob_check(r: &mut Rig) {
         flapped |= anim == tiamat_core::ent::AnimTag::SWING;
     }
     assert!(soared && flapped, "it glides with its wings out, and beats them now and then");
-    // On the ground, sooner or later it lands, and stands or pecks there.
+    let said = heading(r);
+    assert!(said.contains("transit") || said.contains("circle"), "on its way or wheeling: {said}");
+    r.say("plan circle");
+    hold(&r, 80.0, false);
+    r.tick(1);
+    assert!(heading(r).contains("circle"), "it wheels when told");
+
+    // Into a tree: over a canopy, it picks a branch and settles there, and sits.
+    *r.world.floor.lock().unwrap() = Some((63, leaves));
+    r.say("plan tree");
+    assert!(r.said().contains("to_tree"), "it picks a tree: {}", r.said());
+    hold(&r, 64.0, true);
+    r.tick(1);
+    for _ in 0..40 {
+        hold(&r, 64.0, true);
+        r.tick(1);
+        assert_eq!(clip(&r), tiamat_core::ent::AnimTag::IDLE, "sitting in the tree");
+    }
+    assert!(heading(r).contains("treed"), "and stays there");
+    // Walk up to it, and it is off, beating its wings.
+    r.put_mob(crow, 95.5, 64.0, 100.5);
+    r.tick(12);
+    assert_eq!(clip(&r), tiamat_core::ent::AnimTag::SWING, "approached, it flaps off");
+
+    // Now and then down to the ground: it walks and pecks there.
+    *r.world.floor.lock().unwrap() = Some((63, grass));
+    r.say("plan land");
     let mut landed = false;
-    for _ in 0..4000 {
+    for _ in 0..200 {
         hold(&r, 64.0, true);
         r.tick(1);
         let anim = clip(&r);
@@ -1329,15 +1363,34 @@ fn mob_check(r: &mut Rig) {
             break;
         }
     }
-    assert!(landed, "a crow comes down to the ground now and then");
-    // And a player walking up puts it back in the air, beating its wings.
-    r.put_mob(crow, 101.5, 64.0, 100.5);
-    r.tick(12);
-    assert_eq!(clip(&r), tiamat_core::ent::AnimTag::SWING, "startled, it flaps off");
+    assert!(landed, "a crow told to land comes down to the ground");
+
+    // After dark, right beside you, it does you no harm.
+    *r.sounds.time.lock().unwrap() = 0.9;
+    r.say("heal");
+    r.say("plan transit");
+    for _ in 0..200 {
+        r.put_mob(crow, 101.0, 65.5, 100.5);
+        r.tick(1);
+    }
+    assert_eq!(r.number("hp"), 27.0, "a crow at night harms nobody");
+    *r.sounds.time.lock().unwrap() = 0.5;
+
+    // Flown on past everyone, it leaves the world.
+    // (Any fright it was still flying off from ends first.)
+    r.say("plan transit");
+    for _ in 0..120 {
+        if r.mobs().iter().all(|(id, _)| *id != crow) {
+            break;
+        }
+        r.put_mob(crow, 400.5, 80.0, 400.5);
+        r.tick(1);
+    }
+    assert!(r.mobs().iter().all(|(id, _)| *id != crow), "a crow gone past everyone is gone");
     r.say("cull");
     r.tick(1);
     *r.world.floor.lock().unwrap() = None;
-    println!("ok  a crow soars, flaps, lands, and takes off when you come near");
+    println!("ok  a crow crosses, circles, sits in a tree and leaves it when approached, lands, harms nobody, and flies out of the world");
     *r.world.floor.lock().unwrap() = None;
 }
 

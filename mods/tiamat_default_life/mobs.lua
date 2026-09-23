@@ -119,6 +119,7 @@ local function adopt(id, entity)
         voice = between(100, 600),
         perceive_at = (id % PERCEIVE_EVERY),
         seen = nil,             -- { uuid, pos, d2 } of the nearest player
+        height = between(C.crow_cruise_min, C.crow_cruise_max),   -- a navigator's share of the sky
     }
     M.live[id] = m
     return m
@@ -285,7 +286,10 @@ local function try_spawn_near(v)
     if chosen == nil then return end
 
     for _ = 1, C.mob_spawn_tries do
-        local dist = between(C.mob_spawn_min, C.mob_spawn_max)
+        -- A kind may say how far off it appears: crows, far out, so they
+        -- come in over the horizon rather than out of a field beside you.
+        local range = chosen.spawn.distance
+        local dist = range and between(range[1], range[2]) or between(C.mob_spawn_min, C.mob_spawn_max)
         local dx = between(-dist, dist)
         local dz = (below(2) == 0 and 1 or -1) * (dist - math.abs(dx))
         local x, z = math.floor(pos.x) + dx, math.floor(pos.z) + dz
@@ -295,7 +299,21 @@ local function try_spawn_near(v)
             local n = between(group[1], group[2])
             n = math.min(n, (chosen.spawn.cap or 4) - (counts[chosen.id] or 0))
             if n > 0 then
-                local ids = tdl.spawn_mob(chosen.id, feet, n)
+                -- A navigator appears already in the air, flying across the
+                -- country the player is in: toward them, a little to one side.
+                local at = feet
+                if chosen.navigates then at = { x = feet.x, y = feet.y + C.crow_cruise_min, z = feet.z } end
+                local ids = tdl.spawn_mob(chosen.id, at, n)
+                local m = chosen.navigates and ids[1] and M.live[ids[1]]
+                if m then
+                    local hx = pos.x - feet.x + between(-12, 12)
+                    local hz = pos.z - feet.z + between(-12, 12)
+                    local length = math.sqrt(hx * hx + hz * hz)
+                    if length > 0.001 then
+                        m.heading = { x = hx / length, z = hz / length }
+                        m.state, m.timer = "transit", C.crow_transit_max
+                    end
+                end
                 if #ids > 0 then
                     game.log(string.format("tiamat_default_life: %d %s appeared at %d, %d, %d",
                         #ids, chosen.name, x, math.floor(feet.y), z))
@@ -657,6 +675,193 @@ local function away_from(entity, from, flyer)
     return { x = entity.pos.x + dx * 2, y = entity.pos.y + (flyer and 3 or 0), z = entity.pos.z + dz * 2 }
 end
 
+-- Crow navigation -----------------------------------------------------------------
+--
+-- A kind that `navigates` (the crow) has no home to wander round. Its leader
+-- keeps a flight plan and the flock follows it:
+--
+--   transit   straight-ish across the country at its cruising height, from
+--             one horizon to the other, drifting a little off its heading
+--   circle    wheeling round a point for a while
+--   to_tree   down onto the top of a tree it picked, and then
+--   treed     sitting there until its time is up or somebody comes near
+--   land      now and then, down to the ground to walk and peck (the states
+--             a lander already has)
+--
+-- When a plan ends it picks the next, and a crow that has flown on past
+-- every player leaves the world. Only the leader chooses; the flock copies
+-- it, down to each bird finding its own branch in the same tree.
+
+--- A flat direction as a unit vector; a zero one is east.
+local function unit(dx, dz)
+    local length = math.sqrt(dx * dx + dz * dz)
+    if length < 0.001 then return 1, 0 end
+    return dx / length, dz / length
+end
+
+--- Its cruising height: its own share of the sky over the ground under it,
+--- the ground found once a second with the engine's column walk.
+local function cruise_y(m, entity)
+    if m.cruise_at == nil or now >= m.cruise_at then
+        m.cruise_at = now + 20
+        local top = game.surface_at{ x = math.floor(entity.pos.x), z = math.floor(entity.pos.z),
+            from = math.floor(entity.pos.y) + 32, depth = 128 }
+        if top then m.cruise = top.y + 1 + m.height end
+    end
+    return m.cruise or entity.pos.y
+end
+
+local function start_transit(m, hx, hz)
+    if hx == nil then
+        if m.heading then
+            hx, hz = m.heading.x, m.heading.z
+        else
+            hx, hz = between(-10, 10), between(-10, 10)
+        end
+    end
+    hx, hz = unit(hx, hz)
+    m.heading = { x = hx, z = hz }
+    m.state, m.target, m.timer = "transit", nil, between(C.crow_transit_min, C.crow_transit_max)
+end
+
+local function start_circle(m, entity)
+    local hx, hz = unit(m.heading and m.heading.x or 1, m.heading and m.heading.z or 0)
+    m.spin = below(2) == 0 and 1 or -1
+    m.radius = between(C.crow_circle_min, C.crow_circle_max)
+    -- The centre is off to one side, so it turns into the circle from the
+    -- way it was going rather than doubling back.
+    m.centre = { x = entity.pos.x - hz * m.spin * m.radius, z = entity.pos.z + hx * m.spin * m.radius }
+    m.state, m.target, m.timer = "circle", nil, between(C.crow_circle_ticks_min, C.crow_circle_ticks_max)
+end
+
+--- The top of a tree within `reach` blocks of `near`: a few columns tried,
+--- each one call. The spot to stand on, or nil.
+local function find_tree(entity, near, reach)
+    for _ = 1, C.crow_tree_tries do
+        local x = math.floor(near.x) + between(-reach, reach)
+        local z = math.floor(near.z) + between(-reach, reach)
+        local top = game.surface_at{ x = x, z = z, from = math.floor(entity.pos.y) + 8, depth = 128 }
+        if top and I.perches[top.material] then
+            return { x = x + 0.5, y = top.y + 1, z = z + 0.5 }
+        end
+    end
+    return nil
+end
+
+local function start_tree(m, entity, near, reach)
+    local tree = find_tree(entity, near or entity.pos, reach or C.crow_tree_reach)
+    if tree == nil then return false end
+    m.state, m.target, m.timer = "to_tree", tree, C.fly_land_ticks * 2
+    return true
+end
+
+--- The next plan, when one ends: on along its way most often; round in a
+--- circle; into a tree, more often after dark; and now and then down to the
+--- ground.
+local function choose_plan(m, entity)
+    if below(100) < (is_night() and C.crow_tree_chance_night or C.crow_tree_chance) and start_tree(m, entity) then
+        return
+    end
+    local r = below(100)
+    if r < C.crow_ground_chance then
+        m.state, m.target, m.timer = "land", nil, C.fly_land_ticks
+    elseif r < C.crow_ground_chance + C.crow_circle_chance then
+        start_circle(m, entity)
+    elseif m.heading then
+        -- On, a little off its old heading.
+        local turn = between(-3, 3) * 0.1
+        start_transit(m, m.heading.x - m.heading.z * turn, m.heading.z + m.heading.x * turn)
+    else
+        start_transit(m)
+    end
+end
+
+--- Whether no player is within `r` blocks of a position.
+local function far_from_everyone(pos, r)
+    local r2 = r * r
+    for _, v in pairs(tdl.online()) do
+        if v.pos and U.dist2(v.pos, pos) < r2 then return false end
+    end
+    return true
+end
+
+--- One tick of a navigating flyer's plan. Answers false for a state that is
+--- not one of its plans, so the caller carries on with it.
+local function navigate(id, m, entity)
+    local speed = m.kind.speed or 0.3
+    local state = m.state
+    if state == "transit" then
+        if m.timer <= 0 then
+            choose_plan(m, entity)
+            return true
+        end
+        local h = m.heading
+        -- A little drift, now and then, so it is not a ruled line.
+        if (now + m.perceive_at) % 40 == 0 then
+            local d = between(-2, 2) * 0.04
+            h.x, h.z = unit(h.x - h.z * d, h.z + h.x * d)
+        end
+        fly_to(id, m, entity, { x = entity.pos.x + h.x * 12, y = cruise_y(m, entity), z = entity.pos.z + h.z * 12 },
+            speed, false)
+        return true
+    end
+    if state == "circle" then
+        if m.timer <= 0 then
+            choose_plan(m, entity)
+            return true
+        end
+        -- Aim a little ahead round the circle: out along the radius, then on
+        -- along the tangent, so it closes on the circle and follows it.
+        local ux, uz = unit(entity.pos.x - m.centre.x, entity.pos.z - m.centre.z)
+        local tx, tz = -uz * m.spin, ux * m.spin
+        m.heading = { x = tx, z = tz }
+        local r = m.radius
+        fly_to(id, m, entity, { x = m.centre.x + (ux + tx * 0.6) * r, y = cruise_y(m, entity),
+                                z = m.centre.z + (uz + tz * 0.6) * r }, speed, false)
+        return true
+    end
+    if state == "to_tree" then
+        local t = m.target
+        if entity.on_ground then
+            m.treed = true
+            m.state, m.timer = "treed", between(C.crow_treed_min, C.crow_treed_max)
+            game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = ANIM_IDLE })
+            return true
+        end
+        if m.timer <= 0 then
+            choose_plan(m, entity)
+            return true
+        end
+        local dx, dz = t.x - entity.pos.x, t.z - entity.pos.z
+        if dx * dx + dz * dz > 4 then
+            fly_to(id, m, entity, { x = t.x, y = t.y + 3, z = t.z }, speed, false)
+        else
+            glide_down(id, m, entity, t, speed)
+        end
+        return true
+    end
+    if state == "treed" then
+        if m.timer <= 0 then
+            if m.stay then
+                m.timer = between(60, 200)
+            else
+                -- Off again, on its way: the flight's first tick lifts it.
+                m.treed = false
+                start_transit(m)
+                return true
+            end
+        end
+        game.set_entity(id, { anim = ANIM_IDLE })
+        return true
+    end
+    -- In the air with no plan (after a fright, a take-off, a reload): one.
+    if not m.landed and (state == "idle" or state == "wander") then
+        choose_plan(m, entity)
+        return true
+    end
+    return false
+end
+
 local function step(id, dt)
     local entity = game.entity(id)
     if entity == nil or entity.item then return end
@@ -682,7 +887,7 @@ local function step(id, dt)
     if m.state ~= "flee" and m.state ~= "hunt" and m.seen then
         if kind.hostile and hunts_now(kind, entity) then
             m.state, m.threat, m.timer = "hunt", m.seen.uuid, C.mob_hunt_ticks
-        elseif kind.shy and m.seen.d2 < kind.shy * kind.shy then
+        elseif kind.shy and m.seen.d2 < U.square((m.treed or m.landed) and kind.wary or kind.shy) then
             m.state, m.threat, m.timer = "flee", m.seen.uuid, C.mob_flee_ticks // 2
         end
     end
@@ -691,13 +896,21 @@ local function step(id, dt)
     -- or on fire takes to the air.
     if m.state == "flee" or m.state == "hunt" or m.state == "panic" then
         if m.landed then take_off(id, m) end
-        m.roosting = false
+        m.roosting, m.treed = false, false
     end
 
     if m.state == "flee" then
         local from = U.body(m.threat)
         if from and m.timer > 0 then
             move_to(id, m, entity, away_from(entity, from.pos, kind.flyer), true)
+        elseif kind.navigates then
+            -- Frightened off, a crow goes on its way, away from whoever it was.
+            m.threat = nil
+            if from then
+                start_transit(m, entity.pos.x - from.pos.x, entity.pos.z - from.pos.z)
+            else
+                start_transit(m)
+            end
         else
             m.state, m.threat, m.timer = "idle", nil, between(20, 60)
             stand(id, m)
@@ -772,13 +985,22 @@ local function step(id, dt)
                 m.state, m.threat, m.timer = "hunt", lm.threat, C.mob_hunt_ticks
                 return
             end
-            if lm and (lm.landed or lm.state == "land") then
+            if lm and (lm.treed or lm.state == "to_tree") then
+                -- Into the same tree, each on a branch of its own; the ground
+                -- under it if there is no branch to be had.
+                m.stay = true
+                if not m.treed and m.state ~= "to_tree" and not m.landed and m.state ~= "land"
+                    and not start_tree(m, entity, lm.target or leader.pos, C.crow_flock_tree_reach) then
+                    m.state, m.target, m.timer = "land", nil, C.fly_land_ticks
+                end
+            elseif lm and (lm.landed or lm.state == "land") then
                 m.stay = true
                 if not m.landed and m.state ~= "land" then
                     m.state, m.target, m.timer = "land", nil, C.fly_land_ticks
                 end
             else
                 if m.landed then take_off(id, m) end
+                if m.treed then m.treed, m.state = false, "idle" end
                 local at = { x = leader.pos.x + m.offset.x, y = leader.pos.y + m.offset.y, z = leader.pos.z + m.offset.z }
                 if U.dist2(at, entity.pos) > 2 then
                     move_to(id, m, entity, at, false)
@@ -790,6 +1012,18 @@ local function step(id, dt)
         else
             m.flock = nil
         end
+    end
+
+    if kind.navigates then
+        -- Gone on past everyone: out of the world, rather than a crow at the
+        -- edge of it for ever. Checked every couple of seconds, in the air.
+        if (now + m.perceive_at) % 40 == 0 and not m.treed and not m.landed
+            and far_from_everyone(entity.pos, C.crow_leave) then
+            game.despawn_entity(id)
+            M.live[id] = nil
+            return
+        end
+        if navigate(id, m, entity) then return end
     end
 
     -- Going to roost: up under the ceiling it chose, and when it is there, its
@@ -940,12 +1174,17 @@ if C.dev_commands then
         table.sort(parts)
         tdl.say(uuid, #parts > 0 and table.concat(parts, ", ") or "nothing about")
     end)
-    --- The nearest mob as the server sees it: what it is doing, which clip it
-    --- is told to play, and how fast it is going. For checking in play.
+    --- The nearest mob (of a kind, if one is named) as the server sees it:
+    --- what it is doing, which clip it is told to play, and how fast it is
+    --- going. For checking in play.
     local ANIM_NAMES = { [0] = "idle", "walk", "run", "swing", "swim", "sneak" }
-    tdl.command("mob", "admin", function(uuid)
+    tdl.command("mob", "admin", function(uuid, rest)
         local body = U.body(uuid)
-        local id = body and tdl.mobs_near(body.pos, C.mob_count_radius)[1]
+        local id
+        for _, near in ipairs(body and tdl.mobs_near(body.pos, C.mob_count_radius) or {}) do
+            local r = M.live[near]
+            if rest == nil or rest == "" or (r and r.kind.id == rest) then id = near break end
+        end
         local entity = id and game.entity(id)
         if entity == nil then
             tdl.say(uuid, "No mob near.")
@@ -957,6 +1196,38 @@ if C.dev_commands then
         tdl.say(uuid, string.format("%s #%d: %s, clip %s, %.2f blocks/s%s",
             m and m.kind.id or "?", id, m and m.state or "?", ANIM_NAMES[entity.anim] or tostring(entity.anim),
             speed, entity.on_ground and "" or ", in the air"))
+    end)
+    --- Puts the nearest crow on a plan, to watch one without waiting for it.
+    tdl.command("plan", "admin", function(uuid, rest)
+        local body = U.body(uuid)
+        local id, m
+        for _, near in ipairs(body and tdl.mobs_near(body.pos, C.mob_count_radius) or {}) do
+            local r = M.live[near]
+            if r and r.kind.navigates then id, m = near, r break end
+        end
+        local entity = id and game.entity(id)
+        if entity == nil then
+            tdl.say(uuid, "No crow near.")
+            return
+        end
+        if m.landed then take_off(id, m) end
+        m.treed = false
+        if rest == "transit" then
+            start_transit(m)
+        elseif rest == "circle" then
+            start_circle(m, entity)
+        elseif rest == "tree" then
+            if not start_tree(m, entity) then
+                tdl.say(uuid, "No tree near it.")
+                return
+            end
+        elseif rest == "land" then
+            m.state, m.target, m.timer = "land", nil, C.fly_land_ticks
+        else
+            tdl.say(uuid, "plan <transit|circle|tree|land>")
+            return
+        end
+        tdl.say(uuid, "Crow #" .. id .. ": " .. m.state .. ".")
     end)
     tdl.command("ignite", "admin", function(uuid, rest)
         local body = U.body(uuid)
