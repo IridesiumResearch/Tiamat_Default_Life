@@ -5,7 +5,7 @@ voxel engine: hearts, cookies, bubbles when you are under, a thermometer
 only when it matters, food that heals and clothing that keeps you warm; three
 kinds of world (Default, Creative, and a one-life Adventure) with admins over
 them; and everything that lives in the world, beginning with cows, sheep,
-pigs, crows and bats.
+pigs, horses, bears, crows and bats.
 
 Written against the engine's public Lua API and nothing else. The rules that
 shape it are in [`AGENTS.md`](AGENTS.md) (vendored from the engine's `api/`),
@@ -288,13 +288,14 @@ false` in `config.lua`.
 
 ## Creatures
 
-Six so far, in `creatures.lua` as data over the system in `mobs.lua`:
+Seven so far, in `creatures.lua` as data over the system in `mobs.lua`:
 
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
 | Cow | Grass, by day, in twos to fours | Wanders, shies from you, runs when hit | 1 to 3 raw meat |
 | Sheep | Grass and the highland snow, by day, in threes to sixes | The same | 1 to 2 raw meat |
 | Pig | Woodland soil and grass, by day | The same | 1 to 2 raw meat |
+| Horse | Grass, by day, in herds of 2 to 5 | Wanders and grazes, bolts from you at a gallop, snorts. Fifteen points. Cannot be ridden yet: the engine has no right-click on an entity and no way to seat a rider (engine asks 17 and 18) | 1 to 3 raw meat |
 | Bear | Woodland soil and snow, in the Frostmoor, temperate and verdant rings, alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Crow | Comes in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The dark: caves by day, anywhere by night | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
@@ -324,7 +325,8 @@ which launch the game (the pig at `--length 4.5 --rename eating=sneak`; the
 bear at `--length 6.0 --rename eating=sneak`, its walk already quick enough;
 the crow at `--length 2.0 --axis z --rename eating=sneak`, since a bird with
 its wings spread is wider than it is long; the bat at `--length 0.6 --axis z
---rename eating=sneak`; the sheep at `--length 4.0 --rename eating=sneak`):
+--rename eating=sneak`; the sheep at `--length 4.0 --rename eating=sneak`; the horse at `--length 7.0
+--rename eating=sneak`):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak

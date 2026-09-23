@@ -1170,7 +1170,7 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|bear|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|bear|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),
@@ -1261,7 +1261,8 @@ if C.dev_commands then
         local body = U.body(uuid)
         if body == nil then return end
         local n = 0
-        for _, id in ipairs(tdl.mobs_near(body.pos, C.mob_count_radius)) do
+        -- As far as a crow may be before it leaves: everything a player could see.
+        for _, id in ipairs(tdl.mobs_near(body.pos, C.crow_leave)) do
             game.despawn_entity(id)
             M.live[id] = nil
             n = n + 1

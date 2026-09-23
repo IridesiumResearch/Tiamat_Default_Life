@@ -94,6 +94,24 @@ tdl.register_mob{
               rings = { "temperate", "verdant", "shore" }, time = "day", sun_min = 6, group = { 1, 3 }, weight = 3, cap = 6 },
 }
 
+-- The horse: models/horse.glb, from an export that was already skinned.
+-- Seven cells long, 2.6 wide, 6.6 tall to the tips of its ears; its grazing
+-- clip under `sneak` and a rear kick under `swing`. A herd on open grass,
+-- skittish and quick to bolt. It cannot be ridden yet: the engine has no
+-- event for right-clicking an entity and no way to seat a player on one
+-- (docs/engine-asks.md, asks 17 and 18).
+tdl.register_mob{
+    id = "horse", name = "Horse", health = 15,
+    collider = { width = 2.6, height = 5.4 },
+    model = "models/horse.glb", texture = "models/horse.png", grazes = true, jumps = "stuck",
+    walk_speed = 1.3, run_speed = 5.2,
+    shy = 3.0, sight = 12, wander_radius = 14, pause_min = 60, pause_max = 260,
+    sound = "snort", sound_death = "snort", voice_min = 400, voice_max = 1600,
+    drops = { { "raw_meat", 1, 3 } },
+    spawn = { ground = { G .. "grass" }, rings = { "temperate", "verdant", "shore" },
+              time = "day", sun_min = 12, group = { 2, 5 }, weight = 2, cap = 6 },
+}
+
 -- The bear: the woods' own, and nobody's quarry. It ambles, forages with
 -- its head down and leaves you be; hurt it and it comes for you, faster
 -- than you can walk and slower than you can sprint, and swipes hard. Its
