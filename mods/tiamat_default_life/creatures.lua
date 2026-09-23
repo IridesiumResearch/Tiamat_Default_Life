@@ -29,6 +29,9 @@
 --   walk_speed, run_speed  a walker's own speeds, blocks a second (default: the engine's
 --                     walk and sprint, 4.3 and 5.6, which is a player's)
 --   grazes            idles with its head down now and then (the `sneak` clip)
+--   jumps             "stuck": never jumps at a rise, only hops out of somewhere
+--                     it has been stuck (a hole); left out, the engine's steering
+--                     jumps whatever the step cannot take
 --
 -- A flyer with a model plays `swing` for a wingbeat and `run` for a glide
 -- with its wings out; on the ground, `walk`, `idle` and `sneak` as a walker.
@@ -52,7 +55,7 @@ local G = "tiamat_default_world:"
 tdl.register_mob{
     id = "cow", name = "Cow", health = 10,
     collider = { width = 2.4, height = 4.5 },
-    model = "models/cow.glb", texture = "models/cow.png", grazes = true,
+    model = "models/cow.glb", texture = "models/cow.png", grazes = true, jumps = "stuck",
     walk_speed = 1.1, run_speed = 2.8,
     shy = 1.5, sight = 10, wander_radius = 10, pause_min = 60, pause_max = 240,
     sound = "moo", sound_death = "moo", voice_min = 300, voice_max = 1200,
@@ -66,7 +69,7 @@ tdl.register_mob{
 tdl.register_mob{
     id = "sheep", name = "Sheep", health = 8,
     collider = { width = 2.1, height = 3.6 },
-    model = "models/sheep.glb", texture = "models/sheep.png", grazes = true,
+    model = "models/sheep.glb", texture = "models/sheep.png", grazes = true, jumps = "stuck",
     walk_speed = 1.0, run_speed = 2.6,
     shy = 2.0, sight = 10, wander_radius = 8, pause_min = 80, pause_max = 300,
     sound = "baa", sound_death = "baa", voice_min = 300, voice_max = 1200,
@@ -82,7 +85,7 @@ tdl.register_mob{
 tdl.register_mob{
     id = "pig", name = "Pig", health = 10,
     collider = { width = 2.4, height = 2.5 },
-    model = "models/pig.glb", texture = "models/pig.png", grazes = true,
+    model = "models/pig.glb", texture = "models/pig.png", grazes = true, jumps = "stuck",
     walk_speed = 1.1, run_speed = 2.8,
     shy = 1.5, sight = 8, wander_radius = 8, pause_min = 40, pause_max = 200,
     sound = "oink", sound_death = "oink", voice_min = 200, voice_max = 800,

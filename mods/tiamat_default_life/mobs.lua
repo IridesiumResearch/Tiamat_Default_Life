@@ -471,9 +471,13 @@ end
 ---
 --- How fast is the ENTITY's, not the drive's: `speed` is a multiple of the
 --- ordinary pace, kept with the entity, so a kind that names its speeds in
---- blocks a second gets them by scaling the gait it is using. The engine
---- steers and decides the jumping: it walks a one-cell lip and jumps only
---- what the step cannot take.
+--- blocks a second gets them by scaling the gait it is using.
+---
+--- Most kinds are steered by the engine, which walks a one-cell lip and jumps
+--- whatever the step cannot take. A kind with `jumps = "stuck"` (the cow, the
+--- pig, the sheep) is driven here instead and never jumps at a rise: it walks
+--- what the step allows, and hops only once it has been stuck in one place for
+--- `mob_hop_ticks`, which is a hole it has to climb out of.
 local function walk_to(id, m, entity, target, gait)
     local kind = m.kind
     local want = gait == "sprint" and kind.run_speed or kind.walk_speed
@@ -484,19 +488,33 @@ local function walk_to(id, m, entity, target, gait)
             m.speed, spec.speed = scale, scale
         end
     end
-    local going = game.steer_entity(id, target, gait)
 
-    -- Given up: a body that has not moved for a while is against something the
-    -- engine cannot jump, and standing there is worse than going elsewhere.
+    -- Stuck: trying to go and not going, on the ground.
     local speed2 = entity.velocity.x * entity.velocity.x + entity.velocity.z * entity.velocity.z
     if speed2 >= C.mob_moving_speed2 or not entity.on_ground then
         m.stuck = 0
     else
         m.stuck = (m.stuck or 0) + 1
-        if m.stuck >= C.mob_stuck_ticks then
-            m.stuck = 0
-            return false
-        end
+    end
+
+    local going
+    if kind.jumps == "stuck" then
+        local dx, dz = target.x - entity.pos.x, target.z - entity.pos.z
+        going = dx * dx + dz * dz > C.mob_arrive * C.mob_arrive
+        -- One hop, the moment it has been stuck long enough, then walking
+        -- again: a hole climbed out of, not a hare.
+        local hop = going and entity.on_ground and m.stuck == C.mob_hop_ticks
+        spec.drive = { walk = going and { x = dx, z = dz } or { x = 0, z = 0 }, gait = gait, jump = hop }
+    else
+        going = game.steer_entity(id, target, gait)
+    end
+
+    -- Given up: a body that has not moved for a while is against something it
+    -- cannot get over, and standing there is worse than going elsewhere.
+    if m.stuck >= C.mob_stuck_ticks then
+        m.stuck = 0
+        if spec.drive then spec.drive = { walk = { x = 0, z = 0 } } game.set_entity(id, spec) end
+        return false
     end
 
     -- A kind that `hangs` has its roost as its idle clip, so on the ground it

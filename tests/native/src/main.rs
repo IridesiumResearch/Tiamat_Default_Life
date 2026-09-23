@@ -1127,6 +1127,38 @@ fn mob_check(r: &mut Rig) {
     r.tick(1);
     println!("ok  a cow ambles and runs at its own pace, through the engine's steering");
 
+    // A cow never jumps at a rise; stuck in one place (a hole), it hops
+    // once, then walks again, and gives up on the spot if that did not work.
+    r.say("cull");
+    r.say("spawn cow 1");
+    r.tick(1);
+    let (cow, _) = r.mobs()[0].clone();
+    let (mut walked, mut hops, mut last_hop, mut back_to_back) = (false, 0, None::<u32>, false);
+    for t in 0..400u32 {
+        {
+            let mut store = r.entities.0.lock().unwrap();
+            let body = store.entities.get_mut(&cow).unwrap();
+            body.on_ground = true;
+            body.velocity.0 = [0.0; 3];
+        }
+        r.put_mob(cow, 90.5, 64.0, 90.5);
+        r.tick(1);
+        let drive = r.entities.0.lock().unwrap().entities[&cow].drive;
+        walked |= drive.walk != [0.0, 0.0];
+        if drive.jump {
+            hops += 1;
+            back_to_back |= last_hop == Some(t.wrapping_sub(1));
+            last_hop = Some(t);
+        }
+    }
+    assert!(walked, "it tried to walk");
+    assert!(hops >= 1, "stuck, it hops out");
+    assert!(hops <= 400 / 60 + 1, "but only now and then, not a hare: {hops} hops");
+    assert!(!back_to_back, "and one tick at a time");
+    r.say("cull");
+    r.tick(1);
+    println!("ok  a cow never jumps at a rise, and hops once when stuck: {hops} hops in 400 ticks of being stuck");
+
     // A bear leaves you be, standing right beside it. Hurt it and it turns:
     // ten hearts of three over it, then it comes for you and swipes, playing
     // its swing clip, for seven points a blow.
@@ -1327,7 +1359,10 @@ fn mob_check(r: &mut Rig) {
     }
     assert!(soared && flapped, "it glides with its wings out, and beats them now and then");
     let said = heading(r);
-    assert!(said.contains("transit") || said.contains("circle"), "on its way or wheeling: {said}");
+    assert!(
+        ["transit", "circle", "to_tree", "land"].iter().any(|plan| said.contains(plan)),
+        "keeping a flight plan: {said}"
+    );
     r.say("plan circle");
     hold(&r, 80.0, false);
     r.tick(1);

@@ -310,7 +310,11 @@ hurt hunters, and a hurt bear, turn on you. A blow hangs a row of hearts
 over the mob for a second, for whoever struck it (`game.show_over`): two
 points a heart, up to ten, following it as it runs. Cows and pigs amble at
 1.1 blocks a second and run at 2.8, bears at 1.3 and 4.6 (`walk_speed`,
-`run_speed` on a kind, which become `speed` on the entity); say `mob` to
+`run_speed` on a kind, which become `speed` on the entity). Cows, pigs
+and sheep never jump at a rise: they walk what a step allows, and hop only
+once they have been stuck in one place for a second, which is a hole to
+climb out of (`jumps = "stuck"`); a bear is steered by the engine and
+jumps what it must; say `mob` to
 see what the nearest one is doing. Nothing keeps you from sleeping: a bed is a bed.
 
 **Models.** A creature's body is a `.glb` in `models/` with its PNG
