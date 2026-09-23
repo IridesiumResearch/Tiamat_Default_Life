@@ -26,18 +26,7 @@ local R = C.temp_source_radius
 
 local now = 0
 
---- Whether a block holds one of the materials in `set`, returning the entry.
-local function material_in(set, pos)
-    local at = game.get_block(pos)
-    if at == nil or at.occupancy == 0 then return nil end
-    if at.cells then
-        for _, material in ipairs(at.cells) do
-            if set[material] then return set[material] end
-        end
-        return nil
-    end
-    return set[at.material]
-end
+local material_in = U.material_in
 
 --- How deep in fluid the body is, from the engine's own measure.
 local function sample_fluid(v, body)

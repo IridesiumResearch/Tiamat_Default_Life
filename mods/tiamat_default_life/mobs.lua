@@ -15,6 +15,7 @@
 --   tdl.spawn_mob(kind, pos, n)    puts some in the world now
 --   tdl.hurt_mob(id, amount, by)   damage, and death, drops and fleeing
 --   tdl.mobs_near(pos, radius)     ids of ours, nearest first
+--   tdl.set_alight(target, ticks)  a player (UUID) or one of ours (id) burns
 --
 -- Everything that moves goes through the engine: `game.steer_entity` walks a
 -- body toward a point and decides the jumping, a kind's own pace is `speed`
@@ -34,6 +35,8 @@ tdl.mobs = M
 local ANIM_IDLE, ANIM_WALK, ANIM_RUN, ANIM_SWING = 0, 1, 2, 3
 local ANIM_SNEAK = 5    -- the engine's sixth tag; a grazer's head-down clip rides on it
 local PERCEIVE_EVERY = 10
+local FIRE_EVERY = 5      -- ticks between looks at what a body stands in
+local BURN_PERIOD = 10    -- burning after the fire: a point this often, as a player's
 local now = 0
 
 -- Randomness --------------------------------------------------------------------
@@ -340,11 +343,14 @@ function tdl.hurt_mob(id, amount, by)
     show_hearts(id, m.kind, math.max(left, 0), by)
     if left <= 0 then
         -- What it leaves behind, then gone.
+        -- Burned to death, its meat comes out cooked.
+        local burned = (m.burning or 0) > 0 or m.in_fire ~= nil
         for _, drop in ipairs(m.kind.drops) do
             local n = between(drop[2], drop[3] or drop[2])
+            local item = burned and C.cooked_by_fire[drop[1]] or drop[1]
             if n > 0 then
                 tdl.drop({ x = entity.pos.x, y = entity.pos.y + 0.5, z = entity.pos.z },
-                    { material = I.defs[game.mod_id .. ":" .. drop[1]].material, units = n * 27 },
+                    { material = I.defs[game.mod_id .. ":" .. item].material, units = n * 27 },
                     { velocity = { x = 0, y = 0.3, z = 0 } })
             end
         end
@@ -579,6 +585,72 @@ local function stand(id, m)
     end
 end
 
+--- Fire: what the body stands in, looked at every few ticks. In it, the
+--- block's own hits and the burning it leaves; out of it, a point every
+--- `BURN_PERIOD` ticks until the burning is over; in water, none of it. A
+--- creature that catches fire panics, unless it is busy hunting. Returns
+--- false if the fire killed it.
+local function tick_fire(id, m, entity, dt)
+    if (entity.submerged or 0) > 0 then
+        m.burning, m.in_fire, m.fire_acc = 0, nil, 0
+        return true
+    end
+    if (now + m.perceive_at) % FIRE_EVERY == 0 then
+        local feet = U.block_at(entity.pos)
+        m.in_fire = U.material_in(I.contact_fire, feet)
+            or U.material_in(I.contact_fire, { x = feet.x, y = feet.y - 1, z = feet.z })
+    end
+    local fire = m.in_fire
+    local hit = 0
+    if fire then
+        if (m.burning or 0) <= 0 and m.state ~= "hunt" then m.state, m.target = "panic", nil end
+        m.burning = math.max(m.burning or 0, fire.after)
+        m.fire_acc = (m.fire_acc or 0) + dt
+        if m.fire_acc >= fire.ticks then
+            m.fire_acc = 0
+            hit = fire.damage
+        end
+    elseif (m.burning or 0) > 0 then
+        m.burning = m.burning - dt
+        m.fire_acc = (m.fire_acc or 0) + dt
+        if m.fire_acc >= BURN_PERIOD then
+            m.fire_acc = 0
+            hit = 1
+        end
+    else
+        return true
+    end
+    m.flame_acc = (m.flame_acc or 0) + dt
+    if m.flame_acc >= C.flame_every then
+        m.flame_acc = 0
+        U.flames(entity.pos, m.kind.collider.height / 3)
+    end
+    if hit > 0 then
+        tdl.hurt_mob(id, hit, nil)
+        if M.live[id] == nil then return false end
+    end
+    return true
+end
+
+--- Sets a player (a UUID) or one of our creatures (an entity id) on fire
+--- for `ticks`, or longer if it is already burning longer. Answers whether
+--- there was anyone to set alight.
+function tdl.set_alight(target, ticks)
+    if type(target) == "string" then
+        local v = tdl.get(target)
+        if v == nil or v.dead then return false end
+        tdl.effects.apply(v, "burning", ticks)
+        return true
+    end
+    local entity = math.type(target) == "integer" and game.entity(target)
+    if not entity then return false end
+    local m = M.live[target] or adopt(target, entity)
+    if m == nil then return false end
+    if (m.burning or 0) <= 0 and m.state ~= "hunt" then m.state, m.target = "panic", nil end
+    m.burning = math.max(m.burning or 0, ticks)
+    return true
+end
+
 --- Away from a threat: a point on the far side of the body from it.
 local function away_from(entity, from, flyer)
     local dx, dz = entity.pos.x - from.x, entity.pos.z - from.z
@@ -596,6 +668,7 @@ local function step(id, dt)
     if m.hurt_cd > 0 then m.hurt_cd = m.hurt_cd - dt end
     if m.bite_cd > 0 then m.bite_cd = m.bite_cd - dt end
     if (now + m.perceive_at) % PERCEIVE_EVERY == 0 then perceive(m, entity) end
+    if not tick_fire(id, m, entity, dt) then return end
 
     -- A voice now and then.
     m.voice = m.voice - dt
@@ -614,9 +687,9 @@ local function step(id, dt)
         end
     end
 
-    -- A bird on the ground, or a bat on its roost, that is frightened or angry
-    -- takes to the air.
-    if m.state == "flee" or m.state == "hunt" then
+    -- A bird on the ground, or a bat on its roost, that is frightened, angry
+    -- or on fire takes to the air.
+    if m.state == "flee" or m.state == "hunt" or m.state == "panic" then
         if m.landed then take_off(id, m) end
         m.roosting = false
     end
@@ -628,6 +701,20 @@ local function step(id, dt)
         else
             m.state, m.threat, m.timer = "idle", nil, between(20, 60)
             stand(id, m)
+        end
+        return
+    end
+
+    -- On fire: running anywhere, fast, until it goes out.
+    if m.state == "panic" then
+        if (m.burning or 0) <= 0 and m.in_fire == nil then
+            m.state, m.target, m.timer = "idle", nil, between(20, 60)
+            stand(id, m)
+            return
+        end
+        if m.target == nil or not move_to(id, m, entity, m.target, true) then
+            m.target = { x = entity.pos.x + between(-6, 6), y = entity.pos.y + (kind.flyer and 3 or 0),
+                         z = entity.pos.z + between(-6, 6) }
         end
         return
     end
@@ -870,6 +957,16 @@ if C.dev_commands then
         tdl.say(uuid, string.format("%s #%d: %s, clip %s, %.2f blocks/s%s",
             m and m.kind.id or "?", id, m and m.state or "?", ANIM_NAMES[entity.anim] or tostring(entity.anim),
             speed, entity.on_ground and "" or ", in the air"))
+    end)
+    tdl.command("ignite", "admin", function(uuid, rest)
+        local body = U.body(uuid)
+        local id = body and tdl.mobs_near(body.pos, C.mob_count_radius)[1]
+        if id == nil then
+            tdl.say(uuid, "No mob near.")
+            return
+        end
+        tdl.set_alight(id, tonumber(rest) or 100)
+        tdl.say(uuid, "Alight.")
     end)
     tdl.command("cull", "admin", function(uuid)
         local body = U.body(uuid)

@@ -312,6 +312,14 @@ local function tick_fire(uuid, v, dt)
     else
         v.fire_acc = 0
     end
+    -- Alight, in the fire or after it: flames on the body for all to see.
+    if E.has(v, "burning") and v.pos then
+        v.flame_acc = (v.flame_acc or 0) + dt
+        if v.flame_acc >= C.flame_every then
+            v.flame_acc = 0
+            U.flames(v.pos, 1.8)
+        end
+    end
     if v.env.radiation then
         E.apply(v, "radiation", C.radiation_ticks)
     end

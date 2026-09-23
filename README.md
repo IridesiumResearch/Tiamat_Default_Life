@@ -215,14 +215,28 @@ feet.
 Physical (punches; a `core_gear:sword` does six), falls (past three blocks,
 a little over a point a block (1.15), as far as the engine measured the fall, which
 a flight down is not; none landing in water), fire and
-lava (standing on the world's magma or in a campfire, and burning for a
-while after), poison (to your last heart), wither (all the way), starvation
+lava (standing on the world's magma, in a campfire or in Tiamat Weather's
+fire, and burning for a while after, in flames anyone can see), poison (to your last heart), wither (all the way), starvation
 (to your last heart), drowning, freezing and overheating, explosions
 (`tdl.explode{ pos, radius, damage, blocks }`), radiation (a block list in
 `config.lua`, empty in the default world so far).
 
 Hits inside half a second of one another only land the excess over the last
 one, the classic rule.
+
+**Fire catches animals too.** A creature standing in any of those burns,
+keeps burning for a few seconds after, a point every half second, and runs
+about in a panic while it does; water puts it out. Burned to death, it
+leaves its meat cooked. Say `ignite [ticks]` to set the nearest one alight.
+
+**What other mods may call.** `game.exports("tiamat_default_life")`, for a
+mod that lists this one in its `depends` or `optional_depends`
+(`exports.lua`): `add_contact_fire(block, { damage, ticks, after })` and
+`add_heat_source(block, strength)` put another mod's block in the fire and
+heat tables (Tiamat Weather's fire is added this way, at its load), and
+`set_alight(target, ticks)` sets a player (UUID) or one of these creatures
+(entity id) on fire. Each answers `false` for anything it cannot take, and
+none raises.
 
 ## Death
 
@@ -260,7 +274,7 @@ Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
 `god`, `tp`, `revive`, `admins`, and the testing words `hurt
 [n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
 `choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]`,
-`mobs`, `cull`. The testing words vanish altogether when `dev_commands =
+`mobs`, `mob`, `ignite [ticks]`, `cull`. The testing words vanish altogether when `dev_commands =
 false` in `config.lua`.
 
 ## Creatures
@@ -300,7 +314,7 @@ its wings spread is wider than it is long; the bat at `--length 0.6 --axis z
 --rename eating=sneak`):
 
 ```
-python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename Eating=sneak --speed walk=2
+python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak
 cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamat_default_life/models/cow.glb
 MODEL_POSE_DUMP=out/poses cargo run --offline --manifest-path tests/native/Cargo.toml --bin model_check -- mods/tiamat_default_life/models/cow.glb
 python tools/render_model.py out/poses mods/tiamat_default_life/models/cow.png out/cow_sheet.png

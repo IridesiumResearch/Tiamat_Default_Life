@@ -187,4 +187,44 @@ M.radiation_blocks = U.materials(C.radiation_blocks)
 M.weapons = U.materials(C.weapons)
 M.forage = U.materials(C.forage)
 
+-- Fire and heat another mod adds: tiamat_weather's burning block, through
+-- the unlocks this mod exports (exports.lua). They arrive by NAME, at that
+-- mod's load, which is after ours, so they are kept as names and resolved on
+-- the first tick, when every block in the world is registered; one added
+-- after that is resolved at once. A name nothing registered is logged and
+-- dropped.
+local pending = { contact_fire = {}, heat_sources = {} }
+local started = false
+
+local function resolve(table_name)
+    for name, value in pairs(pending[table_name]) do
+        local material = U.material(name)
+        if material then
+            M[table_name][material] = value
+        else
+            game.log("tiamat_default_life: " .. name .. " is not a block; not added to " .. table_name)
+        end
+        pending[table_name][name] = nil
+    end
+end
+
+--- Standing in `name` burns: `{ damage, ticks, after }`, as C.contact_fire.
+function M.add_contact_fire(name, spec)
+    pending.contact_fire[name] = { damage = spec.damage, ticks = spec.ticks, after = spec.after }
+    if started then resolve("contact_fire") end
+end
+
+--- `name` warms whoever stands near it, `strength` 0..1, as C.heat_sources.
+function M.add_heat_source(name, strength)
+    pending.heat_sources[name] = strength
+    if started then resolve("heat_sources") end
+end
+
+tdl.on_tick(function()
+    if started then return end
+    started = true
+    resolve("contact_fire")
+    resolve("heat_sources")
+end)
+
 return M

@@ -626,6 +626,26 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
     }
     let init = format!("{prelude}{}", std::fs::read_to_string(dir.join("init.lua")).unwrap());
     vm.load_mod(MOD, &init, &dir).expect("the mod loads");
+    // A stand-in for Tiamat Weather, which loads after this mod and puts its
+    // burning block into our fire and heat tables through our exports, as
+    // its fire.lua does. What it may not do is refused, not raised.
+    vm.note_dependencies("tiamat_weather", &[MOD.to_owned()]);
+    vm.load_mod(
+        "tiamat_weather",
+        r#"
+        game.register_block{ id = "fire", passable = true }
+        local life = game.exports("tiamat_default_life")
+        assert(life and life.version == 1, "Life exports version 1")
+        assert(life.add_contact_fire("tiamat_weather:fire", { damage = 1, ticks = 20, after = 40 }) == true)
+        assert(life.add_heat_source("tiamat_weather:fire", 1.0) == true)
+        assert(life.add_contact_fire("not a block", { damage = 1, ticks = 20, after = 40 }) == false)
+        assert(life.add_contact_fire("tiamat_weather:fire", { damage = "lots" }) == false)
+        assert(life.add_heat_source("tiamat_weather:fire", 7) == false)
+        assert(life.set_alight({}, 40) == false)
+        "#,
+        &dir,
+    )
+    .expect("the weather stand-in loads and Life's exports answer it");
     vm.freeze().unwrap();
 
     // Noon, so nothing is cold unless a scenario makes it so.
@@ -835,6 +855,22 @@ fn main() {
     r.tick(200);
     assert!(!r.text("fx").contains("burning"), "burning went out");
     println!("ok  lava burned and the fire went out");
+
+    // Weather's fire, put in the fire table through our export: it hurts,
+    // sets you alight, and flames show on the body while it burns.
+    r.say("heal");
+    r.tick(1);
+    let fire = r.material("tiamat_weather:fire");
+    let flames = r.particles.bursts.lock().unwrap().len();
+    r.world.put(100, 64, 100, fire);
+    r.tick(45);
+    assert!(r.number("hp") < 27.0, "Weather's fire burns: {}", r.number("hp"));
+    assert!(r.text("fx").contains("burning"), "and sets you alight");
+    assert!(r.particles.bursts.lock().unwrap().len() > flames, "flames on the body for all to see");
+    r.world.clear();
+    r.tick(200);
+    assert!(!r.text("fx").contains("burning"), "and it goes out");
+    println!("ok  Weather's fire, through the export, burned and set a body alight");
 
     // Death: a scatter on the ground, a move, a screen, everything reset.
     r.say("heal");
@@ -1125,6 +1161,38 @@ fn mob_check(r: &mut Rig) {
     r.say("heal");
     r.tick(1);
     println!("ok  a bear ignores you until hurt, then hunts and mauls you, swinging");
+
+    // An animal set alight panics and burns; one that stands in fire until
+    // it dies leaves its meat cooked.
+    r.say("spawn cow 1");
+    r.tick(1);
+    let (cow, _) = r.mobs()[0].clone();
+    let flames = r.particles.bursts.lock().unwrap().len();
+    r.say("ignite 60");
+    r.tick(2);
+    r.say("mob");
+    assert!(r.said().contains("panic"), "a cow on fire panics: {}", r.said());
+    r.tick(60);
+    assert!(r.mobs()[0].1.health.unwrap().current < 10, "and burns");
+    assert!(r.particles.bursts.lock().unwrap().len() > flames, "in flames");
+    let fire = r.material("tiamat_weather:fire");
+    r.world.put(90, 64, 90, fire);
+    for _ in 0..800 {
+        if r.mobs().is_empty() {
+            break;
+        }
+        r.put_mob(cow, 90.5, 64.0, 90.5);
+        r.tick(1);
+    }
+    assert!(r.mobs().is_empty(), "burned to death");
+    let cooked = r.material("tiamat_default_life:cooked_meat");
+    assert!(r.entities.items(MOD).iter().any(|s| s.material == cooked), "and its meat is cooked");
+    r.world.clear();
+    // The meat, gone too, so the scenarios after this start clean.
+    r.entities.0.lock().unwrap().entities.retain(|_, e| e.item.is_none());
+    r.say("cull");
+    r.tick(1);
+    println!("ok  a cow set alight panicked and burned, and burned to death its meat was cooked");
 
     // A bat at night: it hunts the player, bites, and wheels away.
     *r.sounds.time.lock().unwrap() = 0.9;

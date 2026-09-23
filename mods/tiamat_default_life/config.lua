@@ -134,6 +134,9 @@ C.campfire_damage = 1          -- standing in a campfire
 C.campfire_ticks = 20
 C.burn_after_lava = 100        -- burning carries on for five seconds after climbing out
 C.burn_after_campfire = 40
+C.flame_every = 5              -- ticks between bursts of flame over anything burning
+-- A creature burned to death leaves its meat cooked.
+C.cooked_by_fire = { raw_meat = "cooked_meat" }
 
 -- Falls -------------------------------------------------------------------
 

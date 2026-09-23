@@ -41,8 +41,8 @@
 local G = "tiamat_default_world:"
 
 -- The cow has a body of its own: models/cow.glb, made by tools/skin_glb.py
--- from the modeller's export. Six cells long, 2.4 wide, 4.6 tall, feet on
--- y = 0, facing +Z. Clips: idle, walk, run, swing, and the grazing clip under
+-- from the modeller's export, already skinned. Six cells long, 2.5 wide,
+-- 5.3 tall to the tips of its horns, feet on y = 0, facing +Z. Clips: idle, walk, run, swing, and the grazing clip under
 -- the engine's spare `sneak` tag, since the engine plays six names and no more.
 tdl.register_mob{
     id = "cow", name = "Cow", health = 10,

@@ -54,5 +54,9 @@ if not pcall(game.register_hud_script, { file = "hud.lua", reserve = 216 }) then
     game.register_hud_script("hud.lua")
 end
 
+-- What other mods may call (Tiamat Weather puts its fire in the fire table).
+-- One export per mod, built whole first.
+if game.export then game.export(load("exports")) end
+
 game.log("tiamat_default_life ready: " .. tdl.items.count .. " items, " .. tdl.effects.count .. " effects, "
     .. #tdl.mobs.order .. " creatures")
