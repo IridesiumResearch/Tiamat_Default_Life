@@ -18,8 +18,11 @@
 --
 -- Everything that moves goes through the engine: `game.steer_entity` walks a
 -- body toward a point and decides the jumping, a kind's own pace is `speed`
--- on the entity, and a flyer has its velocity set every tick. Nothing here
--- teleports.
+-- on the entity, and a flyer has its velocity set every tick. The one
+-- teleport is a bat's last few inches onto its roost: it hangs by its feet
+-- from the underside of a block, which puts its body's box a sliver INTO the
+-- ceiling, and a body cannot fly into a block. The engine leaves a body that
+-- starts a tick inside geometry where it is, and lets it move out.
 
 local C = tdl.config
 local U = tdl.util
@@ -190,6 +193,21 @@ local function ground_at(x, z, y)
                 return { x = x + 0.5, y = yy + 1, z = z + 0.5 }, block.material
             end
             clear = 0
+        end
+    end
+    return nil
+end
+
+--- Somewhere to hang from: the nearest solid block above a point, within a
+--- few blocks, or nil. Returns the middle of that block's underside.
+local function ceiling_above(pos)
+    local x, z = math.floor(pos.x), math.floor(pos.z)
+    local y = math.floor(pos.y)
+    for yy = y + 1, y + C.roost_reach do
+        local block = game.get_block{ x = x, y = yy, z = z }
+        if block == nil then return nil end
+        if block.occupancy ~= 0 and not PASSABLE[block.material] then
+            return { x = x + 0.5, y = yy, z = z + 0.5 }
         end
     end
     return nil
@@ -457,7 +475,9 @@ local function walk_to(id, m, entity, target, gait)
         end
     end
 
-    local anim = ANIM_IDLE
+    -- A kind that `hangs` has its roost as its idle clip, so on the ground it
+    -- rests on its eating clip instead.
+    local anim = kind.hangs and ANIM_SNEAK or ANIM_IDLE
     if speed2 >= 0.0025 then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
     spec.anim = anim
     spec.yaw = game.heading(target.x - entity.pos.x, target.z - entity.pos.z)
@@ -549,7 +569,7 @@ end
 --- and is left to its last velocity.
 local function stand(id, m)
     if not m.kind.flyer or m.landed then
-        local anim = (m.grazing and m.state == "idle") and ANIM_SNEAK or ANIM_IDLE
+        local anim = ((m.grazing and m.state == "idle") or m.kind.hangs) and ANIM_SNEAK or ANIM_IDLE
         -- A blow just struck: its swing clip, for as long as the swing lasts.
         if (m.swing or 0) > 0 then
             m.swing = m.swing - 1
@@ -594,8 +614,12 @@ local function step(id, dt)
         end
     end
 
-    -- A bird on the ground that is frightened or angry takes to the air.
-    if m.landed and (m.state == "flee" or m.state == "hunt") then take_off(id, m) end
+    -- A bird on the ground, or a bat on its roost, that is frightened or angry
+    -- takes to the air.
+    if m.state == "flee" or m.state == "hunt" then
+        if m.landed then take_off(id, m) end
+        m.roosting = false
+    end
 
     if m.state == "flee" then
         local from = U.body(m.threat)
@@ -681,6 +705,40 @@ local function step(id, dt)
         end
     end
 
+    -- Going to roost: up under the ceiling it chose, and when it is there, its
+    -- feet to the block and its body hanging below. It hangs, held against
+    -- gravity, until its rest is over or somebody gives it cause.
+    if m.state == "perch" then
+        local c = m.target
+        local under = { x = c.x, y = c.y - 0.5, z = c.z }
+        local dx, dy, dz = under.x - entity.pos.x, under.y - entity.pos.y, under.z - entity.pos.z
+        if m.timer <= 0 then
+            m.state, m.timer = "wander", between(60, 200)
+            pick_wander(m, entity)
+        elseif dx * dx + dz * dz < 0.25 and math.abs(dy) < 0.6 then
+            m.roosting = true
+            m.state, m.timer = "roost", between(kind.roost_min or 400, kind.roost_max or 1600)
+            game.set_entity(id, {
+                pos = { x = c.x, y = c.y + C.roost_hang, z = c.z },
+                velocity = { x = 0, y = C.fly_lift, z = 0 },
+                anim = ANIM_IDLE,
+            })
+        else
+            fly_to(id, m, entity, under, kind.speed or 0.3, false)
+        end
+        return
+    end
+    if m.state == "roost" then
+        if m.timer <= 0 or not m.roosting then
+            m.roosting = false
+            m.state, m.timer = "wander", between(60, 200)
+            pick_wander(m, entity)
+            return
+        end
+        game.set_entity(id, { velocity = { x = 0, y = C.fly_lift, z = 0 }, anim = ANIM_IDLE })
+        return
+    end
+
     -- Coming down: find the ground under it, glide onto it, and it has landed.
     -- Water or nothing below, or too long about it, and it flies on instead.
     if m.state == "land" then
@@ -730,8 +788,12 @@ local function step(id, dt)
             -- A grazer spends about half its pauses with its head down.
             m.grazing = kind.grazes and below(2) == 0
             if kind.flyer and not m.landed then
-                -- A bird that lands spends about half its pauses on the ground.
-                if kind.lands and below(2) == 0 then
+                -- A bat with a ceiling over it roosts about two pauses in three;
+                -- a bird that lands spends about half its pauses on the ground.
+                local ceiling = kind.hangs and below(3) ~= 0 and ceiling_above(entity.pos)
+                if ceiling then
+                    m.state, m.target, m.timer = "perch", ceiling, C.fly_land_ticks
+                elseif kind.lands and below(2) == 0 then
                     m.state, m.target, m.timer = "land", nil, C.fly_land_ticks
                 else
                     pick_wander(m, entity)

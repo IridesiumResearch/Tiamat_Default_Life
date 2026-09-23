@@ -194,7 +194,9 @@ C.mob_hunt_ticks = 400         -- twenty seconds of chasing before losing intere
 C.fly_lift = 0.24              -- cells per tick, the tick of gravity a flyer cancels
 C.fly_flap_ticks = 12          -- one wingbeat's worth of the `swing` clip, at least
 C.fly_flap_chance = 60         -- one tick in this many, a glider beats its wings to hold its height
-C.fly_land_ticks = 200         -- how long a flyer spends coming down before it thinks better of it
+C.fly_land_ticks = 200         -- how long a flyer spends coming down, or going up to roost, before it thinks better of it
+C.roost_reach = 8              -- blocks up a bat looks for a ceiling to hang from
+C.roost_hang = 0.1             -- blocks a roosting bat's origin sits inside the ceiling, so its hanging feet meet it
 
 -- The world's blocks, by name. Every id is looked up with pcall at load, so
 -- a world without these still loads this mod; it just has no lava.

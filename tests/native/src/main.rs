@@ -1138,6 +1138,68 @@ fn mob_check(r: &mut Rig) {
     r.say("cull");
     r.tick(1);
 
+    // A bat, by day, well away from the player: with a ceiling over it, it
+    // goes up and hangs by its feet from the underside, on its idle clip,
+    // and lets go and flutters when hurt. On open ground it crawls and eats,
+    // and never plays its hanging clip there.
+    let stone = r.material("tiamat_default_world:grass");
+    for x in 83..=87 {
+        for z in 83..=87 {
+            r.world.put(x, 72, z, stone);
+        }
+    }
+    r.say("spawn bat 1");
+    r.tick(1);
+    let (bat, _) = r.mobs()[0].clone();
+    let anim_of = |r: &Rig, id: u64| r.entities.0.lock().unwrap().entities[&id].anim;
+    let y_of = |r: &Rig, id: u64| r.entities.0.lock().unwrap().entities[&id].transform.to_world()[1];
+    let mut roosted = false;
+    for _ in 0..4000 {
+        r.put_mob(bat, 85.5, 71.3, 85.5);
+        r.tick(1);
+        if anim_of(&r, bat) == tiamat_core::ent::AnimTag::IDLE {
+            roosted = true;
+            break;
+        }
+    }
+    assert!(roosted, "a bat under a ceiling goes to roost");
+    let hung = y_of(&r, bat);
+    assert!((hung - 72.1).abs() < 0.01, "hanging by its feet from the block's underside: {hung}");
+    r.tick(40);
+    assert_eq!(anim_of(&r, bat), tiamat_core::ent::AnimTag::IDLE, "and it stays hung");
+    r.hold_nothing();
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(bat), owner: None });
+    r.tick(2);
+    let woken = anim_of(&r, bat);
+    assert!(woken == tiamat_core::ent::AnimTag::RUN || woken == tiamat_core::ent::AnimTag::SWING,
+        "hurt, it lets go and flies: {woken:?}");
+    r.say("cull");
+    r.tick(1);
+    r.world.clear();
+
+    let grass = r.material("tiamat_default_world:grass");
+    *r.world.floor.lock().unwrap() = Some((63, grass));
+    r.say("spawn bat 1");
+    r.tick(1);
+    let (bat, _) = r.mobs()[0].clone();
+    let mut ate = false;
+    for _ in 0..4000 {
+        r.put_mob(bat, 85.5, 64.0, 85.5);
+        r.entities.0.lock().unwrap().entities.get_mut(&bat).unwrap().on_ground = true;
+        r.tick(1);
+        let anim = anim_of(&r, bat);
+        assert_ne!(anim, tiamat_core::ent::AnimTag::IDLE, "no hanging on open ground");
+        if anim == tiamat_core::ent::AnimTag::SNEAK {
+            ate = true;
+            break;
+        }
+    }
+    assert!(ate, "a bat comes down to the ground now and then, and eats there");
+    r.say("cull");
+    r.tick(1);
+    *r.world.floor.lock().unwrap() = None;
+    println!("ok  a bat roosts hanging under a ceiling, lets go when hurt, and crawls and eats on the ground");
+
     // A crow, by day: wings in the air, feet on the ground. The fake world
     // has no physics, so it is held where the test wants it, well away from
     // the player, and its own dice decide when it glides, beats its wings and

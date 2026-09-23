@@ -261,7 +261,7 @@ Six so far, in `creatures.lua` as data over the system in `mobs.lua`:
 | Pig | Woodland soil and grass, by day | The same | 1 to 2 raw meat |
 | Bear | Woodland soil and snow, in the Frostmoor, temperate and verdant rings, alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Crow | Open ground, any time, in flocks of 3 to 6 | Wheels over the fields behind a leader by day, gliding with its wings out and beating them to climb; now and then the flock comes down to walk and peck, and goes up together when anyone comes near. After dark it mobs you, pecking for a point and wheeling away | nothing |
-| Bat | The dark: caves by day, anywhere by night | Hunts you in darkness, bites for a point, flutters off, comes back | nothing |
+| Bat | The dark: caves by day, anywhere by night | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
 
 Spawning happens in passes around each player: a spot on the ground twenty
 to forty-four blocks off, checked against the kind's ground blocks (the
@@ -316,7 +316,8 @@ crow and the bat are themselves, painted and animated by their own clips. A flye
 clips mean something else in the air: `run` is its glide, wings out, and
 `swing` its wingbeat; on the ground it walks, idles and pecks (`sneak`) as
 a walker does. A bat never glides: it flutters on `run` and bites on
-`swing`. A kind with no
+`swing`. Its `idle` is its roost, hanging by its feet under a ceiling, so on
+the ground it rests on its eating clip (`sneak`) and crawls on `walk`. A kind with no
 model yet is the engine's white humanoid with its kind as a nametag
 (`placeholder_models` in `config.lua`). A
 creature's kind is read back off the entity, so it survives the world being

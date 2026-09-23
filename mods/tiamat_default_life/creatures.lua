@@ -10,6 +10,9 @@
 --   lands             a flyer that comes down now and then to walk and eat, and
 --                     flies again when its pause is over or anyone comes near
 --   flutters          a flyer that never glides: `run` is its flight, `swing` its bite
+--   hangs             a flyer that roosts upside down under a ceiling, on its `idle`
+--                     clip; on the ground it rests on `sneak` rather than `idle`
+--   roost_min, roost_max  ticks a roost lasts
 --   flock             spawns and moves as a group behind a leader
 --   shy               blocks: a player nearer than this is fled from
 --   hostile           { when = "night" | "dark" | "always", sun_max }
@@ -129,13 +132,16 @@ tdl.register_mob{
 -- flutter off, and bite again. Its body is models/bat.glb, a skinned export
 -- with its wings spread, sized along its body (`--axis z`): a fifth of a
 -- block nose to tail and a block and a third across the wings. It flutters
--- on its `run` clip and bites on `swing`. Its `idle` hangs upside down from
--- a ceiling and its `walk` and eating clip crawl, none of which it does yet.
+-- on its `run` clip and bites on `swing`. With a ceiling over it, it goes up
+-- and hangs there on its `idle` clip; now and then it comes down instead and
+-- crawls (`walk`) and eats (`sneak`) on the ground. Anyone it hunts, it lets
+-- go for.
 tdl.register_mob{
     id = "bat", name = "Bat", health = 3,
     collider = { width = 1.0, height = 1.0 },
     model = "models/bat.glb", texture = "models/bat.png",
-    flyer = true, flutters = true, speed = 0.4, speed_fast = 0.65,
+    flyer = true, flutters = true, hangs = true, lands = true,
+    speed = 0.4, speed_fast = 0.65, walk_speed = 0.3, roost_min = 400, roost_max = 1600,
     sight = 16, wander_radius = 10, fly_low = 2, fly_high = 6,
     hostile = { when = "dark", sun_max = 3 },
     bite = { damage = 1, range = 1.4, cooldown = 30, cause = "were bitten to death by bats" },
