@@ -125,6 +125,7 @@ for _, sound in ipairs({
     { id = "baa", gain = 0.7, pitch_variance = 0.15 },
     { id = "oink", gain = 0.7, pitch_variance = 0.15 },
     { id = "snort", gain = 0.7, pitch_variance = 0.1 },   -- a recording, not generated: sounds/snort.wav
+    { id = "bleat", gain = 0.7, pitch_variance = 0.12 },  -- a recording too: sounds/bleat.wav
     { id = "caw", gain = 0.6, pitch_variance = 0.20 },
     { id = "squeak", gain = 0.5, pitch_variance = 0.25 },
     { id = "growl", gain = 0.9, pitch_variance = 0.12 },

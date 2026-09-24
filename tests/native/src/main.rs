@@ -1635,12 +1635,12 @@ fn climate_check() {
     };
     let grassland = kinds_in(&mut r, "rolling_grasslands");
     assert!(grassland.iter().any(|k| k == "cow" || k == "sheep" || k == "horse"), "grassland has its herds: {grassland:?}");
-    for k in ["pig", "bear", "stag", "bat"] {
+    for k in ["pig", "bear", "stag", "goat", "bat"] {
         assert!(!grassland.iter().any(|g| g == k), "no {k} out on the open grassland: {grassland:?}");
     }
     let taiga = kinds_in(&mut r, "taiga");
     assert!(!taiga.is_empty(), "the taiga has its animals");
-    for k in ["cow", "sheep", "horse", "pig", "bat"] {
+    for k in ["cow", "sheep", "horse", "pig", "goat", "bat"] {
         assert!(!taiga.iter().any(|t| t == k), "no {k} in the taiga: {taiga:?}");
     }
     let salt = kinds_in(&mut r, "salt_pan");

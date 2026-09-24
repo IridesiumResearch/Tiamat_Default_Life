@@ -21,6 +21,7 @@
 --   shy               blocks: a player nearer than this is fled from
 --   hostile           { when = "night" | "dark" | "always", sun_max }
 --   provoked          leaves you be until you hurt it, then hunts you (a bear)
+--   hunt_ticks        how long a hurt one keeps after you (default `mob_hunt_ticks`)
 --   bite              { damage, range (blocks), cooldown (ticks), cause }
 --   sight             blocks it notices a player from
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
@@ -123,6 +124,28 @@ tdl.register_mob{
     -- Wide open grass: grassland, river meadows, the moor.
     spawn = { biomes = { "rolling_grasslands", "river_valleys", "heather_moor" }, ground = { G .. "grass" },
               time = "day", sun_min = 12, group = { 2, 5 }, weight = 2, cap = 6 },
+}
+
+-- The goat: a wild mountain goat, horns swept back. models/goat.glb, from an
+-- export that was already skinned: four cells long, 4.5 tall to the horn
+-- tips, its grazing clip under `sneak` and a head butt under `swing`. It
+-- lives on rock and heights, so it keeps the engine's steering and jumps
+-- what it must: a goat is the one grazer that climbs. Butt it and it butts
+-- you back, and then loses interest.
+tdl.register_mob{
+    id = "goat", name = "Goat", health = 10,
+    collider = { width = 1.6, height = 3.6 },
+    model = "models/goat.glb", texture = "models/goat.png", grazes = true,
+    walk_speed = 1.2, run_speed = 4.8,
+    provoked = true, hunt_ticks = 100,
+    bite = { damage = 3, range = 1.8, cooldown = 30, cause = "were butted by a goat" },
+    sight = 10, wander_radius = 12, pause_min = 60, pause_max = 240,
+    sound = "bleat", sound_death = "bleat", voice_min = 300, voice_max = 1400,
+    drops = { { "raw_meat", 1, 2 } },
+    -- Rock and heights: the highlands, the cliff tops, the karst, the mesa.
+    spawn = { biomes = { "alpine_highlands", "coastal_cliffs", "karst_towers", "arid_mesa", "badlands" },
+              ground = { G .. "snow", G .. "grass" },
+              time = "day", sun_min = 10, group = { 2, 4 }, weight = 3, cap = 6 },
 }
 
 -- The bear: the woods' own, and nobody's quarry. It ambles, forages with

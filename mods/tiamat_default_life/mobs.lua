@@ -412,7 +412,7 @@ function tdl.hurt_mob(id, amount, by)
             end
         end
         if m.kind.hostile or m.kind.provoked then
-            m.state, m.threat, m.timer = "hunt", by, C.mob_hunt_ticks
+            m.state, m.threat, m.timer = "hunt", by, m.kind.hunt_ticks or C.mob_hunt_ticks
             m.angry = true
         else
             m.state, m.threat, m.timer = "flee", by, C.mob_flee_ticks
@@ -1188,7 +1188,7 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|bear|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bear|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),
