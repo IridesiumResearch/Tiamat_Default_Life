@@ -39,6 +39,7 @@
 --   drops             { { item, min, max } }, items of this mod
 --   spawn             { biomes = { [biome id] = weight } | { biome ids } | land = true, ground = { block ids },
 --                       time = "day" | "night" | "any", sun_min, sun_max,
+--                       dark = true: at night, or by day where sun <= sun_max (a monster),
 --                       group = { min, max }, weight, cap,
 --                       distance = { min, max } blocks from the player, if not the usual }
 --
@@ -199,6 +200,109 @@ tdl.register_mob{
               },
               ground = { G .. "grass", G .. "dirt", G .. "snow" },
               time = "day", sun_min = 8, group = { 1, 3 }, weight = 4, cap = 6 },
+}
+
+-- The fox: models/fox.glb, from an export that was already skinned. A cell
+-- over a block long with its brush, its nosing clip under `sneak`. Shy, and
+-- about at any hour, as foxes are: dusk and dawn most of all.
+tdl.register_mob{
+    id = "fox", name = "Fox", health = 6,
+    collider = { width = 1.0, height = 2.2 },
+    model = "models/fox.glb", texture = "models/fox.png", grazes = true, jumps = "stuck",
+    walk_speed = 1.2, run_speed = 5.2,
+    shy = 7, sight = 14, wander_radius = 16, pause_min = 40, pause_max = 200,
+    sound = "yip", sound_death = "yip", voice_min = 600, voice_max = 2400,
+    drops = { { "raw_meat", 1, 1 } },
+    spawn = { biomes = {
+                  temperate_woodlands = UNCOMMON, flower_forest = UNCOMMON, heather_moor = UNCOMMON,
+                  rolling_grasslands = SCARCE, river_valleys = SCARCE, silverwood = SCARCE,
+                  taiga = SCARCE, frostpine_coast = SCARCE, rime_tundra = RARE, dunes = RARE,
+              },
+              ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "snow" },
+              time = "any", sun_min = 6, group = { 1, 2 }, weight = 2, cap = 3 },
+}
+
+-- The squirrel: models/squirrel.glb, from an export that was already
+-- skinned. The smallest thing in the world, under half a block with its
+-- tail. Quick and nervy, in the forests only; silent (the library has no
+-- squirrel).
+tdl.register_mob{
+    id = "squirrel", name = "Squirrel", health = 2,
+    collider = { width = 0.6, height = 0.9 },
+    model = "models/squirrel.glb", texture = "models/squirrel.png", grazes = true, jumps = "stuck",
+    walk_speed = 1.0, run_speed = 5.0,
+    shy = 5, sight = 10, wander_radius = 6, pause_min = 20, pause_max = 120,
+    drops = {},
+    spawn = { biomes = {
+                  temperate_woodlands = COMMON, silverwood = COMMON, flower_forest = UNCOMMON,
+                  redwood_stands = UNCOMMON, taiga = UNCOMMON, frostpine_coast = SCARCE, jungle = SCARCE,
+              },
+              ground = { G .. "loam", G .. "leaf_litter", G .. "grass" },
+              time = "day", sun_min = 4, group = { 1, 2 }, weight = 3, cap = 6 },
+}
+
+-- The wolf: models/wolf.glb, from an export that was already skinned, a
+-- block and a half long, its sniffing clip under `sneak` and a lunge under
+-- `swing`. It lives in the cold forests and the highlands in packs of two
+-- to four, leaves you be, and like the bear turns on whoever hurts it.
+-- Its voice is a dog's bark from the library until there is a howl.
+tdl.register_mob{
+    id = "wolf", name = "Wolf", health = 14,
+    collider = { width = 1.5, height = 3.2 },
+    model = "models/wolf.glb", texture = "models/wolf.png", grazes = true,
+    walk_speed = 1.4, run_speed = 5.4,
+    provoked = true, hunt_ticks = 300,
+    bite = { damage = 4, range = 1.8, cooldown = 24, cause = "were brought down by a wolf" },
+    sight = 14, wander_radius = 20, pause_min = 60, pause_max = 240,
+    sound = "bark", sound_death = "bark", voice_min = 800, voice_max = 3000,
+    drops = { { "raw_meat", 1, 2 } },
+    spawn = { biomes = {
+                  taiga = UNCOMMON, frostpine_coast = UNCOMMON, alpine_highlands = SCARCE,
+                  rime_tundra = SCARCE, redwood_stands = SCARCE, frozen_wastes = RARE, temperate_woodlands = RARE,
+              },
+              ground = { G .. "snow", G .. "permafrost", G .. "loam", G .. "leaf_litter" },
+              time = "any", sun_min = 4, group = { 2, 4 }, weight = 1, cap = 4 },
+}
+
+-- The mammoth: models/mammoth.glb, from an export that was already skinned,
+-- four blocks long and three tall, its foraging clip under `sneak` and a
+-- tusk swing under `swing`. The frozen north's, slow, rare, and a very bad
+-- thing to have hurt. It trumpets: an elephant's take from the library.
+tdl.register_mob{
+    id = "mammoth", name = "Mammoth", health = 60,
+    collider = { width = 5.0, height = 8.4 },
+    model = "models/mammoth.glb", texture = "models/mammoth.png", grazes = true, jumps = "stuck",
+    walk_speed = 1.0, run_speed = 3.6,
+    provoked = true, hunt_ticks = 200,
+    bite = { damage = 9, range = 3.2, cooldown = 40, cause = "were trampled by a mammoth" },
+    sight = 14, wander_radius = 24, pause_min = 100, pause_max = 400,
+    sound = "trumpet", sound_death = "trumpet", voice_min = 1200, voice_max = 4000,
+    drops = { { "raw_meat", 4, 8 } },
+    spawn = { biomes = {
+                  frozen_wastes = SCARCE, rime_tundra = SCARCE, icefall = RARE, rime_wall = RARE,
+              },
+              ground = { G .. "snow", G .. "permafrost" },
+              time = "day", sun_min = 6, group = { 1, 3 }, weight = 1, cap = 3 },
+}
+
+-- The spider: models/spider.glb, from an export that was already skinned
+-- and wider across its legs than it is long (`--axis z`): a block and a
+-- third across, its feeding clip under `sneak` and a strike under `swing`.
+-- The first monster. It appears only in the dark: on any land at night, and
+-- in the caves at any hour. It hunts whoever it sees in the dark and bites
+-- for 2; in daylight it leaves you be.
+tdl.register_mob{
+    id = "spider", name = "Spider", health = 12,
+    collider = { width = 3.0, height = 1.6 },
+    model = "models/spider.glb", texture = "models/spider.png", grazes = true,
+    walk_speed = 1.4, run_speed = 4.8,
+    hostile = { when = "dark", sun_max = 3 },
+    bite = { damage = 2, range = 1.8, cooldown = 30, cause = "were bitten by a spider" },
+    sight = 16, wander_radius = 12, pause_min = 40, pause_max = 200,
+    sound = { "hiss", "hiss_2" }, sound_death = "hiss", voice_min = 300, voice_max = 1200,
+    drops = {},
+    spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3,
+              time = "any", group = { 1, 2 }, weight = 3, cap = 6 },
 }
 
 -- The bear: the woods' own, and nobody's quarry. It ambles, forages with

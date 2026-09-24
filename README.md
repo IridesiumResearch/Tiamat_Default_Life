@@ -5,7 +5,8 @@ voxel engine: hearts, cookies, bubbles when you are under, a thermometer
 only when it matters, food that heals and clothing that keeps you warm; three
 kinds of world (Default, Creative, and a one-life Adventure) with admins over
 them; and everything that lives in the world, beginning with cows, sheep,
-pigs, horses, stags, goats, bunnies, bears, crows and bats.
+pigs, horses, stags, goats, bunnies, foxes, squirrels, wolves, mammoths,
+bears, crows and bats, and the first monster, the spider.
 
 Written against the engine's public Lua API and nothing else. The rules that
 shape it are in [`AGENTS.md`](AGENTS.md) (vendored from the engine's `api/`),
@@ -284,7 +285,9 @@ everything while `config.dev_commands` is on.
 The creatures' voices are recordings from the project's sound library
 (`../Tiamat Sounds`, beside this repo, not in it): a moo, a baa, two oinks,
 a snort, a bleat, a stag's bellow, three bear growls, two caws, a bat's
-squeak and its wings. A creature with several takes picks one each time it
+squeak and its wings, a fox's yip, a spider's two hisses, an elephant's
+trumpet for the mammoth and a dog's bark for the wolf (until there is a
+howl). The bunny and the squirrel are silent. A creature with several takes picks one each time it
 calls. With your head under water you hear the sea, a loop only you hear,
 faded in as you go under and out as you surface.
 
@@ -307,7 +310,7 @@ false` in `config.lua`.
 
 ## Creatures
 
-Ten so far, in `creatures.lua` as data over the system in `mobs.lua`:
+Fifteen so far, in `creatures.lua` as data over the system in `mobs.lua`:
 
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
@@ -318,6 +321,11 @@ Ten so far, in `creatures.lua` as data over the system in `mobs.lua`:
 | Stag | Never better than scarce: in the woods, silverwood, redwoods and taiga; rare in the flower forest, on the moor, in the river meadows and mountains. Any time, in ones to fours | Grazes, very wary, bolts from you at eight blocks and outruns you. Fourteen points | 2 to 3 raw meat |
 | Goat | Uncommon in the mountains and karst; scarce on the cliffs, mesa and badlands; rare on the Rime Wall. By day, in twos to fours | Grazes and climbs; hurt it and it butts you back for 3 for a few seconds, then loses interest. Ten points | 1 to 2 raw meat |
 | Bunny | Common on the grassland, in the flower forest and on the moor; uncommon in the woods, river meadows, savanna and on the cliffs; scarce on shores and dunes, in the taiga, mountains, tundra and silverwood. By day, in ones to threes | Nibbles, bolts from you at six blocks and is gone. Three points; silent | 1 raw meat |
+| Fox | Uncommon in the woods, flower forest and on the moor; scarce on the grassland, river meadows, silverwood, taiga and frostpine coast; rare in the tundra and dunes. Any hour, alone or in pairs | Shy: bolts at seven blocks. Six points; yips | 1 raw meat |
+| Squirrel | Common in the woods and silverwood; uncommon in the flower forest, redwoods and taiga; scarce on the frostpine coast and in the jungle. By day | Tiny, nervy, quick; bolts at five blocks. Two points; silent | nothing |
+| Wolf | Uncommon in the taiga and on the frostpine coast; scarce in the mountains, tundra and redwoods; rare in the frozen wastes and woods. Any hour, in packs of 2 to 4 | Leaves you be; hurt one and it hunts you for fifteen seconds, biting for 4. Fourteen points; barks (a dog's take, for now) | 1 to 2 raw meat |
+| Mammoth | Scarce in the frozen wastes and tundra; rare on the Icefall and the Rime Wall. By day, in ones to threes | Slow and enormous, four blocks long; hurt it and it tramples you for 9. Sixty points; trumpets | 4 to 8 raw meat |
+| Spider | The first monster: any land at night, and the ordinary caves at any hour; never in daylight | Hunts whoever it sees in the dark and bites for 2; in daylight leaves you be. Twelve points; hisses | nothing |
 | Bear | Scarce in the taiga and redwoods; rare in the woods, silverwood, frostpine coast and mountains. Alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The ordinary caves, lit and dark, where it is dark enough | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
@@ -357,7 +365,9 @@ the crow at `--length 2.0 --axis z --rename eating=sneak`, since a bird with
 its wings spread is wider than it is long; the bat at `--length 0.6 --axis z
 --rename eating=sneak`; the sheep at `--length 4.0 --rename eating=sneak`; the horse at `--length 7.0
 --rename eating=sneak`; the stag at `--length 5.5 --axis z --rename eating=sneak`, its antlers wider than
-it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--length 1.5 --rename eating=sneak`):
+it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--length 1.5 --rename eating=sneak`; the fox at 3.3, the wolf at 4.5, the
+mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the spider at
+`--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak

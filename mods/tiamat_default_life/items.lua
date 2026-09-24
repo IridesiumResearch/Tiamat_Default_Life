@@ -144,6 +144,11 @@ for _, sound in ipairs({
     { id = "caw_2", gain = 0.6, pitch_variance = 0.12, ogg = true },
     { id = "squeak", gain = 0.5, pitch_variance = 0.15, ogg = true },
     { id = "flap", gain = 0.5, pitch_variance = 0.15, ogg = true },    -- a bat's wings
+    { id = "yip", gain = 0.6, pitch_variance = 0.10, ogg = true },     -- a fox
+    { id = "bark", gain = 0.8, pitch_variance = 0.12, ogg = true },    -- a wolf (a dog's take)
+    { id = "trumpet", gain = 1.0, pitch_variance = 0.06, ogg = true }, -- a mammoth (an elephant's take)
+    { id = "hiss", gain = 0.7, pitch_variance = 0.10, ogg = true },    -- a spider
+    { id = "hiss_2", gain = 0.7, pitch_variance = 0.10, ogg = true },
     -- The sea over your head: a loop, heard by you alone while your head is under.
     { id = "underwater", gain = 0.6, ogg = true },
 }) do

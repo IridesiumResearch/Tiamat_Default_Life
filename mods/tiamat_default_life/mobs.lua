@@ -80,10 +80,14 @@ function tdl.register_mob(def)
     -- Where it lives, and how often it turns up there: biome id to weight.
     -- `spawn.biomes` is either that map, or a list of ids that all take
     -- `spawn.weight`; `spawn.land` is every land biome at `spawn.weight`.
-    local biomes = def.spawn.land and C.land_biomes or def.spawn.biomes
-    if biomes then
+    -- `land` and `biomes` together are both: every land biome, and the
+    -- listed ones besides (a spider: land at night, and the caves).
+    if def.spawn.land or def.spawn.biomes then
         def.biomes = {}
-        for key, value in pairs(biomes) do
+        for _, id in ipairs(def.spawn.land and C.land_biomes or {}) do
+            def.biomes[id] = def.spawn.weight or 1
+        end
+        for key, value in pairs(def.spawn.biomes or {}) do
             if type(key) == "number" then
                 def.biomes[value] = def.spawn.weight or 1
             elseif value > 0 then
@@ -276,6 +280,11 @@ local function may_spawn(kind, feet, material, biome)
     if s.time == "day" and is_night() then return false end
     if s.time == "night" and not is_night() then return false end
     local light = game.get_light{ x = math.floor(feet.x), y = math.floor(feet.y), z = math.floor(feet.z) }
+    -- A creature of the dark (`spawn.dark`): at night anywhere its biomes
+    -- allow, and by day only where the sun does not reach (`sun_max`).
+    if s.dark then
+        return is_night() or light.sun <= (s.sun_max or 3)
+    end
     if s.sun_min and light.sun < s.sun_min then return false end
     if s.sun_max and light.sun > s.sun_max then return false end
     return true
@@ -1209,7 +1218,7 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|bear|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),

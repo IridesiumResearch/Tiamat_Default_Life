@@ -1658,8 +1658,8 @@ fn climate_check() {
     };
     let grassland = kinds_in(&mut r, "rolling_grasslands");
     assert!(grassland.iter().any(|k| k == "cow" || k == "sheep" || k == "horse"), "grassland has its herds: {grassland:?}");
-    for k in ["bear", "stag", "goat", "bat"] {
-        assert!(!grassland.iter().any(|g| g == k), "no {k} out on the open grassland: {grassland:?}");
+    for k in ["bear", "stag", "goat", "bat", "spider", "mammoth", "wolf", "squirrel"] {
+        assert!(!grassland.iter().any(|g| g == k), "no {k} out on the open grassland by day: {grassland:?}");
     }
     let taiga = kinds_in(&mut r, "taiga");
     assert!(!taiga.is_empty(), "the taiga has its animals");
@@ -1670,6 +1670,14 @@ fn climate_check() {
     assert_eq!(salt, vec!["crow".to_owned()], "only crows over the salt pan");
     let sea = kinds_in(&mut r, "deep_ocean");
     assert!(sea.is_empty(), "nothing of ours at sea: {sea:?}");
+    // After dark the spiders come out, on any land; by day there were none.
+    *r.sounds.time.lock().unwrap() = 0.9;
+    r.say("god");
+    let night = kinds_in(&mut r, "rolling_grasslands");
+    assert!(night.iter().any(|k| k == "spider"), "spiders on the grassland at night: {night:?}");
+    assert!(!night.iter().any(|k| k == "cow" || k == "sheep"), "and the day's herds do not appear then: {night:?}");
+    r.say("god");
+    *r.sounds.time.lock().unwrap() = 0.5;
     let cave = kinds_in(&mut r, "mossy_limestone");
     assert!(cave.is_empty(), "a lit cave by day holds none of the surface animals: {cave:?}");
     // How often, by biome: `odds` says each kind's weight where you stand.

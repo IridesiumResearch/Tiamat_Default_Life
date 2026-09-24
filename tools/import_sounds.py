@@ -44,6 +44,11 @@ RECORDINGS = {
     "caw_2": "2/Mob_Tame_Crow_Valley.wav",
     "squeak": "2/Firefly_audio_minecraft_ASMR_sound_effects__bat_variation1.wav",
     "flap": "2/Firefly_audio_minecraft_ASMR_sound_effects__bat_wing_flap_variation1.wav",
+    "yip": "2/Firefly_audio_minecraft_ASMR_sound_effects__fox_variation1.wav",
+    "bark": "2/Firefly_audio_ASMR-like_Minecraft_world_sounds__dog_bark_variation2.wav",  # a dog's, for the wolf
+    "trumpet": "2/Firefly_audio_minecraft_ASMR_sound_effects__elephant_variation4.wav",   # an elephant's, for the mammoth
+    "hiss": "2/Mob_Hostile_Spider_Warning.wav",
+    "hiss_2": "First Test Sounds/Mob_Hostile_Spider_01.mp3",
     "underwater": "2/Firefly_audio_ASMR_minecraft_like_sound_effects__undersea_variation2.wav",
 }
 
