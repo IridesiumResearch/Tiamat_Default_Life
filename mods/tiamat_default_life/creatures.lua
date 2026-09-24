@@ -179,6 +179,28 @@ tdl.register_mob{
               time = "day", sun_min = 10, group = { 2, 4 }, weight = 3, cap = 6 },
 }
 
+-- The bunny: a wild rabbit. models/bunny.glb, from an export that was already
+-- skinned: a cell and a half long, two tall to the tips of its ears, its
+-- nibbling clip under `sneak`. Small, very shy (it bolts at six blocks) and
+-- quick, and everywhere there is grass to nibble and cover to run to. It
+-- makes no sound; rabbits mostly do not.
+tdl.register_mob{
+    id = "bunny", name = "Bunny", health = 3,
+    collider = { width = 1.0, height = 1.8 },
+    model = "models/bunny.glb", texture = "models/bunny.png", grazes = true, jumps = "stuck",
+    walk_speed = 0.8, run_speed = 5.0,
+    shy = 6, sight = 12, wander_radius = 8, pause_min = 30, pause_max = 160,
+    drops = { { "raw_meat", 1, 1 } },
+    spawn = { biomes = {
+                  rolling_grasslands = COMMON, flower_forest = COMMON, heather_moor = COMMON,
+                  temperate_woodlands = UNCOMMON, river_valleys = UNCOMMON, savanna = UNCOMMON,
+                  coastal_cliffs = UNCOMMON, sandy_shores = SCARCE, dunes = SCARCE,
+                  taiga = SCARCE, alpine_highlands = SCARCE, rime_tundra = SCARCE, silverwood = SCARCE,
+              },
+              ground = { G .. "grass", G .. "dirt", G .. "snow" },
+              time = "day", sun_min = 8, group = { 1, 3 }, weight = 4, cap = 6 },
+}
+
 -- The bear: the woods' own, and nobody's quarry. It ambles, forages with
 -- its head down and leaves you be; hurt it and it comes for you, faster
 -- than you can walk and slower than you can sprint, and swipes hard. Its

@@ -1209,7 +1209,7 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bear|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|bear|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),

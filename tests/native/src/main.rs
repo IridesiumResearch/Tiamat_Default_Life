@@ -1150,7 +1150,13 @@ fn mob_check(r: &mut Rig) {
     r.tick(1);
     let (cow, _) = r.mobs()[0].clone();
     let speed_of = |r: &Rig| r.entities.0.lock().unwrap().entities[&cow].speed;
-    r.tick(30);
+    // Until it sets off: its first pause is a roll of its dice.
+    for _ in 0..400 {
+        r.tick(1);
+        if (speed_of(&r) - 1.0).abs() > 1e-6 {
+            break;
+        }
+    }
     let ambling = speed_of(&r);
     assert!((ambling - 1.1 / 4.3).abs() < 1e-4, "a cow ambles at 1.1 blocks a second: {ambling}");
     r.hold_nothing();
