@@ -5,9 +5,9 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-09-23)
+## Where these stand (2026-09-24)
 
-**Three are open: 16, 17 and 18.** Everything before them landed, and the mod uses every answer. Open asks are
+**Two are open: 17 and 18.** Everything before them landed, and the mod uses every answer. Open asks are
 copied, without the history, to the engine's
 `docs/engine-asks/tiamat_default_life.md`, so the engine side finds every
 mod's open asks in one place. This file keeps everything, landed items
@@ -17,7 +17,7 @@ included.
 |---|---|---|
 | 18 riding | **Open.** | the horse is in the world and cannot be ridden. |
 | 17 using an entity | **Open.** | nothing to right-click a horse with. |
-| 16 a model's skin is not drawn | **Open**, cause found: the client never clears models between visits. | white after the first world of a session; quit fully between worlds. |
+| 16 a model's skin is not drawn | Landed, engine b5ed249. | every animal painted, first world or fifth; checked by replaying the rejoin through the engine's renderer. |
 | 15 a picture over an entity | Landed, engine e5c0394 and 9c4e120. | `game.show_over`: one row of hearts, not sixty-five particles. |
 | 14 a mob's own speed | Landed, engine 033f4e6. | `speed` on the entity, scaled off the gait it walks in. |
 | 13 a mod's model casts no shadow | Landed, engine 7c0679c. | nothing to do; the cow has a shadow. |
@@ -96,7 +96,7 @@ fire). And `game.looking_at` answering an entity when that is what the
 crosshair is on, as `{ entity = id }`, so the between-events question has
 the same answer.
 
-## 16. A mod's model is drawn matte white though its skin arrives (2026-09-23, cause found 2026-09-24): OPEN, a BUG in the client
+## 16. A mod's model is drawn matte white though its skin arrives (2026-09-23, cause found 2026-09-24): LANDED, engine b5ed249
 
 **Seen.** In play, every animal is drawn matte white: the rig lit and
 shadowed and no colour at all. "Again": they can be right on a first visit
@@ -133,8 +133,11 @@ remembering it only while no pass exists). A screenshot test of the rejoin
 order would have caught it; `connection.rs` proves a skin arrives, and
 nothing proved it is drawn.
 
-**Until then.** Quit the game fully between worlds: the first world after
-launch draws its animals painted.
+**Landed 2026-09-24, engine b5ed249**, both halves: a connection's end
+forgets its models, and the renderer keeps the last skin per id whether or
+not a pass exists. Replayed here through the fixed engine (first visit,
+then a rejoin, skin before model): the horse is brown in Simple, Classic
+and Beautiful, where it was white.
 
 ## 15. A picture over an entity (2026-09-22): LANDED, engine e5c0394 (a picture on a particle) and 9c4e120 (`game.show_over`)
 
