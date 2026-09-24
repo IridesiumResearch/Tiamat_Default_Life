@@ -264,7 +264,22 @@ local function tick_food(uuid, v, dt)
     end
 end
 
+--- The sea over your head, while it is: a loop only you hear, faded in as
+--- your head goes under and out as it comes up. Said only when it changes;
+--- a rejoin loads a fresh record and says it again if you are still under.
+local function tick_underwater(uuid, v)
+    local under = v.env.submerged and not v.dead
+    if under == (v.under_loop or false) then return end
+    v.under_loop = under
+    if under then
+        game.play_loop{ id = "underwater", sound = "underwater", player = uuid, everywhere = true, fade_ticks = 10 }
+    else
+        game.stop_loop{ id = "underwater", player = uuid, fade_ticks = 15 }
+    end
+end
+
 local function tick_air(uuid, v, dt)
+    tick_underwater(uuid, v)
     if v.env.submerged then
         if v.air > 0 then
             v.air_acc = v.air_acc + dt

@@ -264,6 +264,8 @@ impl inventory::Access for Inventory {
 struct Sounds {
     plays: Mutex<Vec<String>>,
     time: Mutex<f32>,
+    /// Loops started and stopped, in order: "+id" and "-id".
+    loops: Mutex<Vec<String>>,
 }
 
 impl sound::Access for Sounds {
@@ -271,13 +273,15 @@ impl sound::Access for Sounds {
         self.plays.lock().unwrap().push(request.sound.clone());
         1
     }
-    fn start_loop(&self, _: &LoopRequest) -> u32 {
+    fn start_loop(&self, request: &LoopRequest) -> u32 {
+        self.loops.lock().unwrap().push(format!("+{}", request.id));
         1
     }
     fn time_of_day(&self) -> f32 {
         *self.time.lock().unwrap()
     }
-    fn stop_loop(&self, _: &sound::StopRequest) -> u32 {
+    fn stop_loop(&self, request: &sound::StopRequest) -> u32 {
+        self.loops.lock().unwrap().push(format!("-{}", request.id));
         0
     }
     fn set_time_of_day(&self, fraction: f32) -> bool {
@@ -862,9 +866,14 @@ fn main() {
     assert_eq!(r.number("hp"), 27.0, "a flight down is not a fall");
     println!("ok  a flight down cost nothing");
 
-    // Drowning: the body goes under.
+    // Drowning: the body goes under, and the sea closes over your head.
+    r.sounds.loops.lock().unwrap().clear();
     r.entities.body(|b| b.submerged = 1.0);
     r.tick(20);
+    assert!(
+        r.sounds.loops.lock().unwrap().iter().any(|l| l.ends_with("underwater") && l.starts_with('+')),
+        "the underwater loop starts as the head goes under"
+    );
     assert!(r.flag("wet"));
     assert!(r.flag("air_show"));
     assert!(r.number("air") < 27.0, "air started draining: {}", r.number("air"));
@@ -874,6 +883,12 @@ fn main() {
     r.entities.body(|b| b.submerged = 0.0);
     r.tick(20);
     assert_eq!(r.number("air"), 27.0, "air came straight back");
+    {
+        let loops = r.sounds.loops.lock().unwrap();
+        let started = loops.iter().filter(|l| l.starts_with('+') && l.ends_with("underwater")).count();
+        assert_eq!(started, 1, "started once, not every tick: {loops:?}");
+        assert!(loops.last().is_some_and(|l| l.starts_with('-') && l.ends_with("underwater")), "and stopped on surfacing: {loops:?}");
+    }
     assert!(r.plays("gasp") >= 1);
     println!("ok  drowned to {} points, surfaced and gasped", r.number("hp"));
 

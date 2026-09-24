@@ -25,7 +25,7 @@
 --   bite              { damage, range (blocks), cooldown (ticks), cause }
 --   sight             blocks it notices a player from
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
---   sound, sound_death, voice_min, voice_max
+--   sound, sound_death, voice_min, voice_max   a cue, or a list of cues (takes of one voice)
 --   model, texture    files in this mod: a .glb, and the PNG skin it wears
 --   walk_speed, run_speed  a walker's own speeds, blocks a second (default: the engine's
 --                     walk and sprint, 4.3 and 5.6, which is a player's)
@@ -99,7 +99,7 @@ tdl.register_mob{
     model = "models/pig.glb", texture = "models/pig.png", grazes = true, jumps = "stuck",
     walk_speed = 1.1, run_speed = 2.8,
     shy = 1.5, sight = 8, wander_radius = 8, pause_min = 40, pause_max = 200,
-    sound = "oink", sound_death = "oink", voice_min = 200, voice_max = 800,
+    sound = { "oink", "oink_2" }, sound_death = "oink_2", voice_min = 200, voice_max = 800,
     drops = { { "raw_meat", 1, 2 } },
     -- Rooting in woodland and wet ground, as a wild pig does.
     spawn = { biomes = { "temperate_woodlands", "flower_forest", "silverwood", "river_valleys", "peat_fen" },
@@ -162,7 +162,7 @@ tdl.register_mob{
     provoked = true,
     bite = { damage = 7, range = 2.2, cooldown = 30, cause = "were mauled by a bear" },
     sight = 12, wander_radius = 16, pause_min = 80, pause_max = 300,
-    sound = "growl", sound_death = "growl", voice_min = 400, voice_max = 1600,
+    sound = { "growl", "growl_2", "growl_3" }, sound_death = "growl_3", voice_min = 400, voice_max = 1600,
     drops = { { "raw_meat", 2, 4 } },
     -- Deep woods and the cold forest, and up into the highlands.
     spawn = { biomes = { "temperate_woodlands", "taiga", "redwood_stands", "silverwood", "frostpine_coast",
@@ -182,6 +182,7 @@ tdl.register_mob{
     model = "models/stag.glb", texture = "models/stag.png", grazes = true, jumps = "stuck",
     walk_speed = 1.4, run_speed = 5.6,
     shy = 8, sight = 16, wander_radius = 16, pause_min = 60, pause_max = 240,
+    sound = "bell", sound_death = "bell", voice_min = 600, voice_max = 2400,
     drops = { { "raw_meat", 2, 3 } },
     spawn = { biomes = { "temperate_woodlands", "flower_forest", "silverwood", "redwood_stands", "taiga",
                          "heather_moor", "river_valleys", "alpine_highlands" },
@@ -209,7 +210,7 @@ tdl.register_mob{
     flyer = true, lands = true, flock = true, navigates = true, speed = 0.35, speed_fast = 0.6,
     walk_speed = 0.8,
     shy = 5, wary = 10, sight = 20,
-    sound = "caw", voice_min = 100, voice_max = 500,
+    sound = { "caw", "caw_2" }, voice_min = 100, voice_max = 500,
     drops = {},
     -- Anywhere on dry land.
     spawn = { land = true,
@@ -234,7 +235,7 @@ tdl.register_mob{
     sight = 16, wander_radius = 10, fly_low = 2, fly_high = 6,
     hostile = { when = "dark", sun_max = 3 },
     bite = { damage = 1, range = 1.4, cooldown = 30, cause = "were bitten to death by bats" },
-    sound = "squeak", voice_min = 60, voice_max = 300,
+    sound = { "squeak", "squeak", "flap" }, voice_min = 60, voice_max = 300,
     drops = {},
     -- The ordinary caves, lit and dark.
     spawn = { biomes = tdl.config.cave_biomes, time = "any", sun_max = 2, group = { 2, 4 }, weight = 3, cap = 6 },

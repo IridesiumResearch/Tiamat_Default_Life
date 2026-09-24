@@ -63,6 +63,12 @@ local function between(lo, hi)
     return lo + below(hi - lo + 1)
 end
 
+--- A cue, or one of a list of them: a voice with several takes.
+local function one_of(cue)
+    if type(cue) == "table" then return cue[between(1, #cue)] end
+    return cue
+end
+
 -- Kinds ------------------------------------------------------------------------------
 
 function tdl.register_mob(def)
@@ -391,7 +397,7 @@ function tdl.hurt_mob(id, amount, by)
             end
         end
         if m.kind.sound_death then
-            game.cue{ cue = m.kind.sound_death, pos = entity.pos, radius = 24 }
+            game.cue{ cue = one_of(m.kind.sound_death), pos = entity.pos, radius = 24 }
         end
         game.despawn_entity(id)
         M.live[id] = nil
@@ -915,7 +921,7 @@ local function step(id, dt)
     m.voice = m.voice - dt
     if m.voice <= 0 then
         m.voice = between(kind.voice_min or 200, kind.voice_max or 900)
-        if kind.sound then game.cue{ cue = kind.sound, pos = entity.pos, radius = 24, entity = id } end
+        if kind.sound then game.cue{ cue = one_of(kind.sound), pos = entity.pos, radius = 24, entity = id } end
     end
 
     -- Noticing: the fierce start hunting; the timid shy away from a player

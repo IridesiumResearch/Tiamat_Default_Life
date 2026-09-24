@@ -107,6 +107,14 @@ M.campfire = game.register_block{
 --
 -- Registered here and raised as cues by name from the systems, so a sound
 -- pack can rebind any of them without touching this mod.
+--
+-- Two kinds of file. The creatures' voices and the underwater ambience are
+-- RECORDINGS from the project's sound library, brought in as mono Ogg by
+-- tools/import_sounds.py (which names each take). The rest are generated
+-- placeholders from tools/make_sounds.py, as WAV, until the library has a
+-- take for them. `ogg = true` says which. Several takes of one voice are
+-- separate sounds (`oink`, `oink_2`); a creature lists them and one is picked
+-- each time it calls.
 
 for _, sound in ipairs({
     { id = "hurt", gain = 0.8, pitch_variance = 0.10 },
@@ -121,16 +129,25 @@ for _, sound in ipairs({
     { id = "rested", gain = 0.6 },
     { id = "boom", gain = 1.0, pitch_variance = 0.10 },
     { id = "bite", gain = 0.8, pitch_variance = 0.15 },
-    { id = "moo", gain = 0.7, pitch_variance = 0.12 },
-    { id = "baa", gain = 0.7, pitch_variance = 0.15 },
-    { id = "oink", gain = 0.7, pitch_variance = 0.15 },
-    { id = "snort", gain = 0.7, pitch_variance = 0.1 },   -- a recording, not generated: sounds/snort.wav
-    { id = "bleat", gain = 0.7, pitch_variance = 0.12 },  -- a recording too: sounds/bleat.wav
-    { id = "caw", gain = 0.6, pitch_variance = 0.20 },
-    { id = "squeak", gain = 0.5, pitch_variance = 0.25 },
-    { id = "growl", gain = 0.9, pitch_variance = 0.12 },
+    -- The creatures, recorded.
+    { id = "moo", gain = 0.8, pitch_variance = 0.08, ogg = true },
+    { id = "baa", gain = 0.8, pitch_variance = 0.10, ogg = true },
+    { id = "oink", gain = 0.7, pitch_variance = 0.10, ogg = true },
+    { id = "oink_2", gain = 0.7, pitch_variance = 0.10, ogg = true },
+    { id = "snort", gain = 0.7, pitch_variance = 0.08, ogg = true },
+    { id = "bleat", gain = 0.7, pitch_variance = 0.10, ogg = true },
+    { id = "bell", gain = 0.8, pitch_variance = 0.06, ogg = true },     -- a stag's bellow
+    { id = "growl", gain = 0.9, pitch_variance = 0.08, ogg = true },
+    { id = "growl_2", gain = 0.9, pitch_variance = 0.08, ogg = true },
+    { id = "growl_3", gain = 0.9, pitch_variance = 0.08, ogg = true },
+    { id = "caw", gain = 0.6, pitch_variance = 0.12, ogg = true },
+    { id = "caw_2", gain = 0.6, pitch_variance = 0.12, ogg = true },
+    { id = "squeak", gain = 0.5, pitch_variance = 0.15, ogg = true },
+    { id = "flap", gain = 0.5, pitch_variance = 0.15, ogg = true },    -- a bat's wings
+    -- The sea over your head: a loop, heard by you alone while your head is under.
+    { id = "underwater", gain = 0.6, ogg = true },
 }) do
-    game.register_sound{ id = sound.id, file = "sounds/" .. sound.id .. ".wav",
+    game.register_sound{ id = sound.id, file = "sounds/" .. sound.id .. (sound.ogg and ".ogg" or ".wav"),
         gain = sound.gain, pitch_variance = sound.pitch_variance }
     game.bind_sound(sound.id, sound.id)
 end

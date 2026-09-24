@@ -116,17 +116,8 @@ def main():
     write("boom", mix(tone(120, 30, 0.6, 0.8, "saw", release=0.5), noise(0.5, 0.7, 0.08, release=0.45, seed=17)))
     # A bite: a short snap.
     write("bite", mix(noise(0.06, 0.8, 0.5, seed=31), tone(400, 150, 0.08, 0.4, release=0.04)))
-    # The voices. Placeholders in the classic style: a moo is a low slide, a
-    # baa wobbles, an oink is a grunt, a caw is harsh, a squeak is high.
-    write("moo", mix(tone(150, 110, 0.7, 0.5, "saw", attack=0.08, release=0.35), tone(300, 220, 0.7, 0.15, attack=0.08, release=0.35)))
-    baa = mix(tone(330, 300, 0.5, 0.45, "saw", attack=0.05, release=0.2), tone(660, 600, 0.5, 0.12, attack=0.05, release=0.2))
-    write("baa", [s * (1 + 0.35 * math.sin(i / RATE * 2 * math.pi * 11)) for i, s in enumerate(baa)])
-    write("oink", mix(noise(0.16, 0.7, 0.25, seed=41), tone(200, 90, 0.16, 0.5, "square", release=0.08)))
-    write("caw", mix(tone(700, 500, 0.22, 0.5, "saw", attack=0.01, release=0.1), noise(0.2, 0.35, 0.6, seed=43)))
-    write("squeak", tone(2600, 3400, 0.09, 0.3, release=0.04))
-    # A growl: a low rough rumble that swells and shakes.
-    growl = mix(tone(95, 70, 0.9, 0.55, "saw", attack=0.12, release=0.4), noise(0.9, 0.45, 0.12, attack=0.1, release=0.4, seed=47))
-    write("growl", [s * (1 + 0.45 * math.sin(i / RATE * 2 * math.pi * 23)) for i, s in enumerate(growl)])
+    # The creatures' voices are recordings now, brought in by
+    # tools/import_sounds.py as sounds/<id>.ogg; nothing here makes them.
 
 
 if __name__ == "__main__":
