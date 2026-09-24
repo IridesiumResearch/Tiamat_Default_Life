@@ -1783,6 +1783,27 @@ fn modes_check() {
 }
 
 fn hud_check(r: &Rig) {
+    // The icon hashes pasted into hud.lua are the engine's hashes of the
+    // files in icons/, today. When the engine's hashing changes (the Tiamot to
+    // Tiamat rename changed its prefix) every one of them names a picture the
+    // client has never been sent, and every heart is a magenta box in play.
+    // Checked here, so it fails in the harness and not on the screen; the
+    // cure is `cargo run --offline --manifest-path tests/native/Cargo.toml --bin hashes`.
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../mods").join(MOD);
+    let script = std::fs::read_to_string(dir.join("hud.lua")).expect("hud.lua");
+    let table = &script[script.find("-- ICONS BEGIN").expect("ICONS BEGIN")..script.find("-- ICONS END").expect("ICONS END")];
+    let mut checked = 0;
+    for line in table.lines() {
+        let Some((name, rest)) = line.trim().split_once(" = \"") else { continue };
+        let pasted = rest.trim_end_matches("\",");
+        let bytes = std::fs::read(dir.join("icons").join(format!("{name}.png"))).expect("the icon's file");
+        let hash = tiamat_core::content::hash_bytes(&bytes);
+        let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(pasted, hex, "hud.lua's hash for `{name}` is stale: run the hasher (--bin hashes)");
+        checked += 1;
+    }
+    assert!(checked >= 14, "every icon in hud.lua checked: {checked}");
+    println!("ok  hud.lua's {checked} icon hashes are the engine's own");
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../mods").join(MOD);
     let source = std::fs::read_to_string(dir.join("hud.lua")).unwrap();
 

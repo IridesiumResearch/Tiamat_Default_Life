@@ -18,20 +18,20 @@
 
 -- ICONS BEGIN (written by tests/native --bin hashes; do not edit by hand)
 local ICONS = {
-    bubble = "a4733e270723365521152f63dc362aa70265a8bd2bfc040c83d0ee48b8608673",
-    cookie_empty = "05350defe5bbb1ee6976a9f876a0806c4657a8edda0db3f6bf379dee43733b6d",
-    cookie_full = "636696cc2bc64d1a538fc98244aed674874b35dfcec7638da0ea0fbb07484ab9",
-    cookie_half = "b289a1b889139778f8d31c1e78c560167bf4e6894f298e1c4b0ffb8f737ec514",
-    heart_1 = "64cc87377267ded25ad4ce7d17a391497f4743d68a302446ff04fe6a6f54267d",
-    heart_2 = "6179c570f6247da558cfe4b4d29c0dcfddeb2bf736bd4cc24c77cc381714be92",
-    heart_empty = "ed9093b89481c14e58283ae0c27e08937b1fdaedcfc272bece6865b48a832b3b",
-    heart_flash = "bed7fe750c69adcb481e6968138521204e0faa37cc4ea15a61eb8d8077c93223",
-    heart_full = "0b8944c859499dcf53e390e0b5b6efc4273760c97a936436cda890aea4738fcb",
-    shield = "22f7383bfe806ef3656ca4c88766d84cdf64622129208d03ed50817b07af4cc0",
-    shield_broken = "df9c56671587aabc7373b36dd5091eb018a52549ee54f09e7d119d815c25403a",
-    shield_faint = "77c8a21806b9100aa0a7753ce926f15419271cfeb57b162d8d17d92455c3fe8d",
-    thermo_cold = "840d70aa1ad8b9f02e1a4785c9558fbd69f457e36320bc3351fbf606ea6e2700",
-    thermo_hot = "ccca7952329e5ca9bb84f365867bed7cf9f93b968472ea4502737da31ebb1d74",
+    bubble = "0c6f8fe83e69a678a16fa97edfb1def0cf9f4d921f140bfd5002fdd32d9b6b0f",
+    cookie_empty = "d28d5f6fbf5568ebcb404ca3321a4c744e533c1f05c2a52563d79a3e3633e05e",
+    cookie_full = "a33881b600f18977b02771ce7dc5cb5414e0ca590e9a875b0c39fd936cc7f1ed",
+    cookie_half = "b1d7ec672b5b81973baf9561c0759aa2df15b47ccc6729210d134b5196ae6f98",
+    heart_1 = "86dc16d8ab4dba321ba7bc7fa1b12f317ea7b1550f05f5d679e04e80fdfeb7ac",
+    heart_2 = "98de11bd6f2c5537adc1b6e3e0cc19d4cb767e986755acb6048d9fa9589f9760",
+    heart_empty = "75cd5fc2c68089e8cf1b58a19de613a14f7786fecbc9254d116d0a41277a8426",
+    heart_flash = "ea9353ac417c780c1f5aec18f3b432382b1d53743006cd930d682a7e6930b015",
+    heart_full = "f75accb78cb7613456b4e917ff18378fc3e547c045afcad05d86437f4415e54b",
+    shield = "d2c17fe7fe4ebcd7cd617d2589245fd7428840706c52b5ec29baf25f139fe626",
+    shield_broken = "c5447612e79128629ddb2a7041aba293ac827adfced9c9a32ce386618f8a81e7",
+    shield_faint = "e08ef495d37095a3cd48fb81dc106895907018bfa2899f6b4c799fca51cdee08",
+    thermo_cold = "41fa261ed3f244a6fbc7d9a02fbea61ac96dfad74ac24b43d083ef0a0acc84b6",
+    thermo_hot = "85309517b76661b242902247778f8a641d982850d2aeb91e26d286cbe99801d2",
 }
 -- ICONS END
 
