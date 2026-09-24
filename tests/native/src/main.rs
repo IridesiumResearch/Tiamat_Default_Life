@@ -1386,9 +1386,11 @@ fn mob_check(r: &mut Rig) {
     };
     // In the air it keeps a plan, crossing or circling, and every clip it
     // plays is a wing clip: gliding with its wings out, beating them now and then.
+    // Held above any cruising height (ten to eighteen blocks over the floor
+    // at 63), so it is coming down and glides, beating its wings now and then.
     let (mut soared, mut flapped) = (false, false);
     for _ in 0..600 {
-        hold(&r, 80.0, false);
+        hold(&r, 95.0, false);
         r.tick(1);
         let anim = clip(&r);
         assert!(anim == tiamat_core::ent::AnimTag::RUN || anim == tiamat_core::ent::AnimTag::SWING,
@@ -1650,12 +1652,12 @@ fn climate_check() {
     };
     let grassland = kinds_in(&mut r, "rolling_grasslands");
     assert!(grassland.iter().any(|k| k == "cow" || k == "sheep" || k == "horse"), "grassland has its herds: {grassland:?}");
-    for k in ["pig", "bear", "stag", "goat", "bat"] {
+    for k in ["bear", "stag", "goat", "bat"] {
         assert!(!grassland.iter().any(|g| g == k), "no {k} out on the open grassland: {grassland:?}");
     }
     let taiga = kinds_in(&mut r, "taiga");
     assert!(!taiga.is_empty(), "the taiga has its animals");
-    for k in ["cow", "sheep", "horse", "pig", "goat", "bat"] {
+    for k in ["cow", "horse", "pig", "goat", "bat"] {
         assert!(!taiga.iter().any(|t| t == k), "no {k} in the taiga: {taiga:?}");
     }
     let salt = kinds_in(&mut r, "salt_pan");
@@ -1664,6 +1666,32 @@ fn climate_check() {
     assert!(sea.is_empty(), "nothing of ours at sea: {sea:?}");
     let cave = kinds_in(&mut r, "mossy_limestone");
     assert!(cave.is_empty(), "a lit cave by day holds none of the surface animals: {cave:?}");
+    // How often, by biome: `odds` says each kind's weight where you stand.
+    let odds = |r: &mut Rig, biome: &str| -> std::collections::HashMap<String, u32> {
+        r.say(&format!("biome {biome}"));
+        r.say("odds");
+        let said = r.said();
+        let list = said.split_once(": ").map(|(_, l)| l.to_owned()).unwrap_or_default();
+        list.split(", ")
+            .filter_map(|e| e.rsplit_once(' '))
+            .filter_map(|(k, w)| w.parse().ok().map(|w| (k.to_owned(), w)))
+            .collect()
+    };
+    let w = |m: &std::collections::HashMap<String, u32>, k: &str| m.get(k).copied().unwrap_or(0);
+    let mountains = odds(&mut r, "alpine_highlands");
+    assert!(w(&mountains, "sheep") > w(&mountains, "cow") && w(&mountains, "cow") > 0,
+        "up in the mountains, sheep over cattle, and cattle rare but there: {mountains:?}");
+    let jungle = odds(&mut r, "jungle");
+    assert!(w(&jungle, "pig") > 0 && w(&jungle, "sheep") == 0, "pigs in the jungle, and no sheep: {jungle:?}");
+    let fen = odds(&mut r, "peat_fen");
+    assert!(w(&fen, "pig") > w(&fen, "cow") && w(&fen, "sheep") == 0, "the swamp is the pigs': {fen:?}");
+    let pasture = odds(&mut r, "rolling_grasslands");
+    for k in ["cow", "sheep"] {
+        assert!(w(&pasture, k) > w(&pasture, "horse") && w(&pasture, "horse") > 0, "{k} commoner than horses on the pasture: {pasture:?}");
+    }
+    let woods = odds(&mut r, "temperate_woodlands");
+    assert!(w(&woods, "stag") < w(&woods, "pig") && w(&woods, "bear") < w(&woods, "stag"),
+        "in the woods, pigs over deer over bears: {woods:?}");
     r.say("biome rolling_grasslands");
     println!("ok  climate: temperate comfortable, Glass Waste hot, Crown cold; creatures keep to their own biomes, crows anywhere on land");
 }

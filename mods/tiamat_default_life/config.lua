@@ -249,6 +249,15 @@ C.cold_sources = {
 -- answers. A creature names the ones it lives in (creatures.lua,
 -- `spawn.biomes`); these are the lists more than one kind shares.
 --
+-- How often a kind turns up in a biome, as the weight it is drawn with at a
+-- spawn spot there, against every other kind that lives there. A kind's
+-- `spawn.biomes` names its biomes with one of these (creatures.lua), so
+-- rarity is one decision per biome rather than a number to balance by hand.
+C.common = 10
+C.uncommon = 5
+C.scarce = 2
+C.rare = 1
+
 -- Every surface biome that is dry land: what `spawn.land` means, for the
 -- creatures that live anywhere on land (crows now, night monsters later).
 C.land_biomes = {

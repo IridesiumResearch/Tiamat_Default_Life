@@ -77,11 +77,19 @@ function tdl.register_mob(def)
     def.drops = def.drops or {}
     def.spawn = def.spawn or {}
     def.ground = U.materials(def.spawn.ground or {})
-    -- Where it lives, as a set of the world's biome ids.
+    -- Where it lives, and how often it turns up there: biome id to weight.
+    -- `spawn.biomes` is either that map, or a list of ids that all take
+    -- `spawn.weight`; `spawn.land` is every land biome at `spawn.weight`.
     local biomes = def.spawn.land and C.land_biomes or def.spawn.biomes
     if biomes then
         def.biomes = {}
-        for _, id in ipairs(biomes) do def.biomes[id] = true end
+        for key, value in pairs(biomes) do
+            if type(key) == "number" then
+                def.biomes[value] = def.spawn.weight or 1
+            elseif value > 0 then
+                def.biomes[key] = value
+            end
+        end
     end
     -- A body of its own, wearing its skin. Behind a pcall, so a model the
     -- engine refuses is a log line here and a stand-in body, not a mod that
@@ -248,6 +256,13 @@ local function biome_at(feet)
     return biome_under(feet.x, feet.y, feet.z)
 end
 
+--- How often a kind turns up in a biome: its weight there, or its one
+--- weight where there is no biome to go by.
+local function weight_in(kind, biome)
+    if biome and kind.biomes then return kind.biomes[biome] or 0 end
+    return kind.spawn.weight or 1
+end
+
 --- Whether a kind may appear at a spot right now. Where: the spot's biome
 --- is one the kind lives in; without the world to ask, the block underfoot
 --- stands in for it. When: the time of day and the light.
@@ -308,14 +323,14 @@ local function try_spawn_near(v)
                 if (counts[kid] or 0) < (kind.spawn.cap or 4) and dist >= range[1] and dist <= range[2]
                     and may_spawn(kind, feet, material, biome) then
                     candidates[#candidates + 1] = kind
-                    weight_sum = weight_sum + (kind.spawn.weight or 1)
+                    weight_sum = weight_sum + weight_in(kind, biome)
                 end
             end
             local chosen
             if weight_sum > 0 then
                 local pick = below(weight_sum)
                 for _, kind in ipairs(candidates) do
-                    pick = pick - (kind.spawn.weight or 1)
+                    pick = pick - weight_in(kind, biome)
                     if pick < 0 then chosen = kind break end
                 end
             end
@@ -1270,6 +1285,23 @@ if C.dev_commands then
             return
         end
         tdl.say(uuid, "Crow #" .. id .. ": " .. m.state .. ".")
+    end)
+    --- The odds where you stand: the biome, and each kind that lives there
+    --- with its weight, most likely first. Time of day and light still
+    --- decide on the spot; these are only the draw.
+    tdl.command("odds", "admin", function(uuid)
+        local body = U.body(uuid)
+        if body == nil then return end
+        local biome = biome_at(body.pos)
+        local list = {}
+        for _, kid in ipairs(M.order) do
+            local w = weight_in(M.kinds[kid], biome)
+            if w > 0 then list[#list + 1] = { kid, w } end
+        end
+        table.sort(list, function(a, b) return a[2] > b[2] or (a[2] == b[2] and a[1] < b[1]) end)
+        local parts = {}
+        for _, e in ipairs(list) do parts[#parts + 1] = e[1] .. " " .. e[2] end
+        tdl.say(uuid, (biome or "no biome") .. ": " .. (#parts > 0 and table.concat(parts, ", ") or "nothing lives here"))
     end)
     tdl.command("ignite", "admin", function(uuid, rest)
         local body = U.body(uuid)

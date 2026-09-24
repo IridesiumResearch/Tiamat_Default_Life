@@ -37,7 +37,7 @@
 -- A flyer with a model plays `swing` for a wingbeat and `run` for a glide
 -- with its wings out; on the ground, `walk`, `idle` and `sneak` as a walker.
 --   drops             { { item, min, max } }, items of this mod
---   spawn             { biomes = { biome ids } | land = true, ground = { block ids },
+--   spawn             { biomes = { [biome id] = weight } | { biome ids } | land = true, ground = { block ids },
 --                       time = "day" | "night" | "any", sun_min, sun_max,
 --                       group = { min, max }, weight, cap,
 --                       distance = { min, max } blocks from the player, if not the usual }
@@ -49,12 +49,19 @@
 -- lives anywhere: crows now, night monsters later. The biome lists that
 -- several kinds share are in config.lua.
 --
+-- HOW OFTEN is the weight beside each biome: common, uncommon, scarce or
+-- rare (config.lua), drawn against every other kind living at that spot.
+-- Cattle, pigs and sheep are common across much of the world, each where
+-- it fits best; a stag is never better than scarce, and a bear is rarer.
+--
 -- `ground` is the fallback for a world without that export: the blocks
 -- underfoot that stand for the biome (loam and litter are woodland, grass
 -- is grassland, snow the highlands). With the world there, the biome alone
 -- decides.
 
 local G = "tiamat_default_world:"
+local C = tdl.config
+local COMMON, UNCOMMON, SCARCE, RARE = C.common, C.uncommon, C.scarce, C.rare
 
 -- The cow has a body of its own: models/cow.glb, made by tools/skin_glb.py
 -- from the modeller's export, already skinned. Six cells long, 2.5 wide,
@@ -68,8 +75,14 @@ tdl.register_mob{
     shy = 1.5, sight = 10, wander_radius = 10, pause_min = 60, pause_max = 240,
     sound = "moo", sound_death = "moo", voice_min = 300, voice_max = 1200,
     drops = { { "raw_meat", 1, 3 } },
-    -- Open pasture: grassland, river meadows and the moor.
-    spawn = { biomes = { "rolling_grasslands", "river_valleys", "heather_moor" }, ground = { G .. "grass" },
+    -- Pasture first, and a fair way beyond it; rare up in the mountains.
+    spawn = { biomes = {
+                  rolling_grasslands = COMMON, river_valleys = COMMON,
+                  heather_moor = UNCOMMON, flower_forest = UNCOMMON, savanna = UNCOMMON,
+                  temperate_woodlands = SCARCE, peat_fen = SCARCE, coastal_cliffs = SCARCE,
+                  alpine_highlands = RARE, mangrove_coast = RARE,
+              },
+              ground = { G .. "grass" },
               time = "day", sun_min = 12, group = { 2, 4 }, weight = 4, cap = 6 },
 }
 
@@ -84,8 +97,13 @@ tdl.register_mob{
     sound = "baa", sound_death = "baa", voice_min = 300, voice_max = 1200,
     drops = { { "raw_meat", 1, 2 } },
     -- Sheep take to the highlands too: grass in the lowlands, snow up in the frost ring.
-    -- Hill grazing: the moor, the highlands, the cliff tops, and grassland.
-    spawn = { biomes = { "heather_moor", "alpine_highlands", "coastal_cliffs", "rolling_grasslands" },
+    -- Hill grazing above all: common on the moor and up in the mountains,
+    -- and about the lowland pasture too; never in the jungle or the fen.
+    spawn = { biomes = {
+                  heather_moor = COMMON, alpine_highlands = COMMON, rolling_grasslands = COMMON,
+                  coastal_cliffs = UNCOMMON, river_valleys = UNCOMMON, frostpine_coast = UNCOMMON,
+                  flower_forest = SCARCE, rime_tundra = SCARCE, taiga = RARE,
+              },
               ground = { G .. "grass", G .. "snow", G .. "permafrost" },
               time = "day", sun_min = 12, group = { 3, 6 }, weight = 4, cap = 8 },
 }
@@ -101,8 +119,14 @@ tdl.register_mob{
     shy = 1.5, sight = 8, wander_radius = 8, pause_min = 40, pause_max = 200,
     sound = { "oink", "oink_2" }, sound_death = "oink_2", voice_min = 200, voice_max = 800,
     drops = { { "raw_meat", 1, 2 } },
-    -- Rooting in woodland and wet ground, as a wild pig does.
-    spawn = { biomes = { "temperate_woodlands", "flower_forest", "silverwood", "river_valleys", "peat_fen" },
+    -- Rooting in wet and wooded ground: commonest in the jungle and the
+    -- swamps, common in the woods, about the farmland, never on the heights.
+    spawn = { biomes = {
+                  jungle = COMMON, peat_fen = COMMON, mangrove_coast = COMMON,
+                  temperate_woodlands = COMMON, flower_forest = UNCOMMON, silverwood = UNCOMMON,
+                  river_valleys = UNCOMMON, rolling_grasslands = SCARCE, savanna = SCARCE,
+                  redwood_stands = SCARCE,
+              },
               ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "mud", G .. "dirt" },
               time = "day", sun_min = 6, group = { 1, 3 }, weight = 3, cap = 6 },
 }
@@ -121,8 +145,12 @@ tdl.register_mob{
     shy = 3.0, sight = 12, wander_radius = 14, pause_min = 60, pause_max = 260,
     sound = "snort", sound_death = "snort", voice_min = 400, voice_max = 1600,
     drops = { { "raw_meat", 1, 3 } },
-    -- Wide open grass: grassland, river meadows, the moor.
-    spawn = { biomes = { "rolling_grasslands", "river_valleys", "heather_moor" }, ground = { G .. "grass" },
+    -- Wide open grass, in herds that are a sight rather than a crowd.
+    spawn = { biomes = {
+                  rolling_grasslands = UNCOMMON, savanna = UNCOMMON,
+                  river_valleys = SCARCE, heather_moor = SCARCE,
+              },
+              ground = { G .. "grass" },
               time = "day", sun_min = 12, group = { 2, 5 }, weight = 2, cap = 6 },
 }
 
@@ -143,7 +171,10 @@ tdl.register_mob{
     sound = "bleat", sound_death = "bleat", voice_min = 300, voice_max = 1400,
     drops = { { "raw_meat", 1, 2 } },
     -- Rock and heights: the highlands, the cliff tops, the karst, the mesa.
-    spawn = { biomes = { "alpine_highlands", "coastal_cliffs", "karst_towers", "arid_mesa", "badlands" },
+    spawn = { biomes = {
+                  alpine_highlands = UNCOMMON, karst_towers = UNCOMMON,
+                  coastal_cliffs = SCARCE, arid_mesa = SCARCE, badlands = SCARCE, rime_wall = RARE,
+              },
               ground = { G .. "snow", G .. "grass" },
               time = "day", sun_min = 10, group = { 2, 4 }, weight = 3, cap = 6 },
 }
@@ -165,8 +196,10 @@ tdl.register_mob{
     sound = { "growl", "growl_2", "growl_3" }, sound_death = "growl_3", voice_min = 400, voice_max = 1600,
     drops = { { "raw_meat", 2, 4 } },
     -- Deep woods and the cold forest, and up into the highlands.
-    spawn = { biomes = { "temperate_woodlands", "taiga", "redwood_stands", "silverwood", "frostpine_coast",
-                         "alpine_highlands" },
+    spawn = { biomes = {
+                  taiga = SCARCE, redwood_stands = SCARCE,
+                  temperate_woodlands = RARE, silverwood = RARE, frostpine_coast = RARE, alpine_highlands = RARE,
+              },
               ground = { G .. "loam", G .. "leaf_litter", G .. "snow" },
               time = "any", sun_min = 4, group = { 1, 1 }, weight = 1, cap = 2 },
 }
@@ -184,8 +217,11 @@ tdl.register_mob{
     shy = 8, sight = 16, wander_radius = 16, pause_min = 60, pause_max = 240,
     sound = "bell", sound_death = "bell", voice_min = 600, voice_max = 2400,
     drops = { { "raw_meat", 2, 3 } },
-    spawn = { biomes = { "temperate_woodlands", "flower_forest", "silverwood", "redwood_stands", "taiga",
-                         "heather_moor", "river_valleys", "alpine_highlands" },
+    -- A deer is a thing you are lucky to see: scarce at best.
+    spawn = { biomes = {
+                  temperate_woodlands = SCARCE, silverwood = SCARCE, redwood_stands = SCARCE, taiga = SCARCE,
+                  flower_forest = RARE, heather_moor = RARE, river_valleys = RARE, alpine_highlands = RARE,
+              },
               ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "snow" },
               time = "any", sun_min = 6, group = { 1, 4 }, weight = 2, cap = 5 },
 }

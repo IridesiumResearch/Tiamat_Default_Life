@@ -301,7 +301,7 @@ Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
 `god`, `tp`, `revive`, `admins`, and the testing words `hurt
 [n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
 `choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]`,
-`mobs`, `mob [kind]`, `plan <transit|circle|tree|land>` (the nearest
+`mobs`, `mob [kind]`, `odds`, `plan <transit|circle|tree|land>` (the nearest
 crow), `ignite [ticks]`, `cull`. The testing words vanish altogether when `dev_commands =
 false` in `config.lua`.
 
@@ -311,13 +311,13 @@ Nine so far, in `creatures.lua` as data over the system in `mobs.lua`:
 
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
-| Cow | Rolling Grasslands, River Valleys and the Heather Moor, by day, in twos to fours | Wanders, shies from you, runs when hit | 1 to 3 raw meat |
-| Sheep | Heather Moor, Alpine Highlands, Coastal Cliffs and Rolling Grasslands, by day, in threes to sixes | The same | 1 to 2 raw meat |
-| Pig | Temperate Woodlands, Flower Forest, Silverwood, River Valleys and Peat Fen, by day | The same | 1 to 2 raw meat |
-| Horse | Rolling Grasslands, River Valleys and the Heather Moor, by day, in herds of 2 to 5 | Wanders and grazes, bolts from you at a gallop, snorts. Fifteen points. Cannot be ridden yet: the engine has no right-click on an entity and no way to seat a rider (engine asks 17 and 18) | 1 to 3 raw meat |
-| Stag | Temperate Woodlands, Flower Forest, Silverwood, Redwood Stands, Taiga, Heather Moor, River Valleys and Alpine Highlands, any time, in ones to fours | Grazes, very wary, bolts from you at eight blocks and outruns you. Fourteen points | 2 to 3 raw meat |
-| Goat | Alpine Highlands, Coastal Cliffs, Karst Towers, Arid Mesa and Badlands, by day, in twos to fours | Grazes and climbs; hurt it and it butts you back for 3 for a few seconds, then loses interest. Ten points | 1 to 2 raw meat |
-| Bear | Temperate Woodlands, Taiga, Redwood Stands, Silverwood, Frostpine Coast and Alpine Highlands, alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
+| Cow | Common on the grassland and river meadows; uncommon on the moor, in the flower forest and savanna; scarce in the woods, fen and on the cliffs; rare in the mountains and mangroves. By day, in twos to fours | Wanders, shies from you, runs when hit | 1 to 3 raw meat |
+| Sheep | Common on the moor, in the mountains and on the grassland; uncommon on the cliffs, river meadows and frostpine coast; scarce in the flower forest and tundra; rare in the taiga. By day, in threes to sixes | The same | 1 to 2 raw meat |
+| Pig | Common in the jungle, the fen, the mangroves and the woods; uncommon in the flower forest, silverwood and river meadows; scarce on the grassland, savanna and among the redwoods. By day | The same | 1 to 2 raw meat |
+| Horse | Uncommon on the grassland and savanna, scarce in the river meadows and on the moor. By day, in herds of 2 to 5 | Wanders and grazes, bolts from you at a gallop, snorts. Fifteen points. Cannot be ridden yet: the engine has no right-click on an entity and no way to seat a rider (engine asks 17 and 18) | 1 to 3 raw meat |
+| Stag | Never better than scarce: in the woods, silverwood, redwoods and taiga; rare in the flower forest, on the moor, in the river meadows and mountains. Any time, in ones to fours | Grazes, very wary, bolts from you at eight blocks and outruns you. Fourteen points | 2 to 3 raw meat |
+| Goat | Uncommon in the mountains and karst; scarce on the cliffs, mesa and badlands; rare on the Rime Wall. By day, in twos to fours | Grazes and climbs; hurt it and it butts you back for 3 for a few seconds, then loses interest. Ten points | 1 to 2 raw meat |
+| Bear | Scarce in the taiga and redwoods; rare in the woods, silverwood, frostpine coast and mountains. Alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The ordinary caves, lit and dark, where it is dark enough | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
 
@@ -328,8 +328,11 @@ distance (crows far out, the rest within forty-four) and like the time of
 day and the light, under a cap per kind and a cap overall. The spot comes
 first so that a pass in a place few kinds live is not spent looking for
 one of the others. Only crows live in every land biome; the night
-monsters, when there are any, will too. The biome lists are in each
-kind's `spawn` in `creatures.lua`, and the shared ones in `config.lua`. Say `spawn cow 3`, `mobs` or `cull` in chat while
+monsters, when there are any, will too. How often each kind turns up
+is its weight in that biome, one of common, uncommon, scarce or rare
+(`config.lua`), drawn against the other kinds that live at the spot; each
+kind's biomes and weights are its `spawn.biomes` in `creatures.lua`. Say
+`odds` to see the draw where you stand. Say `spawn cow 3`, `mobs` or `cull` in chat while
 `dev_commands` is on.
 
 A fist does a point to a mob and the reference sword six. Hurt animals run;
