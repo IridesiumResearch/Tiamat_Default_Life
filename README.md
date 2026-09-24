@@ -6,7 +6,7 @@ only when it matters, food that heals and clothing that keeps you warm; three
 kinds of world (Default, Creative, and a one-life Adventure) with admins over
 them; and everything that lives in the world, beginning with cows, sheep,
 pigs, horses, stags, goats, bunnies, foxes, squirrels, wolves, mammoths,
-bears, crows and bats, and the first monster, the spider.
+bears, crows and bats, the first monster, the spider, and the scarecrow.
 
 Written against the engine's public Lua API and nothing else. The rules that
 shape it are in [`AGENTS.md`](AGENTS.md) (vendored from the engine's `api/`),
@@ -310,7 +310,7 @@ false` in `config.lua`.
 
 ## Creatures
 
-Fifteen so far, in `creatures.lua` as data over the system in `mobs.lua`:
+Sixteen so far, in `creatures.lua` as data over the system in `mobs.lua`:
 
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
@@ -326,6 +326,7 @@ Fifteen so far, in `creatures.lua` as data over the system in `mobs.lua`:
 | Wolf | Uncommon in the taiga and on the frostpine coast; scarce in the mountains, tundra and redwoods; rare in the frozen wastes and woods. Any hour, in packs of 2 to 4 | Leaves you be; hurt one and it hunts you for fifteen seconds, biting for 4. Fourteen points; barks (a dog's take, for now) | 1 to 2 raw meat |
 | Mammoth | Scarce in the frozen wastes and tundra; rare on the Icefall and the Rime Wall. By day, in ones to threes | Slow and enormous, four blocks long; hurt it and it tramples you for 9. Sixty points; trumpets | 4 to 8 raw meat |
 | Spider | The first monster: any land at night, and the ordinary caves at any hour; never in daylight | Hunts whoever it sees in the dark and bites for 2; in daylight leaves you be. Twelve points; hisses | nothing |
+| Scarecrow | Very rarely, and only in the fields: the grassland and river meadows. Any hour, alone | Stands in its field and never moves. Hit it and it follows you for good: never further than twelve blocks, never nearer than six, keeping pace however you run, turning to watch you when it stands still. It never strikes. Only when it happens to come up against an apple tree does it stop, and eat. Twenty points; silent | nothing |
 | Bear | Scarce in the taiga and redwoods; rare in the woods, silverwood, frostpine coast and mountains. Alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The ordinary caves, lit and dark, where it is dark enough | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
@@ -367,7 +368,9 @@ its wings spread is wider than it is long; the bat at `--length 0.6 --axis z
 --rename eating=sneak`; the stag at `--length 5.5 --axis z --rename eating=sneak`, its antlers wider than
 it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--length 1.5 --rename eating=sneak`; the fox at 3.3, the wolf at 4.5, the
 mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the spider at
-`--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long):
+`--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long; the
+scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
+wider than it is deep):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak

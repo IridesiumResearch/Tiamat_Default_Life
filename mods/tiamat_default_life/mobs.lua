@@ -77,6 +77,12 @@ function tdl.register_mob(def)
     def.drops = def.drops or {}
     def.spawn = def.spawn or {}
     def.ground = U.materials(def.spawn.ground or {})
+    -- Blocks it eats when it happens to touch them (the scarecrow's apple trees).
+    if def.eats then
+        local set = {}
+        for _, block in ipairs(def.eats) do set[block] = true end
+        def.eat_set = U.materials(set)
+    end
     -- Where it lives, and how often it turns up there: biome id to weight.
     -- `spawn.biomes` is either that map, or a list of ids that all take
     -- `spawn.weight`; `spawn.land` is every land biome at `spawn.weight`.
@@ -277,6 +283,9 @@ local function may_spawn(kind, feet, material, biome)
     elseif next(kind.ground) ~= nil and not kind.ground[material] then
         return false
     end
+    -- A kind that is rare even where it lives: only this share of the draws
+    -- that land on it come to anything (`spawn.chance`, out of a hundred).
+    if s.chance and below(100) >= s.chance then return false end
     if s.time == "day" and is_night() then return false end
     if s.time == "night" and not is_night() then return false end
     local light = game.get_light{ x = math.floor(feet.x), y = math.floor(feet.y), z = math.floor(feet.z) }
@@ -423,6 +432,7 @@ function tdl.hurt_mob(id, amount, by)
         if m.kind.sound_death then
             game.cue{ cue = one_of(m.kind.sound_death), pos = entity.pos, radius = 24 }
         end
+        if m.stalking then game.storage.set("stalk:" .. id, nil) end
         game.despawn_entity(id)
         M.live[id] = nil
         return true
@@ -441,7 +451,12 @@ function tdl.hurt_mob(id, amount, by)
                     x = dx / length * C.knockback, y = C.knockback_up, z = dz / length * C.knockback } })
             end
         end
-        if m.kind.hostile or m.kind.provoked then
+        if m.kind.stalks then
+            -- It does not run and does not hit back. It follows, for good,
+            -- remembered with the world so a restart does not free you.
+            m.stalking = by
+            game.storage.set("stalk:" .. id, by)
+        elseif m.kind.hostile or m.kind.provoked then
             m.state, m.threat, m.timer = "hunt", by, m.kind.hunt_ticks or C.mob_hunt_ticks
             m.angry = true
         else
@@ -687,7 +702,7 @@ local function tick_fire(id, m, entity, dt)
     local fire = m.in_fire
     local hit = 0
     if fire then
-        if (m.burning or 0) <= 0 and m.state ~= "hunt" then m.state, m.target = "panic", nil end
+        if (m.burning or 0) <= 0 and m.state ~= "hunt" and not m.kind.still then m.state, m.target = "panic", nil end
         m.burning = math.max(m.burning or 0, fire.after)
         m.fire_acc = (m.fire_acc or 0) + dt
         if m.fire_acc >= fire.ticks then
@@ -928,6 +943,82 @@ local function navigate(id, m, entity)
     return false
 end
 
+-- The still and the stalking ---------------------------------------------------------
+--
+-- A kind that is `still` (the scarecrow) does not move of its own accord:
+-- not to wander, not from fire. One that `stalks` is still until somebody
+-- hits it, and then it follows that player for good, at a distance: closer
+-- than `near` it steps back, further than `far` it comes on, running when
+-- they are well ahead, and between the two it stands and faces them. It
+-- never strikes. When it happens to touch a block it `eats` it stops and
+-- eats, then goes on. Whom it stalks is kept in storage by entity id, so it
+-- is still after you when the world opens again.
+
+--- Whether a block it eats is touching the body: the blocks round its feet
+--- and up its height, looked at now and then rather than every tick.
+local function touching_food(m, entity)
+    local set = m.kind.eat_set
+    if set == nil or next(set) == nil then return false end
+    local feet = U.block_at(entity.pos)
+    for dy = 0, 2 do
+        for dx = -1, 1 do
+            for dz = -1, 1 do
+                if U.material_in(set, { x = feet.x + dx, y = feet.y + dy, z = feet.z + dz }) then return true end
+            end
+        end
+    end
+    return false
+end
+
+--- One tick of a still kind. Answers true when it has handled the tick.
+local function stalker(id, m, entity, dt)
+    local kind = m.kind
+    if m.stalking == nil and kind.stalks and m.stalk_read == nil then
+        m.stalk_read = true
+        local who = game.storage.get("stalk:" .. id)
+        if type(who) == "string" then m.stalking = who end
+    end
+    if m.state == "panic" then m.state = "idle" end
+    local prey = m.stalking and U.body(m.stalking)
+    if prey == nil then
+        -- Nobody to follow (never hit, or they are away): it stands.
+        game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = ANIM_IDLE })
+        return true
+    end
+    local near, far = kind.stalks.near, kind.stalks.far
+    local face = game.heading(prey.pos.x - entity.pos.x, prey.pos.z - entity.pos.z)
+
+    -- Eating: an apple tree it has come up against, for a while, then on.
+    m.eat_cd = math.max(0, (m.eat_cd or 0) - dt)
+    if (m.eating or 0) > 0 then
+        m.eating = m.eating - dt
+        game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = ANIM_SNEAK })
+        return true
+    end
+    if m.eat_cd <= 0 and (now + m.perceive_at) % PERCEIVE_EVERY == 0 and touching_food(m, entity) then
+        m.eating, m.eat_cd = kind.eat_ticks or 70, kind.eat_every or 400
+        return true
+    end
+
+    local dx, dz = prey.pos.x - entity.pos.x, prey.pos.z - entity.pos.z
+    local d2 = dx * dx + dz * dz
+    if d2 > far * far then
+        -- Too far: after them, running if they are well ahead.
+        walk_to(id, m, entity, prey.pos, d2 > (far + 6) * (far + 6) and "sprint" or "walk")
+    elseif d2 < near * near then
+        -- Too close: a step back, away from them.
+        local length = math.sqrt(d2)
+        local ux, uz = 0, 1
+        if length > 0.001 then ux, uz = dx / length, dz / length end
+        walk_to(id, m, entity, { x = entity.pos.x - ux * 3, y = entity.pos.y, z = entity.pos.z - uz * 3 }, "walk")
+        game.set_entity(id, { yaw = face })
+    else
+        -- Between the two: it stands, and watches.
+        game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = ANIM_IDLE, yaw = face })
+    end
+    return true
+end
+
 local function step(id, dt)
     local entity = game.entity(id)
     if entity == nil or entity.item then return end
@@ -940,6 +1031,8 @@ local function step(id, dt)
     if m.bite_cd > 0 then m.bite_cd = m.bite_cd - dt end
     if (now + m.perceive_at) % PERCEIVE_EVERY == 0 then perceive(m, entity) end
     if not tick_fire(id, m, entity, dt) then return end
+
+    if kind.still and stalker(id, m, entity, dt) then return end
 
     -- A voice now and then.
     m.voice = m.voice - dt
@@ -1218,7 +1311,7 @@ if C.dev_commands then
         local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
         local body = U.body(uuid)
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scarecrow|crow|bat> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),

@@ -632,7 +632,7 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
         "tiamat_default_world",
         r#"
         for _, id in ipairs({ 'magma', 'bramble', 'dream_stone', 'grass', 'loam', 'leaf_litter', 'mud', 'dirt',
-                'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'fern', 'tall_grass',
+                'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'apple_log', 'fern', 'tall_grass',
                 'ladys_mantle', 'ladys_mantle_bloom' }) do
             game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass'
                 or id == 'ladys_mantle' or id == 'ladys_mantle_bloom') }
@@ -1370,6 +1370,79 @@ fn mob_check(r: &mut Rig) {
     r.tick(1);
     *r.world.floor.lock().unwrap() = None;
     println!("ok  a bat roosts hanging under a ceiling, lets go when hurt, and crawls and eats on the ground");
+
+    // The scarecrow: it stands where it is put and does not move; hit it and
+    // it follows at a distance, never striking; against an apple tree it eats.
+    let grass = r.material("tiamat_default_world:grass");
+    *r.world.floor.lock().unwrap() = Some((63, grass));
+    r.say("heal");
+    r.say("spawn scarecrow 1");
+    r.tick(1);
+    let (scarecrow, body) = r.mobs().into_iter().find(|(_, e)| e.model.as_deref() == Some("tiamat_default_life:scarecrow")).expect("a scarecrow");
+    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:scarecrow"));
+    let drive_of = |r: &Rig| r.entities.0.lock().unwrap().entities[&scarecrow].drive;
+    let anim_of = |r: &Rig| r.entities.0.lock().unwrap().entities[&scarecrow].anim;
+    let yaw_of = |r: &Rig| r.entities.0.lock().unwrap().entities[&scarecrow].transform.yaw;
+    let put = |r: &Rig, x: f64, z: f64| {
+        r.put_mob(scarecrow, x, 64.0, z);
+        r.entities.0.lock().unwrap().entities.get_mut(&scarecrow).unwrap().on_ground = true;
+    };
+    for _ in 0..200 {
+        put(&r, 110.5, 100.5);
+        r.tick(1);
+        assert_eq!(drive_of(&r).walk, [0.0, 0.0], "a scarecrow nobody has hit does not move");
+    }
+    r.hold_nothing();
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(scarecrow), owner: None });
+    r.tick(1);
+    let hp = r.number("hp");
+    // Far off (the player is at 100.5, 100.5): it comes on.
+    put(&r, 130.5, 100.5);
+    r.tick(3);
+    let toward = drive_of(&r).walk;
+    assert!(toward[0] < 0.0, "twenty-nine blocks off, it comes toward you: {toward:?}");
+    // Close: it backs away.
+    put(&r, 103.5, 100.5);
+    r.tick(3);
+    let away = drive_of(&r).walk;
+    assert!(away[0] > 0.0, "three blocks off, it steps back: {away:?}");
+    // Between: it stands, and turns to watch you.
+    put(&r, 109.5, 100.5);
+    r.tick(3);
+    assert_eq!(drive_of(&r).walk, [0.0, 0.0], "nine blocks off, it stands");
+    let _ = yaw_of(&r);
+    // It never strikes, however long it keeps you company.
+    for _ in 0..200 {
+        put(&r, 104.0, 100.5);
+        r.tick(1);
+    }
+    assert_eq!(r.number("hp"), hp, "a scarecrow never hurts you");
+    // Against an apple tree, it stops and eats.
+    let apple = r.material("tiamat_default_world:apple_log");
+    r.world.put(110, 64, 100, apple);
+    let mut ate = false;
+    for _ in 0..40 {
+        put(&r, 109.5, 100.5);
+        r.tick(1);
+        ate |= anim_of(&r) == tiamat_core::ent::AnimTag::SNEAK;
+    }
+    assert!(ate, "an apple tree to hand, it eats");
+    r.world.clear();
+    // Whom it follows is kept with the world, and forgotten when it dies.
+    let key = format!("stalk:{scarecrow}");
+    assert!(r.storage.get(MOD, &key).is_some(), "it remembers whom it follows");
+    r.hold("core_gear:sword");
+    for _ in 0..6 {
+        r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(scarecrow), owner: None });
+        r.tick(12);
+    }
+    assert!(r.mobs().iter().all(|(id, _)| *id != scarecrow), "a sword ends it");
+    assert!(r.storage.get(MOD, &key).is_none(), "and it forgets you");
+    r.hold_nothing();
+    r.say("cull");
+    r.tick(1);
+    *r.world.floor.lock().unwrap() = None;
+    println!("ok  a scarecrow stands still, then hit follows at six to twelve blocks, never strikes, eats at an apple tree");
 
     // A crow, by day and by night. The fake world has no physics, so it is
     // held where the test wants it, well away from the player, and `plan`

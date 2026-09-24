@@ -22,6 +22,10 @@
 --   hostile           { when = "night" | "dark" | "always", sun_max }
 --   provoked          leaves you be until you hurt it, then hunts you (a bear)
 --   hunt_ticks        how long a hurt one keeps after you (default `mob_hunt_ticks`)
+--   still             never moves of its own accord: no wandering, no running from fire
+--   stalks            { near, far } blocks: hit it and it follows you for good, between
+--                     the two, and never strikes (see "The still and the stalking")
+--   eats, eat_ticks, eat_every   blocks it eats when it touches them; how long; how often
 --   bite              { damage, range (blocks), cooldown (ticks), cause }
 --   sight             blocks it notices a player from
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
@@ -303,6 +307,31 @@ tdl.register_mob{
     drops = {},
     spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3,
               time = "any", group = { 1, 2 }, weight = 3, cap = 6 },
+}
+
+-- The scarecrow: models/scarecrow.glb, from an export that was already
+-- skinned, a pumpkin-headed figure on a stake with its arms out, 2.2 blocks
+-- tall; sized along its front-to-back (`--axis z --length 1.78`) since it
+-- is wider than it is deep. It hops on its stake to go anywhere (`walk`,
+-- `run`) and puts its hands to its mouth to eat (`sneak`).
+--
+-- It stands in a field and does not move. It turns up very rarely, and only
+-- in the fields. Hit it and it follows you from then on, never letting you
+-- further than twelve blocks off or nearer than six, keeping pace however
+-- you run, and turning to watch you when it stands. It never strikes. Only
+-- when it happens to come up against an apple tree does it stop, and eat.
+tdl.register_mob{
+    id = "scarecrow", name = "Scarecrow", health = 20,
+    collider = { width = 1.8, height = 6.2 },
+    model = "models/scarecrow.glb", texture = "models/scarecrow.png", jumps = "stuck",
+    walk_speed = 3.0, run_speed = 5.6,
+    still = true, stalks = { near = 6, far = 12 },
+    eats = { G .. "apple_log", G .. "apple_leaves" }, eat_ticks = 70, eat_every = 400,
+    sight = 12,
+    drops = {},
+    spawn = { biomes = { rolling_grasslands = RARE, river_valleys = RARE }, chance = 10,
+              ground = { G .. "grass" },
+              time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
 }
 
 -- The bear: the woods' own, and nobody's quarry. It ambles, forages with
