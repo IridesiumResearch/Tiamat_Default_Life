@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Iridesium
 # SPDX-License-Identifier: GPL-3.0-only
 """A tiny renderer for clean, simple drawings: flat colours, soft edges.
 

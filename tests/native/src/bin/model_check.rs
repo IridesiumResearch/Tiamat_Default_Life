@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Iridesium
 // SPDX-License-Identifier: GPL-3.0-only
 //
 // Runs a `.glb` through the engine's own model reader and says what it made

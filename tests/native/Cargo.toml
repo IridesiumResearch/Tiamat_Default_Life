@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Iridesium
 # SPDX-License-Identifier: GPL-3.0-only
 #
 # A native check that runs the mod through the engine's real script VM with a

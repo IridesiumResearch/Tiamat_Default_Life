@@ -1,3 +1,4 @@
+-- SPDX-FileCopyrightText: Iridesium
 -- SPDX-License-Identifier: GPL-3.0-only
 --
 -- Small helpers with no opinion about the game.

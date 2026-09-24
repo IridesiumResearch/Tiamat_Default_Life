@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Iridesium
 # SPDX-License-Identifier: GPL-3.0-only
 """Generates the item and block textures for mods/tiamat_default_life/textures.
 

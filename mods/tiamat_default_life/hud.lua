@@ -1,3 +1,4 @@
+-- SPDX-FileCopyrightText: Iridesium
 -- SPDX-License-Identifier: GPL-3.0-only
 --
 -- The vitals HUD: hearts, cookies, bubbles when you are under, a

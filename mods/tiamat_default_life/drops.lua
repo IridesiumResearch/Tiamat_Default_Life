@@ -1,3 +1,4 @@
+-- SPDX-FileCopyrightText: Iridesium
 -- SPDX-License-Identifier: GPL-3.0-only
 --
 -- Stacks lying on the ground, and picking them back up.

@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Iridesium
 # SPDX-License-Identifier: GPL-3.0-only
 """Lays every PNG in a directory out on one sheet, scaled up, for a look.
 

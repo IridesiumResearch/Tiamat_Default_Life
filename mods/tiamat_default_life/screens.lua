@@ -1,3 +1,4 @@
+-- SPDX-FileCopyrightText: Iridesium
 -- SPDX-License-Identifier: GPL-3.0-only
 --
 -- The mod's two screens, the wardrobe and the death screen, in Tiamat

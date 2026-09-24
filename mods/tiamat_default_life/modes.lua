@@ -1,3 +1,4 @@
+-- SPDX-FileCopyrightText: Iridesium
 -- SPDX-License-Identifier: GPL-3.0-only
 --
 -- The three worlds, and who may bend their rules.

@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Iridesium
 # SPDX-License-Identifier: GPL-3.0-only
 """Turns a rig of rigid parts into one skinned mesh the engine can draw.
 

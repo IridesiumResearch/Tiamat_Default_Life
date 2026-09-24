@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Iridesium
 # SPDX-License-Identifier: GPL-3.0-only
 """Draws the poses `model_check` dumps, textured, without launching the game.
 

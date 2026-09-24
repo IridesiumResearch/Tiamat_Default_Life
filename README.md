@@ -145,6 +145,15 @@ It joins a player, ticks, hurts, poisons, cures, eats, warms, chills, dresses,
 falls, drowns, burns, dies, punches, sleeps, explodes, forages, leaves and
 rejoins, then draws the HUD script through the client's own HUD VM.
 
+And the licensing checks: every source file carries its SPDX lines, and every
+commit since the licence was unified is signed off (`git commit -s`, or
+`git config core.hooksPath .githooks` once to have it added for you):
+
+```
+./scripts/check-spdx.sh
+./scripts/check-dco.sh
+```
+
 ## Controls
 
 The engine owns the keys; these are the suggested defaults, movable in the
@@ -414,7 +423,14 @@ creature is written: a definition table, and nothing else.
 
 ## Licence
 
-GPL-3.0-only, like the world mod beside it. The engine's
-[`LICENSE.EXCEPTION`](https://github.com/IridesiumResearch/Tiamat-Voxel-Game/blob/main/LICENSE.EXCEPTION)
-makes a mod an independent work, so this is a choice rather than an
-obligation.
+GPL-3.0-only, © Iridesium, with an Additional Permission under GPLv3 §7 in
+`LICENSE.EXCEPTION` (version 1.0, 24 September 2026): a mod that interacts
+with Tiamat Default Life only through its exports, the engine's scripting API or
+the network protocol is an independent work and may be licensed however
+its author likes. Copying or adapting this mod's code or assets is not
+covered by that permission and stays under the GPL. `docs/exports.md`
+lists the exports; the engine's `MOD-LICENSING.md` has the plain-language
+version and a matrix of what needs which permission. Third-party assets
+are listed in `docs/assets.md` with their own licences. Contributions are
+taken under the Developer Certificate of Origin with authors retaining
+copyright; see `CONTRIBUTING.md`.

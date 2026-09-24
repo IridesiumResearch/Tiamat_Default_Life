@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Iridesium
 # SPDX-License-Identifier: GPL-3.0-only
 """Reads an 8-bit RGBA or RGB PNG into rows of (r, g, b, a). Standard library only.
 
