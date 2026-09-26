@@ -60,6 +60,10 @@ local function consume(uuid, v, held, def)
     if def.well_fed then
         E.apply(v, "well_fed", C.well_fed_ticks)
     end
+    -- The bucket a drink came in.
+    if def.leaves then
+        game.give(uuid, { material = game.mod_id .. ":" .. def.leaves, count = 1 })
+    end
     tdl.cue(uuid, def.sound or "eat")
     if def.kind == "food" then
         tdl.toast(uuid, "You ate " .. string.lower(def.name) .. ".", 40)
@@ -219,15 +223,6 @@ tdl.on_leave(function(event)
     use_cd[event.player] = nil
 end)
 
--- Foraging: digging a bramble also yields berries ---------------------------------
-
-tdl.on_dig_complete(function(event)
-    local forage = I.forage[event.material]
-    if forage then
-        game.give(event.player, { material = game.mod_id .. ":" .. forage.item, count = forage.count })
-    end
-end)
-
 -- Explosions ------------------------------------------------------------------------
 
 --- Blows something up: `{ pos, radius, damage, blocks }`. Every player in
@@ -277,13 +272,17 @@ end
 -- Chat words, for testing -----------------------------------------------------------
 
 if C.dev_commands then
+    local KIT_COUNT = { clothing = 1, tool = 1, seed = 8, material = 4 }
     local function kit(uuid)
         for _, def in pairs(I.defs) do
-            game.give(uuid, { material = def.id, count = def.kind == "clothing" and 1 or 4 })
+            game.give(uuid, { material = def.id, count = KIT_COUNT[def.kind] or 4 })
         end
         game.give(uuid, { material = game.mod_id .. ":bed", count = 2 })
         game.give(uuid, { material = game.mod_id .. ":campfire", count = 4 })
-        tdl.say(uuid, "A kit: every food, medicine and garment, two beds, four campfires.")
+        game.give(uuid, { material = game.mod_id .. ":fence", count = 32 })
+        game.give(uuid, { material = game.mod_id .. ":gate", count = 2 })
+        game.give(uuid, { material = game.mod_id .. ":beehive", count = 1 })
+        tdl.say(uuid, "A kit: every food, medicine, garment, seed and tool, two beds, four campfires, a pen, a hive.")
     end
 
     tdl.command("kit", "creative", kit)

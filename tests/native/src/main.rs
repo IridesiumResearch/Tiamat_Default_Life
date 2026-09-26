@@ -375,6 +375,12 @@ struct World {
     floor: Mutex<Option<(i32, MaterialId)>>,
     /// The block the player's crosshair is on, if any.
     aimed: Mutex<Option<(i32, i32, i32)>>,
+    /// Block ids by name, so a `set_block` from the mod lands in `blocks`
+    /// and the mod can read back what it wrote (a crop growing, ground
+    /// drying). Filled once the registries are frozen.
+    names: Mutex<HashMap<String, MaterialId>>,
+    /// Night in a cave: no sun anywhere, for the mushrooms.
+    dark: Mutex<bool>,
 }
 
 impl World {
@@ -397,7 +403,7 @@ impl sight::Access for World {
             return None;
         }
         let Reading::Single { material, occupancy } = self.block_at("", BlockPos { x, y, z }) else { return None };
-        (occupancy != 0).then(|| Looked {
+        (occupancy != 0).then(|| Looked::Block {
             domain: "overworld".into(),
             cell: tiamat_core::SubNodePos { x: x * 3 + 1, y: y * 3 + 2, z: z * 3 + 1 },
             material,
@@ -412,6 +418,11 @@ impl sight::Access for World {
                 && occupancy != 0
             {
                 return Some(Surface { y, material, occupancy, fluid: None });
+            }
+            if let Some(volume) = self.fluids.lock().unwrap().get(&(column[0], y, column[1]))
+                && *volume > 0
+            {
+                return Some(Surface { y, material: MaterialId(0), occupancy: 0, fluid: Some(Fluid::new(FluidId(1), *volume)) });
             }
         }
         None
@@ -434,31 +445,53 @@ impl fluid::Access for World {
             None => Fluid::EMPTY,
         }
     }
-    fn set_fluid_at(&self, _: &str, _: BlockPos, _: Fluid) -> bool {
+    fn set_fluid_at(&self, _: &str, pos: BlockPos, fluid: Fluid) -> bool {
+        let mut fluids = self.fluids.lock().unwrap();
+        if fluid.volume() == 0 {
+            fluids.remove(&(pos.x, pos.y, pos.z));
+        } else {
+            fluids.insert((pos.x, pos.y, pos.z), fluid.volume());
+        }
         true
     }
-    fn fluid_id(&self, _: &str) -> Option<FluidId> {
-        None
+    /// The world's water is the one fluid here, number 1.
+    fn fluid_id(&self, name: &str) -> Option<FluidId> {
+        (name == "tiamat_default_world:water").then_some(FluidId(1))
     }
 }
 
 impl LightSource for World {
     fn light_at(&self, _: &str, _: BlockPos) -> Light {
-        Light::DAYLIGHT
+        if *self.dark.lock().unwrap() { Light::DARK } else { Light::DAYLIGHT }
+    }
+}
+
+impl World {
+    /// An edit lands at once (the engine queues it a tick; nothing here
+    /// depends on the gap), as the block named, or as air.
+    fn apply(&self, pos: BlockPos, block: &str) {
+        self.edits.lock().unwrap().push((pos, block.to_owned()));
+        let key = (pos.x, pos.y, pos.z);
+        if block == "engine:air" {
+            // Explicit air, so a floor under it does not fill it back in.
+            self.blocks.lock().unwrap().insert(key, (MaterialId(0), 0));
+        } else if let Some(material) = self.names.lock().unwrap().get(block) {
+            self.blocks.lock().unwrap().insert(key, (*material, 0x7FF_FFFF));
+        }
     }
 }
 
 impl WorldEdit for World {
     fn set_block(&self, _: &str, pos: BlockPos, block: &str) -> bool {
-        self.edits.lock().unwrap().push((pos, block.to_owned()));
+        self.apply(pos, block);
         true
     }
     fn set_partial(&self, _: &str, pos: BlockPos, block: &str, _: u32) -> bool {
-        self.edits.lock().unwrap().push((pos, block.to_owned()));
+        self.apply(pos, block);
         true
     }
     fn merge_partial(&self, _: &str, pos: BlockPos, block: &str, _: u32) -> bool {
-        self.edits.lock().unwrap().push((pos, block.to_owned()));
+        self.apply(pos, block);
         true
     }
 }
@@ -537,6 +570,62 @@ impl Rig {
     }
     fn material(&self, id: &str) -> MaterialId {
         *self.materials.get(id).unwrap_or_else(|| panic!("no material {id}"))
+    }
+    /// What the fake world holds at a block, by name (or "air").
+    fn block_name(&self, x: i32, y: i32, z: i32) -> String {
+        let Reading::Single { material, occupancy } = sight::Access::block_at(&*self.world, "", BlockPos { x, y, z }) else { return "?".into() };
+        if occupancy == 0 {
+            return "air".into();
+        }
+        self.materials.iter().find(|(_, m)| **m == material).map(|(n, _)| n.clone()).unwrap_or_else(|| format!("#{}", material.0))
+    }
+    /// One random tick for the block at a position, as the engine would give it.
+    fn random_tick(&mut self, x: i32, y: i32, z: i32) {
+        let Reading::Single { material, occupancy } = sight::Access::block_at(&*self.world, "", BlockPos { x, y, z }) else { return };
+        if occupancy == 0 {
+            return;
+        }
+        let outcome = self.vm.random_tick(&tiamat_core::script::RandomTickEvent { pos: BlockPos { x, y, z }, material });
+        assert!(outcome.faults.is_empty(), "mod faulted in random tick: {:?}", outcome.faults);
+    }
+    /// The stack in the player's hand, as the engine hands it to a hook.
+    fn held_stack(&self) -> Option<Stack> {
+        let held = (*self.inventory.held.lock().unwrap())?;
+        self.inventory.views.lock().unwrap().get("player:main")?.iter().find(|s| s.material == held).cloned()
+    }
+    /// The place control at the block at a position, with what is held.
+    fn use_at(&mut self, x: i32, y: i32, z: i32) -> tiamat_core::script::HookOutcome {
+        let Reading::Single { material, .. } = sight::Access::block_at(&*self.world, "", BlockPos { x, y, z }) else { panic!("no block") };
+        *self.world.aimed.lock().unwrap() = Some((x, y, z));
+        let held = self.held_stack();
+        self.vm.use_block(&tiamat_core::script::UseEvent {
+            player: PLAYER,
+            domain: "overworld".into(),
+            aim: Some(tiamat_core::script::UseAim { cell: tiamat_core::coords::SubNodePos::new(x * 3 + 1, y * 3 + 2, z * 3 + 1), material }),
+            held,
+        })
+    }
+    /// The place control on one of the mod's creatures, with what is held.
+    fn use_entity(&mut self, id: u64) -> tiamat_core::script::HookOutcome {
+        let held = self.held_stack();
+        self.vm.use_entity(&tiamat_core::script::UseEntityEvent { player: PLAYER, target: EntityId(id), owner: None, held })
+    }
+    /// A dig of the block at a position, completed.
+    fn dig_at(&mut self, x: i32, y: i32, z: i32) -> bool {
+        let Reading::Single { material, .. } = sight::Access::block_at(&*self.world, "", BlockPos { x, y, z }) else { panic!("no block") };
+        let allowed = self
+            .vm
+            .dig_complete(&tiamat_core::script::DigEvent {
+                player: PLAYER,
+                target: tiamat_core::SubNodePos { x: x * 3 + 1, y: y * 3 + 1, z: z * 3 + 1 },
+                material,
+                brush: tiamat_core::dig::Brush::Block,
+            })
+            .allowed;
+        if allowed {
+            self.world.apply(BlockPos { x, y, z }, "engine:air");
+        }
+        allowed
     }
     fn hold(&self, id: &str) {
         let material = self.material(id);
@@ -634,19 +723,31 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
         r#"
         for _, id in ipairs({ 'magma', 'bramble', 'dream_stone', 'grass', 'loam', 'leaf_litter', 'mud', 'dirt',
                 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'apple_log', 'fern', 'tall_grass',
-                'ladys_mantle', 'ladys_mantle_bloom' }) do
+                'ladys_mantle', 'ladys_mantle_bloom', 'mycelium', 'mulch', 'moss', 'black_mud', 'reeds', 'heather',
+                'lichen', 'glow_cap', 'mushroom_cap', 'monstera', 'pitcher_plant', 'apple_leaves', 'apple_blossom',
+                'poppy', 'water' }) do
             game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass'
-                or id == 'ladys_mantle' or id == 'ladys_mantle_bloom') }
+                or id == 'ladys_mantle' or id == 'ladys_mantle_bloom' or id == 'poppy' or id == 'heather') }
         end
+        game.register_fluid{ id = "water", material = "water" }
         local here = "rolling_grasslands"
+        local aliases = {}
         game.register_on_chat(function(e)
             local id = string.match(e.text, "^biome (%S+)$")
             if id then
                 here = id
                 return false
             end
+            if e.text == "aliases" then
+                local list = {}
+                for block, dry in pairs(aliases) do list[#list + 1] = block .. ">" .. dry end
+                table.sort(list)
+                game.chat_to(e.player, table.concat(list, " "))
+                return false
+            end
         end)
-        game.export{ version = 1, biome_under = function(x, y, z) return here end }
+        game.export{ version = 1, biome_under = function(x, y, z) return here end,
+            add_soil_alias = function(block, dry) aliases[block] = dry return true end }
         "#,
         &dir,
     )
@@ -687,11 +788,61 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
         &dir,
     )
     .expect("the weather stand-in loads and Life's exports answer it");
+    // A stand-in for Tiamat Default Craft, which does not exist yet: it
+    // registers what it cooks and forges through the exports, and its own
+    // crop, and every wrong call is refused rather than raised.
+    vm.note_dependencies("tiamat_default_craft", &[MOD.to_owned()]);
+    vm.load_mod(
+        "tiamat_default_craft",
+        r#"
+        game.register_item{ id = "stew" }
+        game.register_item{ id = "axe" }
+        game.register_item{ id = "scythe" }
+        game.register_item{ id = "iron_hoe" }
+        game.register_item{ id = "hay" }
+        game.register_item{ id = "barley_seed" }
+        game.register_item{ id = "barley" }
+        game.register_block{ id = "barley_1", passable = true, drops = {} }
+        game.register_block{ id = "barley_2", passable = true, drops = {} }
+        local life = game.exports("tiamat_default_life")
+        assert(life and life.version == 1)
+        assert(life.add_food("tiamat_default_craft:stew", { food = 6, saturation = 4, effects = { { "hearty", 1200 } }, well_fed = true, sound = "drink" }) == true)
+        assert(life.add_food("tiamat_default_craft:stew", { effects = { { "not_an_effect", 10 } } }) == false)
+        assert(life.add_food("nobody:nothing", { food = 1 }) == false)
+        assert(life.add_weapon("tiamat_default_craft:axe", 4) == true)
+        assert(life.add_weapon("tiamat_default_craft:axe", 0) == false)
+        assert(life.add_drop("cow", "tiamat_default_craft:hay", 1, 1) == true)
+        assert(life.add_drop("dragon", "tiamat_default_craft:hay", 1, 1) == false)
+        assert(life.add_feed("tiamat_default_craft:hay", { "cow", "sheep" }) == true)
+        assert(life.add_feed("tiamat_default_craft:hay", { "cow", "dragon" }) == false)
+        assert(life.add_harvest_tool("tiamat_default_craft:scythe", 3) == true)
+        assert(life.add_harvest_tool("tiamat_default_craft:scythe", 50) == false)
+        assert(life.add_tilling_tool("tiamat_default_craft:iron_hoe") == true)
+        assert(life.add_tilling_tool("tiamat_default_craft:missing") == false)
+        assert(life.add_crop{ id = "barley", stages = { "tiamat_default_craft:barley_1", "tiamat_default_craft:barley_2" },
+            seed = "tiamat_default_craft:barley_seed", produce = "tiamat_default_craft:barley", soil = "tilled", light = "sun" } == true)
+        assert(life.add_crop{ id = "barley", stages = { "tiamat_default_craft:barley_1" },
+            seed = "tiamat_default_craft:barley_seed", produce = "tiamat_default_craft:barley", soil = "tilled" } == false)
+        assert(life.drop({ x = 1, y = 2 }, { material = "tiamat_default_craft:hay", count = 1 }) == nil)
+        game.register_on_chat(function(e)
+            if e.text == "craftdrop" then
+                assert(life.drop({ x = 100.5, y = 64.5, z = 100.5 }, { material = "tiamat_default_craft:hay", count = 2 }) ~= nil)
+                return false
+            end
+        end)
+        "#,
+        &dir,
+    )
+    .expect("the craft stand-in loads and Life's exports answer it");
     vm.freeze().unwrap();
+    // The server hands out fluid numbers once every mod has loaded; the
+    // world's water is 1 here, the number the fake world answers with.
+    vm.set_fluid_ids(&[("tiamat_default_world:water".to_owned(), FluidId(1))]);
 
     // Noon, so nothing is cold unless a scenario makes it so.
     *sounds.time.lock().unwrap() = 0.5;
-    let materials = vm.registered_blocks().into_iter().collect();
+    let materials: HashMap<String, MaterialId> = vm.registered_blocks().into_iter().collect();
+    *world.names.lock().unwrap() = materials.clone();
     Rig { vm, storage, entities, inventory, sounds, huds, dialogs, world, particles, materials }
 }
 
@@ -1076,6 +1227,7 @@ fn main() {
     println!("ok  the wardrobe and the death screen are valid dialog trees");
 
     mob_check(&mut r);
+    farm_check(&mut r);
     ui_check();
     climate_check();
     modes_check();
@@ -1972,6 +2124,421 @@ const BOB: [u8; 32] = [9; 32];
 
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
+/// The farm, end to end: tilling, sowing, growing by random tick, harvest,
+/// water, foraging for the first seed, and the animals' domestic lives.
+fn farm_check(r: &mut Rig) {
+    let grass = r.material("tiamat_default_world:grass");
+    *r.world.floor.lock().unwrap() = Some((63, grass));
+    *r.sounds.time.lock().unwrap() = 0.5;
+    r.world.clear();
+    r.say("cull");
+    r.say("heal");
+    r.say("feed");
+    r.tick(1);
+    let units = |r: &Rig, id: &str| r.inventory.units_of("player:main", r.material(id));
+    let stack = |r: &Rig, id: &str, n: u32| {
+        let material = r.material(id);
+        let mut views = r.inventory.views.lock().unwrap();
+        let list = views.entry("player:main".into()).or_default();
+        list.retain(|s| s.material != material);
+        list.push(Stack::new(material, 27 * n).unwrap());
+        drop(views);
+        *r.inventory.held.lock().unwrap() = Some(material);
+    };
+
+    // Tilled ground is the world's dirt, to the world.
+    r.say("aliases");
+    let aliases = r.said();
+    assert!(aliases.contains("tiamat_default_life:farmland>tiamat_default_world:dirt"), "farmland is a soil alias of dirt: {aliases}");
+    assert!(aliases.contains("tiamat_default_life:wet_farmland>tiamat_default_world:dirt"), "and so is wet farmland: {aliases}");
+
+    // A hoe tills grass; beside water the ground is wet from the start.
+    stack(r, "tiamat_default_life:hoe", 1);
+    r.use_at(100, 63, 101);
+    assert_eq!(r.block_name(100, 63, 101), "tiamat_default_life:farmland", "a hoe tills grass");
+    r.world.fluids.lock().unwrap().insert((104, 63, 101), 27);
+    r.use_at(103, 63, 101);
+    assert_eq!(r.block_name(103, 63, 101), "tiamat_default_life:wet_farmland", "tilled beside water, it is wet");
+    r.world.put(100, 64, 105, grass);
+    r.world.put(100, 63, 105, grass);
+    r.use_at(100, 63, 105);
+    assert_eq!(r.block_name(100, 63, 105), "tiamat_default_world:grass", "nothing tills under a block");
+    println!("ok  a hoe tills grass to tilled ground, wet where water is near");
+
+    // Sowing: wheat on dry ground, rice only on wet.
+    stack(r, "tiamat_default_life:wheat_seeds", 4);
+    r.use_at(100, 63, 101);
+    assert_eq!(r.block_name(100, 64, 101), "tiamat_default_life:wheat_1", "wheat sown on tilled ground");
+    assert_eq!(units(r, "tiamat_default_life:wheat_seeds"), 27 * 3, "one seed spent");
+    r.use_at(100, 63, 101);
+    assert_eq!(units(r, "tiamat_default_life:wheat_seeds"), 27 * 3, "not on a block already sown");
+    stack(r, "tiamat_default_life:rice_seeds", 2);
+    r.use_at(101, 63, 101);
+    assert_eq!(r.block_name(101, 64, 101), "air", "rice will not take on grass");
+    r.use_at(103, 63, 101);
+    assert_eq!(r.block_name(103, 64, 101), "tiamat_default_life:rice_1", "rice sown on wet tilled ground");
+    println!("ok  seeds sow on tilled ground; rice wants it wet");
+
+    // Growth, a random tick at a time: on wet ground in the sun, every turn
+    // is a stage; ripe, it stays ripe.
+    r.world.put(100, 63, 101, r.material("tiamat_default_life:wet_farmland"));
+    r.random_tick(100, 64, 101);
+    assert_eq!(r.block_name(100, 64, 101), "tiamat_default_life:wheat_2", "one turn, one stage, on wet ground");
+    r.random_tick(100, 64, 101);
+    assert_eq!(r.block_name(100, 64, 101), "tiamat_default_life:wheat_3", "and ripe");
+    r.random_tick(100, 64, 101);
+    assert_eq!(r.block_name(100, 64, 101), "tiamat_default_life:wheat_3", "ripe stays ripe");
+    // On dry ground a turn advances a third of the time; out of its biomes a
+    // third of that. In the dark, never.
+    r.world.put(100, 63, 101, r.material("tiamat_default_life:farmland"));
+    let mut turns = 0;
+    for _ in 0..8 {
+        r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_1"));
+        while r.block_name(100, 64, 101) == "tiamat_default_life:wheat_1" && turns < 400 {
+            r.random_tick(100, 64, 101);
+            turns += 1;
+        }
+    }
+    assert!(turns > 10 && turns < 400, "on dry ground a stage takes a few turns: {turns} for eight");
+    *r.world.dark.lock().unwrap() = true;
+    for _ in 0..30 {
+        r.random_tick(100, 64, 101);
+    }
+    assert_eq!(r.block_name(100, 64, 101), "tiamat_default_life:wheat_2", "nothing grows in the dark");
+    *r.world.dark.lock().unwrap() = false;
+    println!("ok  a crop grows a stage a turn on wet ground, slower dry, never dark; {turns} turns dry");
+
+    // Harvest: a ripe crop dug bare-handed gives its produce and seeds; with
+    // a sickle twice the produce; unripe, only the seed back.
+    r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_3"));
+    r.hold_nothing();
+    let (wheat0, seeds0) = (units(r, "tiamat_default_life:wheat"), units(r, "tiamat_default_life:wheat_seeds"));
+    assert!(r.dig_at(100, 64, 101), "a crop may be dug");
+    let hand = units(r, "tiamat_default_life:wheat") - wheat0;
+    assert!((27..=54).contains(&hand), "a hand's harvest is one or two: {hand}");
+    assert!(units(r, "tiamat_default_life:wheat_seeds") > seeds0, "and seeds back");
+    let mut best = 0;
+    for _ in 0..6 {
+        r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_3"));
+        stack(r, "tiamat_default_life:sickle", 1);
+        let before = units(r, "tiamat_default_life:wheat");
+        r.dig_at(100, 64, 101);
+        best = best.max(units(r, "tiamat_default_life:wheat") - before);
+    }
+    assert!(best >= 27 * 3, "a sickle harvests twice as much: best of six was {best}");
+    r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_1"));
+    let (wheat1, seeds1) = (units(r, "tiamat_default_life:wheat"), units(r, "tiamat_default_life:wheat_seeds"));
+    r.dig_at(100, 64, 101);
+    assert_eq!(units(r, "tiamat_default_life:wheat"), wheat1, "an unripe crop gives no produce");
+    assert_eq!(units(r, "tiamat_default_life:wheat_seeds"), seeds1 + 27, "only its seed back");
+    // The ground dug from under a crop takes the crop with it, seed back.
+    r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_2"));
+    r.dig_at(100, 63, 101);
+    r.tick(1);
+    assert_eq!(r.block_name(100, 64, 101), "air", "the crop went with its ground");
+    assert_eq!(units(r, "tiamat_default_life:wheat_seeds"), seeds1 + 54, "and gave its seed back");
+    println!("ok  harvest: produce and seed ripe, seed only unripe, a sickle doubles it, dug ground takes the crop");
+
+    // Water: tilled ground dries without water in reach, wets with it, and
+    // bare dry ground goes back to earth.
+    r.world.fluids.lock().unwrap().clear();
+    r.world.put(110, 63, 110, r.material("tiamat_default_life:wet_farmland"));
+    let mut turns = 0;
+    while r.block_name(110, 63, 110) == "tiamat_default_life:wet_farmland" && turns < 40 {
+        r.random_tick(110, 63, 110);
+        turns += 1;
+    }
+    assert_eq!(r.block_name(110, 63, 110), "tiamat_default_life:farmland", "wet ground with no water near dries");
+    r.world.fluids.lock().unwrap().insert((112, 62, 110), 9);
+    r.random_tick(110, 63, 110);
+    assert_eq!(r.block_name(110, 63, 110), "tiamat_default_life:wet_farmland", "water two blocks off, one down, wets it");
+    r.world.fluids.lock().unwrap().clear();
+    r.world.put(111, 63, 110, r.material("tiamat_default_life:farmland"));
+    let mut turns = 0;
+    while r.block_name(111, 63, 110) == "tiamat_default_life:farmland" && turns < 60 {
+        r.random_tick(111, 63, 110);
+        turns += 1;
+    }
+    assert_eq!(r.block_name(111, 63, 110), "tiamat_default_world:dirt", "bare tilled ground goes back to earth");
+    // A bucket scoops water and waters a field; poured elsewhere it is a block of water.
+    r.world.fluids.lock().unwrap().insert((105, 63, 101), 27);
+    r.world.put(105, 63, 101, MaterialId(0));
+    r.world.blocks.lock().unwrap().insert((105, 63, 101), (MaterialId(0), 0));
+    stack(r, "tiamat_default_life:bucket", 1);
+    let full = units(r, "tiamat_default_life:water_bucket");
+    r.use_at(105, 63, 101);
+    assert_eq!(units(r, "tiamat_default_life:water_bucket"), full + 27, "a bucket of water");
+    assert_eq!(units(r, "tiamat_default_life:bucket"), 0);
+    assert!(r.world.fluids.lock().unwrap().get(&(105, 63, 101)).is_none(), "and the water is gone from the block");
+    for (x, z) in [(120, 120), (121, 120), (121, 121)] {
+        r.world.put(x, 63, z, r.material("tiamat_default_life:farmland"));
+    }
+    stack(r, "tiamat_default_life:water_bucket", 1);
+    r.use_at(120, 63, 120);
+    assert_eq!(r.block_name(121, 63, 121), "tiamat_default_life:wet_farmland", "watered, the field and its neighbours");
+    assert_eq!(units(r, "tiamat_default_life:bucket"), 27, "the bucket is empty again");
+    stack(r, "tiamat_default_life:water_bucket", 1);
+    r.use_at(130, 63, 130);
+    assert_eq!(r.world.fluids.lock().unwrap().get(&(130, 64, 130)).copied(), Some(27), "poured on grass: a block of water on it");
+    println!("ok  tilled ground dries and wets by what is near; a bucket scoops, waters and pours");
+
+    // Trampling: a body that lands on tilled ground treads it flat, crop and all.
+    r.world.put(100, 63, 101, r.material("tiamat_default_life:wet_farmland"));
+    r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_2"));
+    r.entities.set_position(100.5, 64.0, 101.5);
+    r.entities.body(|b| b.fell = 2.0);
+    r.tick(1);
+    r.entities.body(|b| b.fell = 0.0);
+    assert_eq!(r.block_name(100, 63, 101), "tiamat_default_world:dirt", "landed on, tilled ground is earth");
+    assert_eq!(r.block_name(100, 64, 101), "air", "and the crop is flattened");
+    r.entities.set_position(100.5, 64.0, 100.5);
+    println!("ok  a landing tramples tilled ground and the crop on it");
+
+    // The first seed: foraged from the wild plant that stands for the crop,
+    // by chance; and the apple, from an apple leaf.
+    let tall_grass = r.material("tiamat_default_world:tall_grass");
+    r.hold_nothing();
+    let before = units(r, "tiamat_default_life:wheat_seeds");
+    for _ in 0..40 {
+        r.world.put(100, 64, 108, tall_grass);
+        r.dig_at(100, 64, 108);
+    }
+    assert!(units(r, "tiamat_default_life:wheat_seeds") > before, "tall grass dug gives wheat seeds now and then");
+    let apple_leaves = r.material("tiamat_default_world:apple_leaves");
+    let before = units(r, "tiamat_default_life:apple");
+    for _ in 0..60 {
+        r.world.put(100, 66, 108, apple_leaves);
+        r.dig_at(100, 66, 108);
+    }
+    assert!(units(r, "tiamat_default_life:apple") > before, "an apple leaf broken has an apple in it now and then");
+    // A bramble picked by hand gives berries and stands bare until they grow back.
+    let bramble = r.material("tiamat_default_world:bramble");
+    r.world.put(100, 64, 109, bramble);
+    let berries = units(r, "tiamat_default_life:berries");
+    r.use_at(100, 64, 109);
+    assert_eq!(units(r, "tiamat_default_life:berries"), berries + 27, "berries picked");
+    assert_eq!(r.block_name(100, 64, 109), "tiamat_default_life:bramble_picked", "the bramble stands bare");
+    let mut turns = 0;
+    while r.block_name(100, 64, 109) != "tiamat_default_world:bramble" && turns < 40 {
+        r.random_tick(100, 64, 109);
+        turns += 1;
+    }
+    assert_eq!(r.block_name(100, 64, 109), "tiamat_default_world:bramble", "and the berries grow back");
+    // A cane plants a bramble.
+    stack(r, "tiamat_default_life:bramble_cane", 1);
+    r.use_at(100, 63, 112);
+    assert_eq!(r.block_name(100, 64, 112), "tiamat_default_world:bramble", "a cane planted on grass is a bramble");
+    // Mushrooms: spores on a cave floor, in the dark.
+    let mycelium = r.material("tiamat_default_world:mycelium");
+    r.world.put(100, 63, 115, mycelium);
+    stack(r, "tiamat_default_life:spores", 2);
+    r.use_at(100, 63, 115);
+    assert_eq!(r.block_name(100, 64, 115), "tiamat_default_life:mushroom_1", "spores take on mycelium");
+    r.random_tick(100, 64, 115);
+    assert_eq!(r.block_name(100, 64, 115), "tiamat_default_life:mushroom_1", "but not in the sun");
+    *r.world.dark.lock().unwrap() = true;
+    r.random_tick(100, 64, 115);
+    assert_eq!(r.block_name(100, 64, 115), "tiamat_default_life:mushroom_2", "in the dark they come up");
+    *r.world.dark.lock().unwrap() = false;
+    println!("ok  first seeds are foraged, brambles are picked and regrow, spores grow in the dark");
+
+    // Craft's stand-in: its scythe harvests threefold, its hoe tills, its
+    // barley grows by our rules, its stew is eaten and makes you hearty, its
+    // hay feeds a cow and drops from one.
+    r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_3"));
+    stack(r, "tiamat_default_craft:scythe", 1);
+    let mut best = 0;
+    for _ in 0..6 {
+        r.world.put(100, 64, 101, r.material("tiamat_default_life:wheat_3"));
+        let before = units(r, "tiamat_default_life:wheat");
+        r.dig_at(100, 64, 101);
+        best = best.max(units(r, "tiamat_default_life:wheat") - before);
+    }
+    assert!(best >= 27 * 4, "another mod's scythe harvests threefold: {best}");
+    stack(r, "tiamat_default_craft:iron_hoe", 1);
+    r.use_at(101, 63, 101);
+    assert_eq!(r.block_name(101, 63, 101), "tiamat_default_life:farmland", "another mod's hoe tills");
+    stack(r, "tiamat_default_craft:barley_seed", 2);
+    r.use_at(101, 63, 101);
+    assert_eq!(r.block_name(101, 64, 101), "tiamat_default_craft:barley_1", "another mod's crop is sown");
+    r.world.put(101, 63, 101, r.material("tiamat_default_life:wet_farmland"));
+    r.random_tick(101, 64, 101);
+    assert_eq!(r.block_name(101, 64, 101), "tiamat_default_craft:barley_2", "and grows by our rules");
+    r.hold_nothing();
+    let before = units(r, "tiamat_default_craft:barley");
+    r.dig_at(101, 64, 101);
+    assert!(units(r, "tiamat_default_craft:barley") > before, "and is harvested");
+    r.say("starve 4");
+    stack(r, "tiamat_default_craft:stew", 1);
+    r.tick(16);
+    r.press("use");
+    r.tick(1);
+    assert_eq!(r.number("food"), 14.0, "another mod's stew feeds: 4 + 6 + 4");
+    assert!(r.text("fx").contains("hearty"), "and makes you hearty");
+    r.say("craftdrop");
+    r.tick(3);
+    assert!(units(r, "tiamat_default_craft:hay") >= 54, "a stack another mod dropped through us was picked up");
+    println!("ok  another mod's tools, crop, food and drops go through the exports");
+
+    // The animals. Two cows fed on wheat breed; the calf is small, eats
+    // nothing, and grows up. No ground from here on, so nothing else
+    // wanders in while the minutes pass.
+    *r.world.floor.lock().unwrap() = None;
+    r.world.clear();
+    r.say("feed");
+    r.say("cull");
+    r.say("spawn cow 2");
+    r.tick(1);
+    let cows: Vec<u64> = r.mobs().iter().map(|(id, _)| *id).collect();
+    assert_eq!(cows.len(), 2);
+    for (i, id) in cows.iter().enumerate() {
+        r.put_mob(*id, 102.5 + i as f64, 64.0, 100.5);
+    }
+    stack(r, "tiamat_default_life:wheat", 4);
+    r.use_entity(cows[0]);
+    r.tick(1);
+    assert_eq!(units(r, "tiamat_default_life:wheat"), 27 * 3, "the cow ate a sheaf");
+    assert!(r.text("toast").contains("eats"), "{}", r.text("toast"));
+    r.use_entity(cows[0]);
+    assert_eq!(units(r, "tiamat_default_life:wheat"), 27 * 3, "a fed cow eats no more");
+    r.use_entity(cows[1]);
+    r.tick(12);
+    assert!(cows.iter().any(|id| r.storage.get(MOD, &format!("breed:{id}")).is_some()), "a fed pair is expecting, remembered with the world");
+    for _ in 0..2400 / 20 + 1 {
+        for (i, id) in cows.iter().enumerate() {
+            r.put_mob(*id, 102.5 + i as f64, 64.0, 100.5);
+        }
+        r.tick(20);
+    }
+    let herd = r.mobs();
+    assert_eq!(herd.len(), 3, "a calf: {}", herd.len());
+    let (calf, body) = herd.iter().find(|(id, _)| !cows.contains(id)).cloned().expect("the calf");
+    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:cow_young"), "the calf is the small body");
+    assert_eq!(body.health.map(|h| h.current), Some(5), "on half the health");
+    stack(r, "tiamat_default_life:wheat", 2);
+    let refused = r.use_entity(calf);
+    assert_eq!(units(r, "tiamat_default_life:wheat"), 27 * 2, "a calf is not fed");
+    assert!(refused.reason.as_deref().unwrap_or("").contains("young"), "{:?}", refused.reason);
+    for _ in 0..(20 * 60 * 10) / 100 + 1 {
+        r.tick(100);
+    }
+    let grown = r.mobs();
+    assert_eq!(grown.len(), 3, "still three");
+    assert!(grown.iter().all(|(_, e)| e.model.as_deref() == Some("tiamat_default_life:cow")), "and all grown");
+    println!("ok  two cows fed on wheat breed a calf, which is small, eats nothing and grows up");
+
+    // Milk, and what it does; wool; an egg.
+    let cow = r.mobs()[0].0;
+    stack(r, "tiamat_default_life:bucket", 1);
+    let milk = units(r, "tiamat_default_life:milk");
+    r.use_entity(cow);
+    assert_eq!(units(r, "tiamat_default_life:milk"), milk + 27, "a bucket of milk");
+    stack(r, "tiamat_default_life:bucket", 1);
+    let refused = r.use_entity(cow);
+    assert_eq!(units(r, "tiamat_default_life:bucket"), 27, "and no more for a while");
+    assert!(refused.reason.as_deref().unwrap_or("").contains("while"), "{:?}", refused.reason);
+    r.say("poison 400");
+    r.say("starve 10");
+    stack(r, "tiamat_default_life:milk", 1);
+    r.tick(16);
+    r.press("use");
+    r.tick(1);
+    assert!(!r.text("fx").contains("poison"), "milk settles a poisoned stomach");
+    assert_eq!(units(r, "tiamat_default_life:bucket"), 27 * 2, "the bucket comes back");
+    r.say("cull");
+    r.say("spawn sheep 1");
+    r.tick(1);
+    let sheep = r.mobs()[0].0;
+    stack(r, "tiamat_default_life:shears", 1);
+    r.use_entity(sheep);
+    assert!(units(r, "tiamat_default_life:wool") >= 27, "shorn");
+    let wool = units(r, "tiamat_default_life:wool");
+    r.use_entity(sheep);
+    assert_eq!(units(r, "tiamat_default_life:wool"), wool, "and not again yet");
+    r.say("cull");
+    r.say("spawn hen 1");
+    r.tick(1);
+    let (hen, body) = r.mobs()[0].clone();
+    assert!(body.nametag.is_some() && body.model.as_deref() == Some("engine:humanoid"), "a hen wears the stand-in body, named");
+    let egg = r.material("tiamat_default_life:egg");
+    for _ in 0..(20 * 60 * 8) / 100 + 1 {
+        r.put_mob(hen, 120.5, 64.0, 120.5);
+        r.tick(100);
+    }
+    assert!(r.entities.items(MOD).iter().any(|s| s.material == egg), "the hen laid an egg");
+    println!("ok  a cow gives milk that cures poison, a sheep gives wool, a hen lays");
+
+    // A lead: the animal follows, and the rope comes off at a distance.
+    r.say("cull");
+    r.say("spawn cow 1");
+    r.tick(1);
+    let cow = r.mobs()[0].0;
+    stack(r, "tiamat_default_life:lead", 1);
+    r.use_entity(cow);
+    r.tick(1);
+    assert!(r.text("toast").contains("lead"), "{}", r.text("toast"));
+    r.put_mob(cow, 106.5, 64.0, 100.5);
+    r.entities.0.lock().unwrap().entities.get_mut(&cow).unwrap().on_ground = true;
+    r.tick(12);
+    let walk = r.entities.0.lock().unwrap().entities[&cow].drive.walk;
+    assert!(walk[0] < 0.0, "six blocks off, a led cow comes after you: {walk:?}");
+    r.put_mob(cow, 101.5, 64.0, 100.5);
+    r.tick(3);
+    assert_eq!(r.entities.0.lock().unwrap().entities[&cow].drive.walk, [0.0, 0.0], "beside you it stands");
+    r.put_mob(cow, 120.5, 64.0, 100.5);
+    r.tick(3);
+    r.put_mob(cow, 101.5, 64.0, 100.5);
+    r.use_entity(cow);
+    r.tick(1);
+    assert!(r.text("toast").contains("You lead"), "the rope came off at twenty blocks, so this puts it on again: {}", r.text("toast"));
+    r.say("cull");
+    r.tick(1);
+    println!("ok  a led cow follows and stands by you, and the lead breaks at a distance");
+
+    // A gate opens and shuts; a hive fills beside flowers and gives honey;
+    // a wild hive is found under the flower forest's trees.
+    r.world.put(103, 64, 101, r.material("tiamat_default_life:gate"));
+    r.hold_nothing();
+    r.use_at(103, 64, 101);
+    assert_eq!(r.block_name(103, 64, 101), "tiamat_default_life:gate_open");
+    r.use_at(103, 64, 101);
+    assert_eq!(r.block_name(103, 64, 101), "tiamat_default_life:gate");
+    r.world.put(100, 66, 101, r.material("tiamat_default_life:beehive"));
+    for _ in 0..20 {
+        r.random_tick(100, 66, 101);
+    }
+    assert_eq!(r.block_name(100, 66, 101), "tiamat_default_life:beehive", "no flowers, no honey");
+    r.world.put(102, 64, 102, r.material("tiamat_default_world:poppy"));
+    let mut turns = 0;
+    while r.block_name(100, 66, 101) == "tiamat_default_life:beehive" && turns < 30 {
+        r.random_tick(100, 66, 101);
+        turns += 1;
+    }
+    assert_eq!(r.block_name(100, 66, 101), "tiamat_default_life:beehive_full", "flowers near, it fills");
+    let honey = units(r, "tiamat_default_life:honey");
+    r.use_at(100, 66, 101);
+    assert!(units(r, "tiamat_default_life:honey") > honey, "honey taken");
+    assert_eq!(r.block_name(100, 66, 101), "tiamat_default_life:beehive", "and the hive is empty again");
+    let leaves = r.material("tiamat_default_world:oak_leaves");
+    for x in 60..140 {
+        for z in 60..140 {
+            r.world.put(x, 72, z, leaves);
+        }
+    }
+    r.say("biome flower_forest");
+    r.tick(100 * 40);
+    let hives: Vec<String> = r.storage.0.lock().unwrap().keys().filter(|(m, k)| m == MOD && k.starts_with("hive:")).map(|(_, k)| k.clone()).collect();
+    assert!(!hives.is_empty(), "a wild hive was found under the canopy");
+    let placed = r.world.blocks.lock().unwrap().values().filter(|(m, _)| *m == r.material("tiamat_default_life:beehive")).count();
+    assert!(placed >= hives.len(), "and stands under the leaves: {placed} of {}", hives.len());
+    r.say("biome rolling_grasslands");
+    r.world.clear();
+    r.say("cull");
+    r.tick(1);
+    println!("ok  a gate swings, a hive fills beside flowers and gives honey, wild hives hang in the flower forest");
+    *r.world.floor.lock().unwrap() = None;
+}
+
 fn kind_of(e: &Entity) -> Option<String> {
     match e.model.as_deref() {
         Some(m) if m != "engine:humanoid" => Some(m.rsplit(':').next().unwrap_or(m).to_owned()),

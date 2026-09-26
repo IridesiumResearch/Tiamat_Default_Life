@@ -338,8 +338,74 @@ for key, value in pairs(tdl_overrides or {}) do
 end
 
 -- Digging one of these also yields food: berries from the world's brambles.
+-- Foraging: what digging one of the world's plants leaves in the bag besides
+-- the plant. Each entry is a list of `{ item, count, chance }` (chance out
+-- of a hundred; left out, always), the items this mod's. This is where the
+-- FIRST seed of every crop comes from: a crop with no wild origin could
+-- never be started, so each is found in the wild plant that stands for it.
 C.forage = {
-    ["tiamat_default_world:bramble"] = { item = "berries", count = 1 },
+    ["tiamat_default_world:bramble"] = { { "berries", 1 }, { "bramble_cane", 1, 25 } },
+    ["tiamat_default_world:tall_grass"] = { { "wheat_seeds", 1, 20 } },
+    ["tiamat_default_world:heather"] = { { "turnip_seeds", 1, 25 } },
+    ["tiamat_default_world:lichen"] = { { "turnip_seeds", 1, 20 } },
+    ["tiamat_default_world:reeds"] = { { "rice_seeds", 1, 30 } },
+    ["tiamat_default_world:monstera"] = { { "melon_seeds", 1, 20 } },
+    ["tiamat_default_world:pitcher_plant"] = { { "melon_seeds", 1, 20 } },
+    ["tiamat_default_world:glow_cap"] = { { "spores", 1, 40 } },
+    ["tiamat_default_world:mushroom_cap"] = { { "spores", 1, 60 }, { "mushroom", 1 } },
+    -- Apples grow on apple trees: a leaf block broken has one in it now and then.
+    ["tiamat_default_world:apple_leaves"] = { { "apple", 1, 15 } },
+    ["tiamat_default_world:apple_blossom"] = { { "apple", 1, 5 } },
 }
+
+-- Farming ---------------------------------------------------------------------
+--
+-- Growth is by the engine's random tick, which offers each loaded block a
+-- turn now and then (rarely: that is what makes a crop take a while), so
+-- what is tuned here is the CHANCE a turn advances a stage rather than a
+-- time. A hundred is every turn.
+C.crop_grow_chance = 100       -- a stage advances, on wet ground, in the light
+C.crop_grow_dry_chance = 33    -- and on dry ground
+C.crop_out_of_place_scale = 3  -- outside its biomes a crop takes this many times as long
+C.crop_light = 8               -- sun a crop needs (0..15); a mushroom needs LESS than `mushroom_light`
+C.mushroom_light = 6
+C.farmland_water_reach = 2     -- blocks: water this near keeps farmland wet
+C.farmland_dry_chance = 50     -- a turn dries wet farmland with no water in reach
+C.farmland_revert_chance = 25  -- a turn turns bare, dry farmland back to dirt
+C.farmland_absorb_rate = 9     -- cells of fluid a block of farmland drinks a fluid tick, to become wet
+C.bramble_regrow_chance = 50   -- a turn regrows a picked bramble's berries
+C.sickle_yield = 2             -- a sickle's harvest, as a multiple of a hand's
+C.hive_fill_chance = 40        -- a turn fills a hive with flowers near it
+C.hive_flower_reach = 4        -- blocks a hive looks for flowers
+C.hive_chance = 6              -- of the spawn passes in the flower forest, one in this many finds a wild hive
+C.hive_per_chunk = 1           -- never more than this many wild hives in a chunk column, ever
+
+-- The world's flowers, which a hive wants near it (husbandry.lua).
+C.flowers = {
+    "tiamat_default_world:ladys_mantle_bloom", "tiamat_default_world:blue_lunaria", "tiamat_default_world:roman_chamomile",
+    "tiamat_default_world:water_iris", "tiamat_default_world:wild_mint", "tiamat_default_world:allium",
+    "tiamat_default_world:peony", "tiamat_default_world:poppy", "tiamat_default_world:bluebell",
+    "tiamat_default_world:heather", "tiamat_default_world:rose_blooms", "tiamat_default_world:apple_blossom",
+    "tiamat_default_world:cherry_blossom", "tiamat_default_world:gorse",
+}
+
+-- Husbandry ---------------------------------------------------------------------
+
+C.fed_ticks = 20 * 60          -- a fed animal stays fed (ready to breed) for a minute
+C.breed_ticks = 2400           -- two fed animals together: a young one two minutes on
+C.breed_cooldown_ticks = 20 * 60 * 5   -- and not again for five minutes
+C.breed_reach = 3              -- blocks apart at most
+C.grow_up_ticks = 20 * 60 * 10 -- a young animal is grown ten minutes on
+C.young_scale = 0.55           -- how big a young one is drawn, of its parent
+C.milk_ticks = 20 * 60 * 5     -- a cow or goat gives milk again five minutes on
+C.wool_ticks = 20 * 60 * 5     -- a sheep's wool is back five minutes on
+C.egg_ticks_min = 20 * 60 * 4  -- a hen lays every four to eight minutes
+C.egg_ticks_max = 20 * 60 * 8
+C.lead_reach = 3               -- blocks: a led animal keeps within this of you
+C.lead_break = 12              -- and further than this the lead comes off
+C.use_reach = 4                -- blocks: how far a right-click reaches an animal
+C.hearty_damage_scale = 0.85   -- a stew: physical damage kept off
+C.steady_exhaust_scale = 0.8   -- bread: hunger slowed
+C.raw_meat_poison_ticks = 60   -- raw meat sits badly for three seconds (it was five)
 
 return C

@@ -8,7 +8,8 @@ them; and everything that lives in the world, beginning with cows, sheep,
 pigs, horses, stags, goats, bunnies, foxes, squirrels, wolves, mammoths,
 bears, crows and bats, the first monster, the spider, the scurrier and the
 cave troll deep in the caves, the swamp hag in the fens, the scarecrow, and
-now and then, far off at night, a ghost.
+now and then, far off at night, a ghost. And the farm: tilled ground, six
+crops, and the animals fed, bred, milked, shorn and led.
 
 Written against the engine's public Lua API and nothing else. The rules that
 shape it are in [`AGENTS.md`](AGENTS.md) (vendored from the engine's `api/`),
@@ -164,7 +165,8 @@ settings screen.
 | Key | Action |
 |---|---|
 | **X** | Use what you are holding: eat food, take medicine. With an empty hand, at the bed you look at or one beside you: sleep. |
-| **Right mouse** | Holding food or medicine: eat it or take it, as X does, wherever you look. At a bed: sleep in it. |
+| **Right mouse** | Holding food or medicine: eat it or take it, as X does, wherever you look. At a bed: sleep in it. A hoe at grass or earth: till it. Seeds at tilled ground: sow. A bucket at water: fill it; a bucket of water at tilled ground: water it and its neighbours, anywhere else: pour it. At a bramble, bare-handed: pick its berries. At a gate: open or shut it. At a full hive: take the honey. |
+| **Right mouse on an animal** | With its feed: feed it (a fed pair breeds). A bucket at a cow or goat: milk. Shears at a sheep: wool. A lead: lead it, or let it go. Empty-handed: what it is. |
 | **O** | Wardrobe: the inventory screen on its Wardrobe tab, four worn slots over what you carry. Clothing there keeps you warm or cool. Again to close. |
 
 Every binding, the engine's included, with who may use it and what should
@@ -274,8 +276,10 @@ happened.
 | Item | Does |
 |---|---|
 | Apple, berries, bread | Snacks: two cookies, one, two and a half. |
+| Turnip, rice, mushroom, egg | From the farm, raw: a cookie and a half for a turnip, a cookie for the rest. |
+| Milk | A bucket of it, from a cow or a goat: a cookie, and it settles a poisoned stomach. The bucket comes back. |
 | Cooked meat | The staple: four cookies and a full belly; leaves you **well fed** (faster healing for a while). |
-| Raw meat | A cookie and a half, and a few seconds of poison. Cook it. |
+| Raw meat | A cookie and a half, and three seconds of poison. Cook it. |
 | Hot stew | Three cookies and a minute of **warmth**. |
 | Cool melon | A cookie and a half and a minute of **cooling**. |
 | Honey | Sweet: heals a heart and keeps healing briefly. |
@@ -286,10 +290,75 @@ happened.
 | Bed | Sleep in it at night (X on it or beside it) to heal fully and make it home. When everyone here has slept, it is morning. Using it any time sets home. |
 | Campfire | Warm within three blocks. Burns if you stand in it. |
 
-Digging one of the world's brambles also gives berries.
+Where each comes from is the farm, below. Two buffs are ready for the
+kitchen that is not here yet: **hearty** (a cooked meal: a little less hurt
+by a blow) and **steady** (bread: hunger comes on slower). Cooking, milling
+and curing are Tiamat Default Craft's, which registers what it makes through
+this mod's `add_food` (docs/exports.md); until it is here bread, hot stew
+and the golden apple have no source. Say `kit` in chat for one of everything
+while `config.dev_commands` is on.
 
-There are no recipes and no cooking yet. Say `kit` in chat for one of
-everything while `config.dev_commands` is on.
+## Farming
+
+**Ground.** A hoe, right-clicked at grass or bare earth with nothing on it,
+tills it. Tilled ground drinks whatever fluid touches it — the river it is
+dug beside, a puddle of rain, a bucket poured on it — and is **wet** from
+then on, which is what crops want; wet ground with no water within two
+blocks dries again, and dry ground with water that near wets. A bucket of
+water right-clicked at a field wets the block and its eight neighbours;
+anywhere else it pours a block of water. Bare, dry tilled ground goes back
+to earth on its own, and anything that LANDS on tilled ground — you off a
+step, a cow off a ledge — treads it flat, crop and all. To the world it is
+dirt (World's `add_soil_alias`), so its own rules read it as ground.
+
+**Crops**, six, each for a country the world has. A crop is sown by
+right-clicking its seed at tilled ground and grows through its stages by
+the engine's random tick: on wet ground in the sun (or the dark, for
+mushrooms) every turn its block gets is a stage; on dry ground a third of
+them; outside the crop's own biomes a third of those again. Dig it to
+harvest: ripe, its produce and one or two seeds; unripe, only the seed back.
+A **sickle** doubles the produce. Digging the ground out from under a crop
+takes the crop with it, seed back.
+
+| Crop | Belongs in | Wants | Gives | Its first seed is found in |
+|---|---|---|---|---|
+| Wheat | Grassland, river meadows, flower forest, moor, savanna, woods | Tilled ground, sun | Wheat (feed for the herd; flour, once there is a mill) | Tall grass, dug |
+| Turnip | Taiga, tundra, frostpine coast, mountains, moor, woods, silverwood | Tilled ground, sun | Turnips, eaten raw | Heather or lichen, dug |
+| Rice | River meadows, fen, mangroves, jungle | WET tilled ground only, sun | Rice | Reeds, dug |
+| Melon | Jungle, mangroves, savanna | Tilled ground, sun | Cool melons | Jungle plants (monstera, pitcher plant), dug |
+| Mushrooms | Anywhere dark: a cave floor, a cellar | Mycelium, mulch, moss, mud or earth; sun below 6 | Mushrooms | Glow caps and mushroom caps, dug |
+| Bramble | Where the world put it, or on grass or earth of yours | Nothing | Berries, picked bare-handed with a right-click; they grow back | A cane, found now and then in a bramble dug |
+
+Apples are in apple trees: a leaf block broken has one in it now and then.
+`crops.lua` is the data; `farming.lua` the rules; `config.lua` the odds
+(`crop_grow_chance` and the rest).
+
+## Husbandry
+
+Right-click an animal. **Fed** with what it eats (wheat for a cow, sheep,
+horse or goat; a turnip, berries or an apple for a pig; grain for a hen), it
+is ready to breed for a minute, and two fed adults of a kind within three
+blocks of each other are expecting: two minutes on, a young one, at half the
+health and drawn at half the size, which eats nothing and is grown ten
+minutes later. A pair breeds again five minutes on. What is expecting is
+remembered with the world; that an animal was fed a moment ago is not.
+
+| Animal | Gives, alive | With |
+|---|---|---|
+| Cow, goat | A bucket of milk, every five minutes | A bucket |
+| Sheep | One to three wool, every five minutes | Shears |
+| Hen | An egg, every four to eight minutes, wherever it stands | Nothing: pick it up |
+| A beehive | Honey, when there are flowers within four blocks; it fills by random tick | A right-click at a full hive |
+
+Wild hives hang under the trees of the flower forest, never more than one
+to a chunk; dig one up and hang it by your own flowers. A **lead**
+right-clicked at an animal makes it follow you, three blocks behind, until
+you right-click it again or get twelve blocks ahead. A **fence** keeps in
+the animals that only hop when stuck — cows, sheep, pigs, hens — and not a
+goat or a horse; a **gate** in it opens and shuts with a right-click. Dead,
+the animals leave hide, bone, sinew, wool and feathers beside their meat
+(the creature table). The hen has no model yet: it wears the engine's
+stand-in body with its name over it until `models/hen.glb` arrives.
 
 ## Sound
 
@@ -314,14 +383,18 @@ the generated placeholders from `tools/make_sounds.py`.
 Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
 `god`, `tp`, `revive`, `admins`, and the testing words `hurt
 [n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
-`choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]` (`spawn swarm` for a bat swarm, `spawn cave_troll`),
+`choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n] [young]` (`spawn swarm` for a bat swarm, `spawn cow 2 young` for calves),
 `mobs`, `mob [kind]`, `odds`, `plan <transit|circle|tree|land>` (the nearest
 crow), `ignite [ticks]`, `cull`. The testing words vanish altogether when `dev_commands =
 false` in `config.lua`.
 
 ## Creatures
 
-Sixteen so far, in `creatures.lua` as data over the system in `mobs.lua`:
+Twenty-two so far, in `creatures.lua` as data over the system in `mobs.lua`.
+Beside its meat each leaves the makings of things: hide (cattle, horses,
+goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
+(most), sinew (horses, wolves, stags, mammoths), wool (sheep), feathers
+(hens and crows); the exact numbers are each kind's `drops`.
 
 | Kind | Where and when | Manner | Leaves |
 |---|---|---|---|
@@ -337,12 +410,14 @@ Sixteen so far, in `creatures.lua` as data over the system in `mobs.lua`:
 | Wolf | Uncommon in the taiga and on the frostpine coast; scarce in the mountains, tundra and redwoods; rare in the frozen wastes and woods. Any hour, in packs of 2 to 4 | Leaves you be; hurt one and it hunts you for fifteen seconds, biting for 4. Fourteen points; barks (a dog's take, for now) | 1 to 2 raw meat |
 | Mammoth | Scarce in the frozen wastes and tundra; rare on the Icefall and the Rime Wall. By day, in ones to threes | Slow and enormous, four blocks long; hurt it and it tramples you for 9. Sixty points; trumpets | 4 to 8 raw meat |
 | Spider | The first monster: any land at night, and the ordinary caves at any hour, and not often; never in daylight | Hunts whoever it sees in the dark within ten blocks and bites for 2, slower than you walk, and lets you go at fourteen; in daylight leaves you be. Twelve points; hisses | nothing |
+| Cave rat | The ordinary caves, common, at any hour, in twos and threes | Nibbles about the cave floor and bolts from you at four blocks. Harmless. Three points; silent | 0 to 1 raw meat, 0 to 1 bone |
 | Scurrier | Only the ordinary caves, where it is dark, and extremely seldom; alone | Hunts whoever it sees in the dark, fast on its feet but not as fast as you sprint, and bites for 3. Ten points; silent | nothing |
 | Cave troll | The ordinary caves, where it is dark and there is room for it, very seldom; alone | Wants nothing to do with you: come within ten blocks and it walks off until it is fifteen away. Hit it and it hunts you for good, through death and a restart, and hits for 10. Eighty points; growls | nothing |
 | Swamp hag | The fens and the mangroves only, very, very seldom; alone | Hunts whoever she sees in the dark; her staff strikes for 3 and poisons. Twenty points; silent | nothing |
 | Ghost | Any land, at night only, extremely seldom, and always a long way off (56 to 88 blocks); alone | Drifts about far off. Come within forty blocks of it, or let the night end, and it is gone in a breath of mist. It never harms anybody | nothing |
 | Scarecrow | Very rarely, and only in the fields: the grassland and river meadows. Any hour, alone | Stands in its field and never moves. Hit it and it follows you for good: never further than thirty-six blocks, never nearer than eighteen, keeping pace however you run, turning to watch you when it stands still. It never strikes. Only when it happens to come up against an apple tree does it stop, and eat. Twenty points; silent | nothing |
 | Bear | Seldom: scarce in the taiga and redwoods, rare in the woods, silverwood, frostpine coast and mountains, and only a fifth of those come to anything; never more than one about | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
+| Hen | Uncommon on the grassland, river meadows and in the flower forest; scarce in the woods, savanna and on the moor. By day, in twos to fours | Pecks about, shies from you; lays an egg every few minutes. Fed on grain, and bred (Husbandry). No model yet: the stand-in body, named | 1 raw meat, 1 to 2 feathers |
 | Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The ordinary caves, lit and dark, where it is dark enough; now and then a swarm of eight to fourteen | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat. A swarm churns round its leader and roosts where it roosts, and leaves you be until you hit one of it, when all of it comes for you | nothing |
 
@@ -385,7 +460,7 @@ it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--le
 mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the spider at
 `--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long; the
 scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
-wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the ghost
+wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 2.4 --axis z --rename eating=sneak`; the ghost
 at `--length 2.6 --axis z --rename eating=sneak`, its arms out; the cave troll at `--length 5.5
 --axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`.
 A channel that holds its bone at rest for a whole clip is dropped, since the engine starts every

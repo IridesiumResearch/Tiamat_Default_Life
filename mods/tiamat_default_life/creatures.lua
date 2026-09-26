@@ -49,6 +49,9 @@
 -- A flyer with a model plays `swing` for a wingbeat and `run` for a glide
 -- with its wings out; on the ground, `walk`, `idle` and `sneak` as a walker.
 --   drops             { { item, min, max } }, items of this mod
+--   breeds            fed twice over, a pair has young (husbandry.lua); it gets a young body
+--   feeds             { item ids of this mod } it may be fed with, which readies it to breed
+--   milk              a bucket milks it;  wool   shears shear it;  lays   it lays eggs
 --   spawn             { biomes = { [biome id] = weight } | { biome ids } | land = true, ground = { block ids },
 --                       time = "day" | "night" | "any", sun_min, sun_max,
 --                       dark = true: at night, or by day where sun <= sun_max (a monster),
@@ -89,7 +92,8 @@ tdl.register_mob{
     walk_speed = 1.1, run_speed = 2.8,
     shy = 1.5, sight = 10, wander_radius = 10, pause_min = 60, pause_max = 240,
     sound = "moo", sound_death = "moo", voice_min = 300, voice_max = 1200,
-    drops = { { "raw_meat", 1, 3 } },
+    breeds = true, feeds = { "wheat" }, milk = true,
+    drops = { { "raw_meat", 1, 3 }, { "hide", 1, 2 }, { "bone", 1, 2 } },
     -- Pasture first, and a fair way beyond it; rare up in the mountains.
     spawn = { biomes = {
                   rolling_grasslands = COMMON, river_valleys = COMMON,
@@ -110,7 +114,8 @@ tdl.register_mob{
     walk_speed = 1.0, run_speed = 2.6,
     shy = 2.0, sight = 10, wander_radius = 8, pause_min = 80, pause_max = 300,
     sound = "baa", sound_death = "baa", voice_min = 300, voice_max = 1200,
-    drops = { { "raw_meat", 1, 2 } },
+    breeds = true, feeds = { "wheat" }, wool = true,
+    drops = { { "raw_meat", 1, 2 }, { "wool", 1, 1 }, { "bone", 1, 1 } },
     -- Sheep take to the highlands too: grass in the lowlands, snow up in the frost ring.
     -- Hill grazing above all: common on the moor and up in the mountains,
     -- and about the lowland pasture too; never in the jungle or the fen.
@@ -133,7 +138,8 @@ tdl.register_mob{
     walk_speed = 1.1, run_speed = 2.8,
     shy = 1.5, sight = 8, wander_radius = 8, pause_min = 40, pause_max = 200,
     sound = { "oink", "oink_2" }, sound_death = "oink_2", voice_min = 200, voice_max = 800,
-    drops = { { "raw_meat", 1, 2 } },
+    breeds = true, feeds = { "turnip", "berries", "apple" },
+    drops = { { "raw_meat", 1, 2 }, { "hide", 0, 1 }, { "bone", 1, 1 } },
     -- Rooting in wet and wooded ground: commonest in the jungle and the
     -- swamps, common in the woods, about the farmland, never on the heights.
     spawn = { biomes = {
@@ -144,6 +150,27 @@ tdl.register_mob{
               },
               ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "mud", G .. "dirt" },
               time = "day", sun_min = 6, group = { 1, 3 }, weight = 3, cap = 6 },
+}
+
+-- The hen: the farmyard's bird. It has no model yet, so it wears the
+-- engine's stand-in body with its name over it, as every creature did
+-- before its model arrived; drop `models/hen.glb` and `models/hen.png` in
+-- and name them here and it is a hen. It lays an egg every few minutes
+-- wherever it stands, is fed on grain, and breeds like the rest.
+tdl.register_mob{
+    id = "hen", name = "Hen", health = 4,
+    collider = { width = 1.2, height = 1.6 },
+    grazes = true, jumps = "stuck",
+    walk_speed = 0.9, run_speed = 2.6,
+    shy = 2.5, sight = 8, wander_radius = 6, pause_min = 30, pause_max = 160,
+    breeds = true, feeds = { "wheat_seeds", "wheat" }, lays = true,
+    drops = { { "raw_meat", 1, 1 }, { "feather", 1, 2 }, { "bone", 0, 1 } },
+    spawn = { biomes = {
+                  rolling_grasslands = UNCOMMON, river_valleys = UNCOMMON, flower_forest = UNCOMMON,
+                  temperate_woodlands = SCARCE, savanna = SCARCE, heather_moor = SCARCE,
+              },
+              ground = { G .. "grass", G .. "dirt" },
+              time = "day", sun_min = 10, group = { 2, 4 }, weight = 3, cap = 6 },
 }
 
 -- The horse: models/horse.glb, from an export that was already skinned.
@@ -159,7 +186,8 @@ tdl.register_mob{
     walk_speed = 1.3, run_speed = 5.2,
     shy = 3.0, sight = 12, wander_radius = 14, pause_min = 60, pause_max = 260,
     sound = "snort", sound_death = "snort", voice_min = 400, voice_max = 1600,
-    drops = { { "raw_meat", 1, 3 } },
+    breeds = true, feeds = { "wheat", "apple" },
+    drops = { { "raw_meat", 1, 3 }, { "hide", 1, 2 }, { "bone", 1, 2 }, { "sinew", 0, 1 } },
     -- Wide open grass, in herds that are a sight rather than a crowd.
     spawn = { biomes = {
                   rolling_grasslands = UNCOMMON, savanna = UNCOMMON,
@@ -184,7 +212,8 @@ tdl.register_mob{
     bite = { damage = 3, range = 1.8, cooldown = 30, cause = "were butted by a goat" },
     sight = 10, wander_radius = 12, pause_min = 60, pause_max = 240,
     sound = "bleat", sound_death = "bleat", voice_min = 300, voice_max = 1400,
-    drops = { { "raw_meat", 1, 2 } },
+    breeds = true, feeds = { "wheat", "turnip" }, milk = true,
+    drops = { { "raw_meat", 1, 2 }, { "hide", 0, 1 }, { "bone", 1, 1 } },
     -- Rock and heights: the highlands, the cliff tops, the karst, the mesa.
     spawn = { biomes = {
                   alpine_highlands = UNCOMMON, karst_towers = UNCOMMON,
@@ -205,7 +234,7 @@ tdl.register_mob{
     model = "models/bunny.glb", texture = "models/bunny.png", grazes = true, jumps = "stuck",
     walk_speed = 0.8, run_speed = 5.0,
     shy = 6, sight = 12, wander_radius = 8, pause_min = 30, pause_max = 160,
-    drops = { { "raw_meat", 1, 1 } },
+    drops = { { "raw_meat", 1, 1 }, { "hide", 0, 1 } },
     spawn = { biomes = {
                   rolling_grasslands = COMMON, flower_forest = COMMON, heather_moor = COMMON,
                   temperate_woodlands = UNCOMMON, river_valleys = UNCOMMON, savanna = UNCOMMON,
@@ -226,7 +255,7 @@ tdl.register_mob{
     walk_speed = 1.2, run_speed = 5.2,
     shy = 7, sight = 14, wander_radius = 16, pause_min = 40, pause_max = 200,
     sound = "yip", sound_death = "yip", voice_min = 600, voice_max = 2400,
-    drops = { { "raw_meat", 1, 1 } },
+    drops = { { "raw_meat", 1, 1 }, { "hide", 1, 1 } },
     spawn = { biomes = {
                   temperate_woodlands = UNCOMMON, flower_forest = UNCOMMON, heather_moor = UNCOMMON,
                   rolling_grasslands = SCARCE, river_valleys = SCARCE, silverwood = SCARCE,
@@ -269,7 +298,7 @@ tdl.register_mob{
     bite = { damage = 4, range = 1.8, cooldown = 24, cause = "were brought down by a wolf" },
     sight = 14, wander_radius = 20, pause_min = 60, pause_max = 240,
     sound = "bark", sound_death = "bark", voice_min = 800, voice_max = 3000,
-    drops = { { "raw_meat", 1, 2 } },
+    drops = { { "raw_meat", 1, 2 }, { "hide", 1, 1 }, { "sinew", 1, 1 }, { "bone", 1, 2 } },
     spawn = { biomes = {
                   taiga = UNCOMMON, frostpine_coast = UNCOMMON, alpine_highlands = SCARCE,
                   rime_tundra = SCARCE, redwood_stands = SCARCE, frozen_wastes = RARE, temperate_woodlands = RARE,
@@ -291,7 +320,7 @@ tdl.register_mob{
     bite = { damage = 9, range = 3.2, cooldown = 40, cause = "were trampled by a mammoth" },
     sight = 14, wander_radius = 24, pause_min = 100, pause_max = 400,
     sound = "trumpet", sound_death = "trumpet", voice_min = 1200, voice_max = 4000,
-    drops = { { "raw_meat", 4, 8 } },
+    drops = { { "raw_meat", 4, 8 }, { "hide", 2, 4 }, { "bone", 2, 4 }, { "sinew", 1, 2 } },
     spawn = { biomes = {
                   frozen_wastes = SCARCE, rime_tundra = SCARCE, icefall = RARE, rime_wall = RARE,
               },
@@ -344,6 +373,22 @@ tdl.register_mob{
     spawn = { biomes = { rolling_grasslands = RARE, river_valleys = RARE }, chance = 1,
               ground = { G .. "grass" },
               time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
+}
+
+-- The cave rat: models/cave_rat.glb, from an export that was already
+-- skinned, under a block long (`--length 2.4 --axis z`); its nibbling clip
+-- under `sneak`. The caves' vermin: common in the ordinary caves at any
+-- hour, in twos and threes, skittish, and harmless. Silent, until the
+-- library has a squeak that is not a bat's.
+tdl.register_mob{
+    id = "cave_rat", name = "Cave rat", health = 3,
+    collider = { width = 0.8, height = 1.4 },
+    model = "models/cave_rat.glb", texture = "models/cave_rat.png", grazes = true, jumps = "stuck",
+    walk_speed = 1.0, run_speed = 4.6,
+    shy = 4, sight = 8, wander_radius = 6, pause_min = 20, pause_max = 120,
+    drops = { { "raw_meat", 0, 1 }, { "bone", 0, 1 } },
+    spawn = { biomes = C.cave_biomes, sun_max = 6,
+              time = "any", group = { 2, 3 }, weight = 4, cap = 6 },
 }
 
 -- The scurrier: models/scurrier.glb, from an export that was already skinned,
@@ -445,7 +490,7 @@ tdl.register_mob{
     bite = { damage = 7, range = 2.2, cooldown = 30, cause = "were mauled by a bear" },
     sight = 12, wander_radius = 16, pause_min = 80, pause_max = 300,
     sound = { "growl", "growl_2", "growl_3" }, sound_death = "growl_3", voice_min = 400, voice_max = 1600,
-    drops = { { "raw_meat", 2, 4 } },
+    drops = { { "raw_meat", 2, 4 }, { "hide", 1, 2 }, { "bone", 1, 2 } },
     -- Deep woods and the cold forest, and up into the highlands.
     spawn = { biomes = {
                   taiga = SCARCE, redwood_stands = SCARCE,
@@ -469,7 +514,7 @@ tdl.register_mob{
     walk_speed = 1.4, run_speed = 5.6,
     shy = 8, sight = 16, wander_radius = 16, pause_min = 60, pause_max = 240,
     sound = "bell", sound_death = "bell", voice_min = 600, voice_max = 2400,
-    drops = { { "raw_meat", 2, 3 } },
+    drops = { { "raw_meat", 2, 3 }, { "hide", 1, 2 }, { "sinew", 1, 2 }, { "bone", 1, 2 } },
     -- A deer is a thing you are lucky to see: scarce at best.
     spawn = { biomes = {
                   temperate_woodlands = SCARCE, silverwood = SCARCE, redwood_stands = SCARCE, taiga = SCARCE,
@@ -500,7 +545,7 @@ tdl.register_mob{
     walk_speed = 0.8,
     shy = 5, wary = 10, sight = 20,
     sound = { "caw", "caw_2" }, voice_min = 100, voice_max = 500,
-    drops = {},
+    drops = { { "feather", 1, 2 } },
     -- Anywhere on dry land.
     spawn = { land = true,
               ground = { G .. "grass", G .. "packed_dirt", G .. "leaf_litter", G .. "dead_wood", G .. "dirt" },

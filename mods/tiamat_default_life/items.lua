@@ -15,11 +15,15 @@ local M = { defs = {}, by_material = {}, count = 0 }
 
 --- Registers an item and remembers what it does.
 ---
---- `def.kind` is "food", "medicine" or "clothing". Food and medicine share
---- the fields `food`, `saturation`, `heal`, `effects` (a list of
---- `{ id, ticks }`), `cures` (a list of effect ids removed), `sound`, and
---- `temperature` ("warm" or "cool", a lasting shift). Clothing has `warmth`
---- (+1 warm, -1 cool) and `armour` (a fraction of physical damage kept off).
+--- `def.kind` is "food", "medicine", "clothing", "seed", "tool" or
+--- "material". Food and medicine share the fields `food`, `saturation`,
+--- `heal`, `effects` (a list of `{ id, ticks }`), `cures` (a list of effect
+--- ids removed), `sound`, `temperature` ("warm" or "cool", a lasting shift),
+--- and `leaves` (an item handed back: the bucket a drink came in). Clothing
+--- has `warmth` (+1 warm, -1 cool) and `armour` (a fraction of physical
+--- damage kept off). A seed has `crop` (farming.lua); a tool `tills`,
+--- `harvest` (its yield, as a multiple of a hand's), `shears`, `bucket`,
+--- `lead`. A material is carried and traded and nothing more.
 local function item(id, name, description, def)
     local material = game.register_item{
         id = id,
@@ -50,7 +54,7 @@ item("berries", "Berries", "Picked from a bramble. A bite.",
 item("bread", "Bread", "A loaf. Filling.",
     { kind = "food", food = 5, saturation = 3, sound = "eat" })
 item("raw_meat", "Raw meat", "Better cooked. Eating it raw sits badly.",
-    { kind = "food", food = 3, saturation = 0, sound = "eat", effects = { { "poison", 100 } } })
+    { kind = "food", food = 3, saturation = 0, sound = "eat", effects = { { "poison", tdl.config.raw_meat_poison_ticks } } })
 item("cooked_meat", "Cooked meat", "The staple. Four cookies and a full belly.",
     { kind = "food", food = 8, saturation = 6, sound = "eat", well_fed = true })
 item("hot_stew", "Hot stew", "Warms you through for a good while.",
@@ -62,6 +66,50 @@ item("honey", "Honey", "Sweet. Mends a little on its own.",
 item("golden_apple", "Golden apple", "Heals, then keeps healing, and hardens you for a while.",
     { kind = "food", food = 4, saturation = 5, heal = 6, sound = "eat",
       effects = { { "regeneration", 200 }, { "resistance", 400 } } })
+
+-- From the farm (farming.lua) and the animals (husbandry.lua). Raw produce
+-- is a snack; what a kitchen makes of it is Tiamat Default Craft's, and
+-- until it is here bread, stew and cured meat have no source.
+item("turnip", "Turnip", "Pulled from tilled ground. A cookie and a half, raw.",
+    { kind = "food", food = 3, saturation = 1, sound = "eat" })
+item("rice", "Rice", "A handful of grain from a paddy. A bite, raw.",
+    { kind = "food", food = 2, saturation = 1, sound = "eat" })
+item("mushroom", "Mushroom", "From the dark of a cave. A bite.",
+    { kind = "food", food = 2, saturation = 1, sound = "eat" })
+item("egg", "Egg", "A hen's. A bite, raw.",
+    { kind = "food", food = 2, saturation = 1, sound = "eat" })
+item("milk", "Bucket of milk", "Fresh from a cow or a goat. Settles a poisoned stomach.",
+    { kind = "food", food = 2, saturation = 2, sound = "drink", cures = { "poison" }, leaves = "bucket" })
+item("wheat", "Wheat", "A sheaf. Feed for the herd; flour, once there is a mill.",
+    { kind = "material" })
+
+-- Seeds: each plants the crop it names on tilled ground (farming.lua). The
+-- first of each is found in the wild plant that stands for it (config.lua's
+-- `forage`); every harvest gives more.
+item("wheat_seeds", "Wheat seeds", "Sow on tilled ground in the grasslands.", { kind = "seed", crop = "wheat" })
+item("turnip_seeds", "Turnip seeds", "Sow on tilled ground; they like the cold edge of the woods.", { kind = "seed", crop = "turnip" })
+item("rice_seeds", "Rice seed", "Sow on WET tilled ground, by the river or in the fen.", { kind = "seed", crop = "rice" })
+item("melon_seeds", "Melon seeds", "Sow on tilled ground in the jungle.", { kind = "seed", crop = "melon" })
+item("spores", "Spores", "Scatter on the floor of a dark cave.", { kind = "seed", crop = "mushroom" })
+item("bramble_cane", "Bramble cane", "Plant on grass or dirt for a berry bush of your own.", { kind = "seed", crop = "bramble" })
+
+-- Tools. These are Life's until Tiamat Default Craft registers its own in
+-- wood, bronze and iron through `add_tilling_tool` and `add_harvest_tool`
+-- (exports.lua); what each DOES is written here either way.
+item("hoe", "Hoe", "Right-click grass or dirt to till it.", { kind = "tool", tills = true })
+item("sickle", "Sickle", "Harvest a ripe crop with it for twice the yield.", { kind = "tool", harvest = tdl.config.sickle_yield })
+item("shears", "Shears", "Right-click a sheep for its wool.", { kind = "tool", shears = true })
+item("bucket", "Bucket", "Right-click water to fill it, or a cow or goat to milk it.", { kind = "tool", bucket = true })
+item("water_bucket", "Bucket of water", "Right-click tilled ground to water it, or anywhere else to pour.",
+    { kind = "tool", bucket = "water" })
+item("lead", "Lead", "Right-click an animal to lead it; again to let it go.", { kind = "tool", lead = true })
+
+-- What the animals give, alive and dead.
+item("wool", "Wool", "A sheep's fleece, sheared.", { kind = "material" })
+item("feather", "Feather", "A hen's, or a crow's.", { kind = "material" })
+item("hide", "Hide", "Leather, once it is worked.", { kind = "material" })
+item("bone", "Bone", "", { kind = "material" })
+item("sinew", "Sinew", "Cord, once it is worked.", { kind = "material" })
 
 -- Medicine ------------------------------------------------------------------
 
@@ -102,6 +150,85 @@ M.campfire = game.register_block{
     hardness = 0.4,
     textures = { all = "textures/campfire.png" },
     light_emit = { r = 15, g = 9, b = 2 },
+}
+
+-- The farm's ground (farming.lua). Tilled ground drinks whatever fluid
+-- touches it, rain and river alike, and is wet from then until it dries
+-- (`absorbs` is the engine's, drying is a random tick of ours). Both count
+-- as dirt to the world, through its `add_soil_alias`.
+M.farmland = game.register_block{
+    id = "farmland",
+    name = "Tilled ground",
+    description = "Dry. Sow seeds on it; water it, or wait for rain.",
+    hardness = 0.5,
+    textures = { all = "textures/farmland.png" },
+    absorbs = { rate = tdl.config.farmland_absorb_rate, becomes = "wet_farmland" },
+}
+M.wet_farmland = game.register_block{
+    id = "wet_farmland",
+    name = "Wet tilled ground",
+    description = "Crops grow on it. Dries out unless water is near.",
+    hardness = 0.5,
+    textures = { all = "textures/wet_farmland.png" },
+}
+
+-- A pen. A fence keeps in what does not jump (a cow, a sheep, a pig: the
+-- kinds that only hop when stuck); a goat or a horse is over it. A gate
+-- swings open and shut with a right-click, and an open one is walked
+-- through by anything.
+M.fence = game.register_block{
+    id = "fence",
+    name = "Fence",
+    description = "Keeps the herd in. A goat will not respect it.",
+    hardness = 1.0,
+    textures = { all = "textures/fence.png" },
+    cutout = true,
+}
+M.gate = game.register_block{
+    id = "gate",
+    name = "Gate",
+    description = "Shut. Right-click to open it.",
+    hardness = 1.0,
+    textures = { all = "textures/gate.png" },
+    cutout = true,
+}
+M.gate_open = game.register_block{
+    id = "gate_open",
+    name = "Gate",
+    description = "Open. Right-click to shut it.",
+    hardness = 1.0,
+    textures = { all = "textures/gate_open.png" },
+    cutout = true, passable = true,
+}
+
+-- A beehive (husbandry.lua): found wild under the trees of the flower
+-- forest, and moved wherever there are flowers. It fills by random tick
+-- when flowers are near, and a full one is emptied of its honey with a
+-- right-click.
+M.beehive = game.register_block{
+    id = "beehive",
+    name = "Beehive",
+    description = "Bees, busy. It fills when there are flowers near.",
+    hardness = 0.6,
+    textures = { all = "textures/beehive.png" },
+}
+M.beehive_full = game.register_block{
+    id = "beehive_full",
+    name = "Beehive",
+    description = "Full of honey. Right-click to take it.",
+    hardness = 0.6,
+    textures = { all = "textures/beehive_full.png" },
+}
+
+-- A bramble with its berries picked (farming.lua): the world's bramble
+-- again once its berries have grown back.
+M.bramble_picked = game.register_block{
+    id = "bramble_picked",
+    name = "Bramble",
+    description = "Picked bare. The berries grow back.",
+    hardness = 0.3,
+    textures = { all = "textures/bramble_picked.png" },
+    billboard = "cross",
 }
 
 -- Sounds --------------------------------------------------------------------
@@ -234,6 +361,19 @@ do
 end
 M.heat_sources = U.materials(C.heat_sources)
 M.cold_sources = U.materials(C.cold_sources)
+
+--- Another mod's item as one of ours to eat or use: `material` its qualified
+--- id, `id` its number, `def` the same table `item` takes (exports.lua's
+--- `add_food` builds it). It is not in `count`; that is what this mod ships.
+function M.add_def(material, id, def)
+    def.id = material
+    def.short = string.match(material, ":(.+)$") or material
+    def.name = U.friendly(material)
+    def.material = id
+    M.defs[material] = def
+    M.by_material[id] = def
+    return def
+end
 M.radiation_blocks = U.materials(C.radiation_blocks)
 M.weapons = U.materials(C.weapons)
 M.forage = U.materials(C.forage)

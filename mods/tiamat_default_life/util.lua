@@ -132,4 +132,46 @@ function U.friendly(id)
     return (string.gsub(string.match(id, ":(.+)$") or id, "_", " "))
 end
 
+-- Randomness ------------------------------------------------------------------
+--
+-- A xorshift over Lua's own 64-bit integers, which wrap: the same world
+-- ticked the same way rolls the same numbers on every machine (charter
+-- rule 4), and nothing in this mod calls the platform's `math.random`. One
+-- stream for the whole mod: the creatures, the crops and the drops all draw
+-- from it, in tick order, which is the same order everywhere.
+local seed = 0x2545F4914F6CDD1D
+
+function U.rand()
+    seed = seed ~ (seed << 13)
+    seed = seed ~ (seed >> 7)
+    seed = seed ~ (seed << 17)
+    return seed
+end
+
+--- An integer in 0..n-1.
+function U.below(n)
+    return (U.rand() >> 1) % n
+end
+
+--- An integer in lo..hi.
+function U.between(lo, hi)
+    return lo + U.below(hi - lo + 1)
+end
+
+--- True `chance` times in a hundred.
+function U.chance(chance)
+    return U.below(100) < chance
+end
+
+--- A block position as a storage key: "x,y,z".
+function U.key(pos)
+    return pos.x .. "," .. pos.y .. "," .. pos.z
+end
+
+--- The block position a cell (three to a block, as a dig or a use reports
+--- one) is in.
+function U.cell_block(x, y, z)
+    return { x = x // 3, y = y // 3, z = z // 3 }
+end
+
 return U

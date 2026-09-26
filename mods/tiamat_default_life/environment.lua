@@ -123,6 +123,8 @@ end
 --- hurts landing in water.
 local function track_fall(uuid, v, body)
     local fall = body.fell or 0
+    -- Landing on tilled ground tramples it, however short the drop (farming.lua).
+    if fall > 0 and tdl.farming then tdl.farming.trample(body.pos) end
     if fall > C.fall_safe_blocks and not v.env.wet then
         local damage = (fall - C.fall_safe_blocks) * C.fall_damage_per_block
         tdl.cue(uuid, "thud")

@@ -60,6 +60,8 @@ local EFFECT_NAMES = {
     cooling = { "Cooled", { 150, 210, 255, 255 } },
     well_fed = { "Well fed", { 230, 200, 120, 255 } },
     rested = { "Well rested", { 190, 230, 190, 255 } },
+    hearty = { "Hearty", { 220, 160, 120, 255 } },
+    steady = { "Steady", { 210, 190, 140, 255 } },
 }
 
 local function icon(name, x, y, size, anchor)

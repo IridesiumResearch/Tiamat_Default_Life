@@ -47,7 +47,8 @@ fly (`game.set_player_abilities`), which is not making anybody an operator.
 | Key | Action | Notes |
 |---|---|---|
 | **X** | Use what you hold: eat, bandage, antidote. Empty-handed, at the bed you look at or one beside you: sleep. | |
-| **Right mouse** | Holding food or medicine: eat it or take it, wherever you look. At a bed: sleep in it. | The engine's place control, with nothing placeable in hand; at open sky or past reach too, since `hooks.lua` registers `on_use` with `anywhere` (engine protocol 76). |
+| **Right mouse** | Holding food or medicine: eat it or take it, wherever you look. At a bed: sleep in it. A hoe at grass or earth: till. Seeds at tilled ground: sow. A bucket at water: fill; a bucket of water at a field: water it, elsewhere: pour. Bare-handed at a bramble: pick berries. At a gate: open or shut. At a full hive: honey. | The engine's place control, with nothing placeable in hand; at open sky or past reach too, since `hooks.lua` registers `on_use` with `anywhere` (engine protocol 76). |
+| **Right mouse on an animal** | Its feed: feed it. A bucket at a cow or goat: milk. Shears at a sheep: wool. A lead: lead it, or let it go. Empty-handed: what it is. | `on_use_entity` (engine ask 17, landed 2026-09-26): the server casts the ray, so the animal used is the one under the crosshair. |
 | **O** | Wardrobe: the inventory screen on its Wardrobe tab (Tiamat Default UI), or a plain dialog without it. | Was G, which is the engine's debug block row. O for outfit. |
 
 ## The engine's keys, as they are and as they should be

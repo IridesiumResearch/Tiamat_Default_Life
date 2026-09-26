@@ -225,6 +225,7 @@ local function tick_food(uuid, v, dt)
     if E.has(v, "rested") then
         rate = rate * C.exhaust_rested
     end
+    rate = rate * E.exhaust_scale(v)
     tdl.exhaust(uuid, rate * dt)
 
     -- Regeneration, paid for in food.

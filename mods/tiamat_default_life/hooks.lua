@@ -19,6 +19,7 @@ local digs = {}
 local places = {}
 local steps = {}
 local uses = {}
+local entity_uses = {}
 
 -- Runs `fn(dt_ticks)` every tick, after everything subscribed before it.
 ---@param fn fun(dt_ticks: integer)
@@ -82,6 +83,16 @@ end
 -- a string or `false` to handle it; the first handler to do so stops the rest.
 function tdl.on_use(fn)
     uses[#uses + 1] = fn
+end
+
+-- Runs `fn(event)` when a player USES an entity: the place control with a
+-- creature (or a dropped stack, or somebody's body) nearer than any block.
+-- `event.target` is the entity, `event.owner` the player it belongs to if it
+-- is a body, `event.held` what is in the hand. Return a string or `false`
+-- to handle it; the first handler to do so stops the rest, and `on_use` is
+-- then not asked.
+function tdl.on_use_entity(fn)
+    entity_uses[#entity_uses + 1] = fn
 end
 
 game.register_on_tick(function(dt_ticks)
@@ -162,6 +173,19 @@ if game.register_on_use then
     -- player looks. An older engine ignores the option and asks only at a
     -- block.
     game.register_on_use(dispatch, { anywhere = true })
+end
+
+-- Engine ask 17, landed 2026-09-26: an older engine has no such hook, and
+-- then an animal is a thing you cannot feed.
+if game.register_on_use_entity then
+    game.register_on_use_entity(function(event)
+        for _, fn in ipairs(entity_uses) do
+            local verdict = fn(event)
+            if verdict ~= nil and verdict ~= true then
+                return verdict
+            end
+        end
+    end)
 end
 
 game.register_on_place(function(event)

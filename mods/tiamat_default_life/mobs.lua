@@ -40,29 +40,8 @@ local FIRE_EVERY = 5      -- ticks between looks at what a body stands in
 local BURN_PERIOD = 10    -- burning after the fire: a point this often, as a player's
 local now = 0
 
--- Randomness --------------------------------------------------------------------
---
--- A xorshift over Lua's own 64-bit integers, which wrap: the same world
--- ticked the same way rolls the same numbers on every machine (charter
--- rule 4), and nothing here calls the platform's `math.random`.
-local seed = 0x2545F4914F6CDD1D
-
-local function rand()
-    seed = seed ~ (seed << 13)
-    seed = seed ~ (seed >> 7)
-    seed = seed ~ (seed << 17)
-    return seed
-end
-
---- An integer in 0..n-1.
-local function below(n)
-    return (rand() >> 1) % n
-end
-
---- An integer in lo..hi.
-local function between(lo, hi)
-    return lo + below(hi - lo + 1)
-end
+-- Randomness: the mod's one deterministic stream, in util.lua.
+local below, between = U.below, U.between
 
 --- A cue, or one of a list of them: a voice with several takes.
 local function one_of(cue)
@@ -112,6 +91,13 @@ function tdl.register_mob(def)
         if not ok then
             game.log("tiamat_default_life: " .. def.id .. " keeps its stand-in body: " .. tostring(why))
         end
+        -- A kind that breeds has a young body too: the same model, smaller.
+        -- Its size is what says it is young, across a restart, since the
+        -- model is kept with the entity (husbandry.lua).
+        if ok and def.breeds then
+            pcall(game.register_model, { id = def.id .. "_young", file = def.model, texture = def.texture,
+                scale = C.young_scale })
+        end
     end
     M.kinds[def.id] = def
     M.order[#M.order + 1] = def.id
@@ -123,10 +109,13 @@ local function kind_of(entity)
     if entity.item then return nil end
     if entity.model and entity.model ~= "engine:humanoid" then
         local short = string.match(entity.model, "^" .. game.mod_id .. ":(.+)$")
-        if short and M.kinds[short] then return M.kinds[short] end
+        if short then
+            short = string.gsub(short, "_young$", "")
+            if M.kinds[short] then return M.kinds[short] end
+        end
     end
     if entity.nametag then
-        local short = string.lower(entity.nametag)
+        local short = string.lower(string.gsub(entity.nametag, " %(young%)$", ""))
         if M.kinds[short] then return M.kinds[short] end
     end
     return nil
@@ -169,9 +158,11 @@ local function adopt(id, entity)
         local leader = game.storage.get("swarm:" .. id)
         if math.type(leader) == "integer" then join_swarm(m, leader) end
     end
+    if tdl.husbandry then tdl.husbandry.adopt(id, m, entity) end
     M.live[id] = m
     return m
 end
+M.adopt = adopt
 
 --- Ids of our mobs near a position, nearest first.
 function tdl.mobs_near(pos, radius)
@@ -203,13 +194,17 @@ function tdl.spawn_mob(kind_id, pos, count, opts)
             health = kind.health,
             collider = kind.collider,
         }
-        -- Its own body if the engine took one; else the stand-in, named.
+        -- Its own body if the engine took one; else the stand-in, named. A
+        -- young one is the smaller body, or the stand-in named as young, on
+        -- half the health.
+        local young = opts and opts.young and kind.breeds
         if kind.has_model or not C.placeholder_models then
-            spec.model = kind.qualified
+            spec.model = kind.qualified .. (young and "_young" or "")
         else
             spec.model = "engine:humanoid"
-            spec.nametag = kind.name
+            spec.nametag = kind.name .. (young and " (young)" or "")
         end
+        if young then spec.health = math.max(1, kind.health // 2) end
         local id = game.spawn_entity(spec)
         if id then
             ids[#ids + 1] = id
@@ -299,6 +294,8 @@ local function biome_at(feet)
     if biome_under == nil then return nil end
     return biome_under(feet.x, feet.y, feet.z)
 end
+
+M.biome_at, M.ground_at = biome_at, ground_at   -- for the farm (farming.lua)
 
 --- How often a kind turns up in a biome: its weight there, or its one
 --- weight where there is no biome to go by.
@@ -465,9 +462,11 @@ function tdl.hurt_mob(id, amount, by)
         for _, drop in ipairs(m.kind.drops) do
             local n = between(drop[2], drop[3] or drop[2])
             local item = burned and C.cooked_by_fire[drop[1]] or drop[1]
-            if n > 0 then
+            -- Ours by short name; another mod's (`add_drop`) by its qualified one.
+            local material = drop.qualified and U.material(item) or I.defs[game.mod_id .. ":" .. item].material
+            if n > 0 and material then
                 tdl.drop({ x = entity.pos.x, y = entity.pos.y + 0.5, z = entity.pos.z },
-                    { material = I.defs[game.mod_id .. ":" .. item].material, units = n * 27 },
+                    { material = material, units = n * 27 },
                     { velocity = { x = 0, y = 0.3, z = 0 } })
             end
         end
@@ -477,6 +476,7 @@ function tdl.hurt_mob(id, amount, by)
         if m.stalking then game.storage.set("stalk:" .. id, nil) end
         if m.swarm then game.storage.set("swarm:" .. id, nil) end
         if m.grudge then game.storage.set("grudge:" .. id, nil) end
+        if tdl.husbandry then tdl.husbandry.forget(id, m) end
         game.despawn_entity(id)
         M.live[id] = nil
         return true
@@ -1130,6 +1130,11 @@ local function step(id, dt)
     if (now + m.perceive_at) % PERCEIVE_EVERY == 0 then perceive(m, entity) end
     if not tick_fire(id, m, entity, dt) then return end
 
+    -- Landing on tilled ground tramples it, as a player's does.
+    if (entity.fell or 0) > 0 and tdl.farming then tdl.farming.trample(entity.pos) end
+    -- Growing up, breeding, laying, being led (husbandry.lua).
+    if tdl.husbandry and tdl.husbandry.step(id, m, entity, dt) then return end
+
     -- A bird or bat on foot that finds itself in the air (off a ledge, the
     -- ground dug from under it) flies at once, rather than standing on nothing.
     if kind.flyer and m.landed and not entity.on_ground then take_off(id, m) end
@@ -1456,6 +1461,7 @@ local function step(id, dt)
     end
 end
 
+M.move_to, M.stand = move_to, stand   -- for husbandry.lua
 tdl.on_entity_step(step)
 
 -- The tick: spawning, and forgetting what is far away ------------------------------------
@@ -1480,17 +1486,17 @@ end)
 
 if C.dev_commands then
     tdl.command("spawn", "admin", function(uuid, rest)
-        local kind, n = string.match(rest, "^([%a_]+)%s*(%d*)$")
+        local kind, n, young = string.match(rest, "^([%a_]+)%s*(%d*)%s*(%a*)$")
         local body = U.body(uuid)
         local swarm = kind == "swarm"
         if swarm then kind = "bat" end
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_troll|swamp_hag|scarecrow|ghost|crow|bat|swarm> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_rat|cave_troll|swamp_hag|scarecrow|ghost|crow|bat|hen|swarm> [count] [young]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),
                      z = body.pos.z + body.facing.z * 4 }
-        local ids = tdl.spawn_mob(kind, at, tonumber(n) or (swarm and 12 or 1), { swarm = swarm })
+        local ids = tdl.spawn_mob(kind, at, tonumber(n) or (swarm and 12 or 1), { swarm = swarm, young = young == "young" })
         tdl.say(uuid, #ids .. " " .. kind .. (#ids == 1 and "" or "s") .. " spawned.")
     end)
     tdl.command("mobs", "admin", function(uuid)

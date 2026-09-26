@@ -7,7 +7,8 @@ the record; the open ones are copied to the engine repo (see below).
 
 ## Where these stand (2026-09-26)
 
-**Two are open: 17 and 18.** Everything before them landed, and the mod uses every answer.
+**One is open: 18.** Everything else landed, and the mod uses every answer: 17 landed 2026-09-26
+(engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
 One thing landed that was never numbered: the place control at nothing (open sky, or a
 block past reach) reaches a mod that asks, engine a6d34e1 (protocol 76), so food is eaten
 with the right mouse wherever you look. Open asks are
@@ -19,7 +20,7 @@ included.
 | Item | State | In this mod |
 |---|---|---|
 | 18 riding | **Open.** | the horse is in the world and cannot be ridden. |
-| 17 using an entity | **Open.** | nothing to right-click a horse with. |
+| 17 using an entity | Landed, engine 50462b7. | feeding, milking, shearing and leading, in husbandry.lua. |
 | (unnumbered) a use at nothing | Landed, engine a6d34e1, protocol 76. | `hooks.lua` registers `on_use` with `{ anywhere = true }`; right mouse eats what is held at open sky too. |
 | 16 a model's skin is not drawn | Landed, engine b5ed249. | every animal painted, first world or fifth; checked by replaying the rejoin through the engine's renderer. |
 | 15 a picture over an entity | Landed, engine e5c0394 and 9c4e120. | `game.show_over`: one row of hearts, not sixty-five particles. |
@@ -71,7 +72,14 @@ at the seat plus eye height. Sneak dismounts by default, and
 them) lets the mod say where they land. A mount that is despawned or dies
 drops its rider.
 
-## 17. Using an entity: right-click on a mob (2026-09-23): OPEN
+## 17. Using an entity: right-click on a mob (2026-09-23): LANDED, engine 50462b7
+
+**Landed 2026-09-26** as `game.register_on_use_entity(fn(e))`, `e = { player,
+target, owner, held }`, the same ladder as `on_use`, asked before `on_use`
+with the server casting the reach ray against the entities' boxes; and
+`game.looking_at` answers `{ domain, entity, owner }` when that is what the
+crosshair is on. hooks.lua wraps it as `tdl.on_use_entity`; husbandry.lua
+feeds, milks, shears and leads through it.
 
 **Wanted.** The place control on an animal does something: get on a horse,
 later milk a cow, shear a sheep, feed a pig.

@@ -213,6 +213,411 @@ picture("campfire", [
     (union(circle(0.0, -0.14, 0.20), intersect(halfplane(-1.0, 0.5, -0.12), halfplane(1.0, 0.5, -0.12), halfplane(0, -1, -0.16))), FLAME_CORE),
 ], background=ASH)
 
+# --- Farming ---------------------------------------------------------------
+#
+# Crops, produce, tools and the blocks a farm is made of. The crop stages and
+# the picked bramble are cross-billboard sprites, so they stand on the bottom
+# edge of a transparent canvas; the ground blocks are painted edge to edge.
+
+IRON = rgba(156, 160, 168)
+IRON_DARK = rgba(84, 88, 96)
+SOIL = rgba(126, 88, 52)
+SOIL_DARK = rgba(84, 56, 32)
+GRASS_BG = rgba(98, 152, 70)
+STRAW = rgba(220, 180, 84)
+STRAW_DARK = rgba(150, 110, 40)
+ROPE = rgba(200, 162, 106)
+ROPE_DARK = rgba(132, 98, 56)
+CREAM = rgba(244, 238, 222)
+CREAM_DARK = rgba(184, 174, 150)
+TURNIP = rgba(154, 92, 174)
+TURNIP_DARK = rgba(96, 50, 112)
+CAP = rgba(150, 100, 60)
+CAP_DARK = rgba(92, 56, 30)
+
+
+def leaf(cx, cy, rx, ry, angle, colour=LEAF):
+    """An ellipse turned by `angle` degrees, then set down at (cx, cy)."""
+    return (translate(rotate(ellipse(0, 0, rx, ry), angle), cx, cy), colour)
+
+
+def stalk(x0, y0, x1, y1, r=0.05, colour=LEAF):
+    return (capsule(x0, y0, x1, y1, r), colour)
+
+
+def drop(cx, cy, r):
+    """A teardrop: a circle with a point twice its radius above."""
+    point = intersect(halfplane(-1, 0.5, -r), halfplane(1, 0.5, -r), halfplane(0, -1, 0))
+    return translate(union(circle(0, 0, r), point), cx, cy)
+
+
+def scatter(shape_at, colour, dark, spots):
+    layers = []
+    for cx, cy, angle in spots:
+        layers += outlined(translate(rotate(shape_at(), angle), cx, cy), colour, dark, 0.04)
+    return layers
+
+
+def toadstool(cx, base, w, h, cap=CAP, cap_dark=CAP_DARK, stem=CREAM, stem_dark=CREAM_DARK):
+    """A mushroom standing at (cx, base): a pale stem under a domed cap."""
+    top = base + h
+    cap_shape = intersect(ellipse(cx, top - h * 0.45, w, h * 0.55), halfplane(0, -1, top - h * 0.45))
+    return [
+        *outlined(capsule(cx, base, cx, top - h * 0.35, w * 0.32), stem, stem_dark, 0.04),
+        *outlined(cap_shape, cap, cap_dark, 0.05),
+        gloss(cx - w * 0.4, top - h * 0.2, w * 0.18, h * 0.10, shade(cap, 0.45)),
+    ]
+
+
+def bucket(inside, glossy=False):
+    """A wooden bucket seen from slightly above; `inside` fills the mouth."""
+    body = intersect(halfplane(-1, -0.12, -0.56), halfplane(1, -0.12, -0.56), halfplane(0, -1, -0.72), halfplane(0, 1, -0.40))
+    mouth = ellipse(0.0, 0.40, 0.60, 0.20)
+    handle = intersect(subtract(circle(0.0, 0.40, 0.68), circle(0.0, 0.40, 0.62)), halfplane(0, -1, 0.40))
+    layers = [
+        (handle, WOOD_DARK),
+        *outlined(union(body, mouth), WOOD, WOOD_DARK, 0.06),
+        (capsule(-0.26, 0.24, -0.20, -0.66, 0.02), WOOD_DARK),
+        (capsule(0.02, 0.24, 0.02, -0.66, 0.02), WOOD_DARK),
+        (capsule(0.30, 0.24, 0.24, -0.66, 0.02), WOOD_DARK),
+        (intersect(box(0.0, -0.12, 0.70, 0.05), shrink(body, 0.04)), shade(WOOD, 0.35)),
+        *outlined(mouth, inside, WOOD_DARK, 0.06),
+    ]
+    if glossy:
+        layers.append(gloss(-0.22, 0.44, 0.16, 0.06, rgba(255, 255, 255, 170)))
+    return layers
+
+
+# Produce
+
+TURNIP_ROOT = union(circle(0.0, -0.20, 0.54), drop(0.0, -1.0, 0.16))
+picture("turnip", [
+    leaf(-0.28, 0.44, 0.34, 0.11, 60),
+    leaf(0.30, 0.46, 0.34, 0.11, -60),
+    leaf(0.0, 0.54, 0.34, 0.11, 90, LEAF_DARK),
+    *outlined(TURNIP_ROOT, CREAM, TURNIP_DARK, 0.06),
+    (intersect(shrink(TURNIP_ROOT, 0.06), halfplane(0, -1, -0.02)), TURNIP),
+    gloss(-0.22, 0.08, 0.10, 0.12, rgba(230, 200, 240, 200)),
+])
+
+HEAP = union(ellipse(0.0, -0.50, 0.78, 0.32), circle(0.0, -0.36, 0.44))
+picture("rice", [
+    *outlined(HEAP, CREAM, CREAM_DARK, 0.06),
+    *scatter(lambda: ellipse(0, 0, 0.12, 0.05), shade(CREAM, 0.5), CREAM_DARK,
+             [(-0.44, -0.46, 20), (-0.12, -0.30, -30), (0.20, -0.22, 15), (0.46, -0.44, -20),
+              (0.02, -0.56, 40), (-0.30, -0.66, -10), (0.30, -0.64, 25), (0.0, 0.02, -15)]),
+])
+
+picture("mushroom", toadstool(0.0, -0.90, 0.62, 1.30) + [
+    (circle(-0.24, 0.30, 0.07), shade(CAP, 0.5)),
+    (circle(0.18, 0.44, 0.06), shade(CAP, 0.5)),
+    (circle(0.34, 0.16, 0.05), shade(CAP, 0.5)),
+])
+
+EGG = union(ellipse(0.0, -0.16, 0.50, 0.54), ellipse(0.0, 0.08, 0.42, 0.62))
+picture("egg", [
+    *outlined(EGG, rgba(226, 196, 160), rgba(160, 118, 80), 0.06),
+    gloss(-0.20, 0.24, 0.10, 0.18, rgba(255, 244, 230, 200)),
+])
+
+picture("milk", bucket(rgba(246, 243, 234), glossy=True))
+picture("bucket", bucket(rgba(48, 30, 18)))
+picture("water_bucket", bucket(rgba(72, 142, 212), glossy=True))
+
+SHEAF = [(-0.52, 0.48), (-0.26, 0.62), (0.0, 0.70), (0.26, 0.62), (0.52, 0.48)]
+picture("wheat", [
+    *[stalk(0.0, -0.90, tx, ty, 0.05, STRAW) for tx, ty in SHEAF],
+    *[layer for tx, ty in SHEAF
+      for layer in outlined(translate(rotate(ellipse(0, 0, 0.10, 0.24), -tx * 40), tx, ty + 0.14), STRAW, STRAW_DARK, 0.04)],
+    *outlined(rotate(box(0.0, -0.36, 0.34, 0.09, 0.04), 8), ROPE, ROPE_DARK, 0.04),
+])
+
+SEED_SPOTS = [(-0.50, 0.40, 30), (0.10, 0.52, -20), (0.56, 0.20, 60), (-0.20, 0.06, -50),
+              (0.30, -0.16, 10), (-0.58, -0.30, -30), (0.02, -0.46, 45), (0.50, -0.56, -10), (-0.30, -0.70, 20)]
+picture("wheat_seeds", scatter(lambda: ellipse(0, 0, 0.15, 0.09), rgba(200, 150, 70), rgba(126, 86, 34), SEED_SPOTS))
+picture("turnip_seeds", scatter(lambda: circle(0, 0, 0.11), rgba(76, 52, 40), rgba(34, 22, 16), SEED_SPOTS))
+picture("rice_seeds", scatter(lambda: ellipse(0, 0, 0.17, 0.06), CREAM, CREAM_DARK, SEED_SPOTS))
+picture("melon_seeds", scatter(lambda: drop(0, -0.08, 0.11), rgba(240, 226, 190), rgba(176, 150, 100), SEED_SPOTS))
+
+picture("spores", toadstool(0.0, -0.92, 0.30, 0.50) + [
+    (circle(cx, cy, r), rgba(230, 222, 200, 210))
+    for cx, cy, r in ((-0.40, 0.10, 0.07), (-0.10, 0.30, 0.09), (0.28, 0.14, 0.08), (0.50, 0.40, 0.06),
+                      (-0.56, 0.44, 0.06), (0.10, 0.62, 0.07), (-0.24, 0.66, 0.05), (0.42, 0.68, 0.05),
+                      (-0.06, -0.02, 0.06), (0.62, -0.10, 0.05), (-0.62, -0.14, 0.05))
+])
+
+
+def thorny(x0, y0, x1, y1, thorns):
+    """A dark cane with small thorns sticking out along it."""
+    layers = [stalk(x0, y0, x1, y1, 0.08, rgba(34, 68, 36))]
+    for t, side in thorns:
+        px, py = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+        nx, ny = -(y1 - y0), x1 - x0
+        n = (nx * nx + ny * ny) ** 0.5
+        layers.append(stalk(px, py, px + nx / n * 0.18 * side, py + ny / n * 0.18 * side, 0.035, rgba(34, 68, 36)))
+    return layers
+
+
+picture("bramble_cane", [
+    *thorny(-0.72, -0.76, 0.72, 0.76, [(0.2, 1), (0.4, -1), (0.6, 1), (0.8, -1)]),
+    leaf(-0.22, 0.30, 0.26, 0.11, 60, LEAF_DARK),
+    leaf(0.36, -0.10, 0.24, 0.10, -30, LEAF),
+])
+
+# Tools
+
+picture("hoe", [
+    *outlined(capsule(-0.80, -0.82, 0.24, 0.40, 0.08), WOOD, WOOD_DARK, 0.05),
+    *outlined(translate(rotate(box(0, 0, 0.54, 0.18, 0.05), -45), 0.50, 0.32), IRON, IRON_DARK, 0.05),
+    gloss(0.36, 0.54, 0.05, 0.14, rgba(240, 240, 250, 170)),
+])
+
+# A crescent: a circle less a smaller one set up and to the right, so the blade
+# is thick at the bottom left and tapers to a point at the top.
+BLADE = intersect(subtract(circle(0.10, 0.22, 0.62), circle(0.26, 0.36, 0.56)), halfplane(1, 0, -0.35))
+picture("sickle", [
+    *outlined(capsule(0.12, -0.36, 0.46, -0.88, 0.09), WOOD, WOOD_DARK, 0.05),
+    *outlined(BLADE, IRON, IRON_DARK, 0.05),
+    gloss(-0.38, 0.08, 0.05, 0.18, rgba(240, 240, 250, 170)),
+])
+
+RING = subtract(circle(0, 0, 0.22), circle(0, 0, 0.12))
+picture("shears", [
+    *outlined(rotate(capsule(0, -0.06, 0, 0.82, 0.10), 22), IRON, IRON_DARK, 0.05),
+    *outlined(rotate(capsule(0, -0.06, 0, 0.82, 0.10), -22), IRON, IRON_DARK, 0.05),
+    *outlined(capsule(0.0, -0.06, -0.30, -0.50, 0.06), IRON, IRON_DARK, 0.04),
+    *outlined(capsule(0.0, -0.06, 0.30, -0.50, 0.06), IRON, IRON_DARK, 0.04),
+    *outlined(translate(RING, -0.38, -0.66), IRON, IRON_DARK, 0.04),
+    *outlined(translate(RING, 0.38, -0.66), IRON, IRON_DARK, 0.04),
+    (circle(0.0, -0.06, 0.07), IRON_DARK),
+    gloss(0.14, 0.46, 0.04, 0.16, rgba(240, 240, 250, 170)),
+])
+
+# Animal goods
+
+COIL = subtract(circle(0.0, -0.06, 0.60), circle(0.0, -0.06, 0.32))
+picture("lead", [
+    *outlined(COIL, ROPE, ROPE_DARK, 0.05),
+    (subtract(circle(0.0, -0.06, 0.48), circle(0.0, -0.06, 0.44)), ROPE_DARK),
+    *outlined(capsule(0.36, 0.26, 0.56, 0.48, 0.07), ROPE, ROPE_DARK, 0.04),
+    *outlined(subtract(circle(0.66, 0.66, 0.26), circle(0.66, 0.66, 0.13)), ROPE, ROPE_DARK, 0.04),
+])
+
+FLEECE = union(circle(-0.36, 0.04, 0.36), circle(0.30, 0.10, 0.38), circle(0.0, 0.34, 0.34),
+               circle(-0.16, -0.36, 0.34), circle(0.30, -0.34, 0.32), circle(0.0, -0.06, 0.40))
+picture("wool", [
+    *outlined(FLEECE, CREAM, rgba(184, 180, 172), 0.06),
+    (circle(-0.36, 0.04, 0.24), shade(CREAM, -0.05)),
+    (circle(0.30, -0.34, 0.20), shade(CREAM, -0.05)),
+    gloss(-0.06, 0.34, 0.12, 0.10, rgba(255, 255, 255, 220)),
+])
+
+PLUME = translate(rotate(union(ellipse(0, 0.08, 0.20, 0.62), ellipse(0, 0.30, 0.16, 0.48)), 40), 0.04, 0.10)
+NOTCH = translate(rotate(union(capsule(-0.30, -0.06, 0.02, -0.06, 0.04), capsule(-0.28, 0.20, 0.02, 0.20, 0.04)), 40), 0.0, 0.0)
+picture("feather", [
+    *outlined(capsule(0.54, -0.58, 0.72, -0.82, 0.05), rgba(228, 226, 218), rgba(150, 148, 140), 0.03),
+    *outlined(subtract(PLUME, NOTCH), rgba(58, 60, 66), rgba(22, 24, 28), 0.05),
+    (capsule(-0.42, 0.66, 0.52, -0.52, 0.03), rgba(216, 214, 206)),
+])
+
+HIDE = union(box(0.0, 0.0, 0.66, 0.50, 0.24), circle(-0.62, 0.42, 0.20), circle(0.66, 0.40, 0.18),
+             circle(-0.64, -0.44, 0.18), circle(0.62, -0.46, 0.20), circle(0.0, 0.58, 0.16))
+picture("hide", [
+    *outlined(HIDE, rgba(200, 160, 110), rgba(138, 98, 58), 0.08),
+    (circle(-0.24, 0.10, 0.12), rgba(186, 144, 96)),
+    (ellipse(0.26, -0.12, 0.16, 0.10), rgba(186, 144, 96)),
+    (circle(0.10, 0.32, 0.07), rgba(186, 144, 96)),
+])
+
+BONE_SHAPE = union(capsule(-0.46, -0.46, 0.46, 0.46, 0.12),
+                   circle(-0.62, -0.36, 0.17), circle(-0.40, -0.60, 0.17),
+                   circle(0.62, 0.36, 0.17), circle(0.40, 0.60, 0.17))
+picture("bone", [
+    *outlined(BONE_SHAPE, rgba(240, 234, 216), rgba(170, 160, 140), 0.06),
+    gloss(-0.14, 0.02, 0.06, 0.18, rgba(255, 255, 255, 170)),
+])
+
+SINEW = subtract(ellipse(0.0, 0.04, 0.62, 0.46), ellipse(0.0, 0.04, 0.44, 0.28))
+picture("sinew", [
+    *outlined(capsule(-0.44, -0.30, -0.80, -0.72, 0.07), rgba(220, 196, 150), ROPE_DARK, 0.04),
+    *outlined(capsule(0.44, -0.30, 0.78, -0.70, 0.07), rgba(220, 196, 150), ROPE_DARK, 0.04),
+    *outlined(SINEW, rgba(220, 196, 150), ROPE_DARK, 0.05),
+    *[(intersect(translate(rotate(capsule(0, -0.10, 0, 0.10, 0.025), a), cx, cy), shrink(SINEW, 0.05)), ROPE_DARK)
+      for cx, cy, a in ((-0.40, 0.36, -40), (0.0, 0.46, 0), (0.40, 0.36, 40), (0.54, -0.10, 80), (-0.54, -0.10, -80),
+                        (-0.30, -0.30, -140), (0.30, -0.30, 140))],
+])
+
+# Ground and structures
+
+FURROWS = union(*[capsule(-1.2, y, 1.2, y, 0.09) for y in (0.62, 0.20, -0.22, -0.64)])
+CLODS = [(circle(-0.60, 0.42, 0.09)), (circle(0.30, 0.44, 0.07)), (circle(-0.10, 0.00, 0.08)),
+         (circle(0.62, -0.02, 0.06)), (circle(-0.50, -0.44, 0.07)), (circle(0.22, -0.42, 0.09)), (circle(0.70, -0.84, 0.06))]
+picture("farmland", [
+    (FURROWS, SOIL_DARK),
+    *[(clod, shade(SOIL, 0.18)) for clod in CLODS],
+], background=SOIL)
+
+WET = rgba(86, 64, 48)
+picture("wet_farmland", [
+    (FURROWS, rgba(50, 36, 28)),
+    *[(capsule(-0.6, y + 0.03, 0.9, y + 0.03, 0.025), rgba(150, 140, 150, 110)) for y in (0.62, 0.20, -0.22, -0.64)],
+    *[(clod, shade(WET, 0.16)) for clod in CLODS],
+], background=WET)
+
+POSTS = [*outlined(box(-0.56, 0.0, 0.13, 1.20), WOOD, WOOD_DARK, 0.05),
+         *outlined(box(0.56, 0.0, 0.13, 1.20), WOOD, WOOD_DARK, 0.05)]
+PLANKS = [*outlined(box(0.0, 0.38, 1.20, 0.14), WOOD, WOOD_DARK, 0.05),
+          *outlined(box(0.0, -0.30, 1.20, 0.14), WOOD, WOOD_DARK, 0.05)]
+picture("fence", [*PLANKS, *POSTS], background=GRASS_BG)
+
+picture("gate", [
+    *PLANKS,
+    *outlined(rotate(box(0.0, 0.04, 0.74, 0.11), 32), WOOD, WOOD_DARK, 0.05),
+    *POSTS,
+    *outlined(box(0.58, 0.06, 0.10, 0.16, 0.04), IRON, IRON_DARK, 0.04),
+], background=GRASS_BG)
+
+picture("gate_open", [
+    *outlined(box(-0.36, 0.04, 0.06, 0.62, 0.02), shade(WOOD, -0.1), WOOD_DARK, 0.03),
+    *POSTS,
+], background=GRASS_BG)
+
+
+def skep(straw, straw_dark, extra):
+    dome = intersect(circle(0.0, -0.30, 0.82), halfplane(0, -1, -0.84))
+    return [
+        *outlined(dome, straw, straw_dark, 0.06),
+        *[(intersect(capsule(-1.0, y, 1.0, y, 0.03), shrink(dome, 0.06)), straw_dark) for y in (0.30, 0.06, -0.18, -0.42, -0.66)],
+        gloss(-0.34, 0.28, 0.10, 0.08, shade(straw, 0.4)),
+        (circle(0.0, -0.66, 0.11), rgba(40, 24, 12)),
+        *extra,
+    ]
+
+
+HIVE_BG = rgba(62, 40, 24)
+picture("beehive", skep(STRAW, STRAW_DARK, []), background=HIVE_BG)
+picture("beehive_full", skep(rgba(226, 170, 60), rgba(150, 100, 30), [
+    (drop(-0.10, -0.92, 0.07), AMBER),
+    (drop(0.12, -0.86, 0.05), AMBER),
+    (capsule(-0.10, -0.76, -0.10, -0.86, 0.04), AMBER),
+]), background=HIVE_BG)
+
+picture("bramble_picked", [
+    *thorny(-0.80, -0.90, 0.20, 0.80, [(0.25, 1), (0.5, -1), (0.75, 1)]),
+    *thorny(0.70, -0.92, -0.30, 0.60, [(0.3, -1), (0.6, 1), (0.85, -1)]),
+    *thorny(-0.86, 0.20, 0.86, 0.36, [(0.3, 1), (0.7, -1)]),
+    leaf(-0.44, 0.50, 0.22, 0.10, 40, LEAF_DARK),
+    leaf(0.52, -0.16, 0.22, 0.10, -50, LEAF_DARK),
+    leaf(0.06, -0.40, 0.20, 0.09, 20, LEAF),
+])
+
+# Crop stages: sprites standing on the bottom edge.
+
+picture("wheat_1", [
+    stalk(-0.32, -1.0, -0.44, -0.46, 0.05),
+    stalk(0.02, -1.0, 0.06, -0.30, 0.05),
+    stalk(0.36, -1.0, 0.44, -0.50, 0.05),
+])
+
+picture("wheat_2", [
+    *[stalk(x, -1.0, x + dx, 0.10, 0.05) for x, dx in ((-0.56, -0.08), (-0.20, -0.02), (0.14, 0.02), (0.50, 0.08))],
+    *[(ellipse(x + dx, 0.18, 0.08, 0.18), shade(LEAF, 0.25)) for x, dx in ((-0.56, -0.08), (-0.20, -0.02), (0.14, 0.02), (0.50, 0.08))],
+    stalk(-0.40, -1.0, -0.72, -0.40, 0.045, LEAF_DARK),
+    stalk(0.32, -1.0, 0.70, -0.44, 0.045, LEAF_DARK),
+])
+
+RIPE = [(-0.62, -0.12), (-0.30, -0.02), (0.02, 0.06), (0.34, -0.02), (0.64, -0.12)]
+picture("wheat_3", [
+    *[stalk(x * 0.7, -1.0, x, 0.44 + dy, 0.045, STRAW) for x, dy in RIPE],
+    *[layer for x, dy in RIPE for layer in outlined(ellipse(x, 0.62 + dy, 0.11, 0.30), STRAW, STRAW_DARK, 0.04)],
+    *[(ellipse(x - 0.03, 0.72 + dy, 0.03, 0.14), shade(STRAW, 0.4)) for x, dy in RIPE],
+    stalk(-0.30, -1.0, -0.80, -0.30, 0.04, shade(STRAW, -0.2)),
+    stalk(0.30, -1.0, 0.80, -0.34, 0.04, shade(STRAW, -0.2)),
+])
+
+
+def rosette(size):
+    return [
+        leaf(-0.24 * size, -1.0 + 0.30 * size, 0.42 * size, 0.15 * size, 55, LEAF_DARK),
+        leaf(0.24 * size, -1.0 + 0.30 * size, 0.42 * size, 0.15 * size, -55, LEAF_DARK),
+        leaf(-0.44 * size, -1.0 + 0.18 * size, 0.36 * size, 0.13 * size, 20),
+        leaf(0.44 * size, -1.0 + 0.18 * size, 0.36 * size, 0.13 * size, -20),
+        leaf(0.0, -1.0 + 0.42 * size, 0.42 * size, 0.15 * size, 90),
+    ]
+
+
+picture("turnip_1", rosette(0.8))
+picture("turnip_2", rosette(1.4))
+picture("turnip_3", [
+    *rosette(1.9),
+    *outlined(intersect(circle(0.0, -1.06, 0.40), halfplane(0, -1, -1.0)), CREAM, TURNIP_DARK, 0.05),
+    (intersect(circle(0.0, -1.06, 0.35), halfplane(0, -1, -0.86)), TURNIP),
+])
+
+picture("rice_1", [
+    stalk(-0.30, -1.0, -0.46, -0.30, 0.03),
+    stalk(0.0, -1.0, 0.04, -0.14, 0.03),
+    stalk(0.32, -1.0, 0.48, -0.36, 0.03),
+])
+
+TUFT = [(-0.10, -0.70, 0.30), (-0.10, -0.36, 0.34), (-0.10, -0.06, 0.16), (-0.10, 0.28, 0.06), (-0.10, 0.58, 0.20),
+        (0.10, 0.74, -0.16), (0.10, 0.52, -0.34), (0.10, 0.20, -0.30), (0.10, -0.24, -0.10)]
+picture("rice_2", [
+    *[stalk(x, -1.0, x + tx, ty, 0.03, LEAF_DARK if i % 2 else LEAF) for i, (x, tx, ty) in enumerate(TUFT)],
+])
+
+HEADS = [(-0.60, 0.36, -0.36), (-0.24, 0.62, -0.10), (0.10, 0.70, 0.12), (0.44, 0.58, 0.30), (0.70, 0.30, 0.44)]
+picture("rice_3", [
+    *[stalk(x * 0.4, -1.0, x, y, 0.03) for x, y, _ in HEADS],
+    stalk(-0.20, -1.0, -0.76, -0.14, 0.03, LEAF_DARK),
+    stalk(0.20, -1.0, 0.78, -0.10, 0.03, LEAF_DARK),
+    *[(translate(rotate(ellipse(0, 0, 0.06, 0.20), 20 if x < 0 else -20), x + dx, y - 0.16), rgba(228, 216, 172)) for x, y, dx in HEADS],
+])
+
+picture("melon_1", [
+    stalk(0.0, -1.0, 0.0, -0.44, 0.04),
+    leaf(-0.28, -0.32, 0.26, 0.20, 20),
+    leaf(0.28, -0.32, 0.26, 0.20, -20),
+])
+
+VINE = [
+    stalk(-0.90, -0.94, -0.30, -0.70, 0.04, LEAF_DARK),
+    stalk(-0.30, -0.70, 0.20, -0.86, 0.04, LEAF_DARK),
+    stalk(0.20, -0.86, 0.80, -0.62, 0.04, LEAF_DARK),
+    stalk(-0.30, -0.70, -0.16, -0.20, 0.04, LEAF_DARK),
+    leaf(-0.68, -0.60, 0.24, 0.18, 30),
+    leaf(-0.02, -0.14, 0.26, 0.20, -10),
+    leaf(0.36, -0.60, 0.24, 0.18, 15),
+    leaf(0.78, -0.40, 0.22, 0.16, -40),
+]
+FLOWER = union(*[circle(0.56 + 0.13 * dx, 0.02 + 0.13 * dy, 0.10) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (0.7, 0.7), (-0.7, 0.7), (0.7, -0.7), (-0.7, -0.7))])
+picture("melon_2", [
+    *VINE,
+    stalk(0.36, -0.60, 0.56, 0.0, 0.03, LEAF_DARK),
+    (FLOWER, rgba(244, 208, 60)),
+    (circle(0.56, 0.02, 0.09), rgba(224, 140, 40)),
+])
+
+MELON = circle(0.30, -0.56, 0.42)
+picture("melon_3", [
+    *VINE,
+    *outlined(MELON, RIND, RIND_DARK, 0.06),
+    *[(intersect(translate(rotate(capsule(0, -0.50, 0, 0.50, 0.035), a), 0.30, -0.56), shrink(MELON, 0.06)), RIND_DARK)
+      for a in (-40, -13, 13, 40)],
+    gloss(0.14, -0.36, 0.08, 0.10, shade(RIND, 0.45)),
+])
+
+picture("mushroom_1", [
+    *toadstool(-0.30, -1.0, 0.16, 0.34, shade(CAP, 0.25), CAP_DARK),
+    *toadstool(0.26, -1.0, 0.13, 0.26, shade(CAP, 0.25), CAP_DARK),
+])
+
+picture("mushroom_2", [
+    *toadstool(-0.44, -1.0, 0.34, 0.80),
+    *toadstool(0.40, -1.0, 0.40, 1.00),
+    *toadstool(0.02, -1.0, 0.22, 0.46),
+])
+
 
 def main(force=False):
     OUT.mkdir(parents=True, exist_ok=True)

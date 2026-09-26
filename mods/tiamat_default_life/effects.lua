@@ -52,6 +52,11 @@ effect("warmth", { name = "Warmed", temperature = C.temp_food })
 effect("cooling", { name = "Cooled", temperature = -C.temp_food })
 effect("well_fed", { name = "Well fed" })
 effect("rested", { name = "Well rested" })
+-- From the kitchen: a meal that was cooked rather than picked. Hearty is a
+-- stew's, and takes the edge off a blow; steady is bread's, and slows the
+-- hunger that walking and working bring on.
+effect("hearty", { name = "Hearty", damage_scale = C.hearty_damage_scale })
+effect("steady", { name = "Steady", exhaust_scale = C.steady_exhaust_scale })
 
 --- Puts an effect on a player, or extends one already there to the longer
 --- of the two durations. `v` is the player's vitals record.
@@ -107,6 +112,16 @@ function E.damage_scale(v, kind)
         if def.damage_scale and (kind == "physical" or kind == "explosion" or kind == "fall") then
             scale = scale * def.damage_scale
         end
+    end
+    return scale
+end
+
+--- The multiplier active effects put on how fast hunger comes on.
+function E.exhaust_scale(v)
+    local scale = 1.0
+    for id in pairs(v.fx) do
+        local def = E.defs[id]
+        if def.exhaust_scale then scale = scale * def.exhaust_scale end
     end
     return scale
 end

@@ -43,6 +43,9 @@ load("death")                -- dying, dropping, respawning
 load("actions")              -- eating, sleeping, the wardrobe, explosions, chat commands
 load("mobs")                 -- the mob system: spawning, behaviour, being hit, dropping
 load("creatures")            -- cow, sheep, pig, crow, bat, as data
+load("husbandry")            -- feeding, breeding, milk, wool, eggs, honey, leads and gates
+load("farming")              -- tilled ground, sowing, growth, harvest, foraging
+load("crops")                -- wheat, turnip, rice, melon, mushrooms, as data
 
 -- The HUD: hearts, cookies, bubbles and the thermometer, drawn on the
 -- player's machine from the values vitals.lua sends with `game.set_hud`.
