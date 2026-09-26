@@ -77,8 +77,9 @@ function tdl.on_entity_step(fn)
 end
 
 -- Runs `fn(event)` when a player USES a block (the place control with
--- nothing to place). Return a string or `false` to handle it; the first
--- handler to do so stops the rest.
+-- nothing to place), or uses at nothing: then `event.x`, `event.y`, `event.z`
+-- and `event.material` are nil and `event.held` is what it always is. Return
+-- a string or `false` to handle it; the first handler to do so stops the rest.
 function tdl.on_use(fn)
     uses[#uses + 1] = fn
 end
@@ -148,14 +149,19 @@ game.register_on_entity_step(function(id, dt)
 end)
 
 if game.register_on_use then
-    game.register_on_use(function(event)
+    local function dispatch(event)
         for _, fn in ipairs(uses) do
             local verdict = fn(event)
             if verdict ~= nil and verdict ~= true then
                 return verdict
             end
         end
-    end)
+    end
+    -- `anywhere` (engine protocol 76): the place control at open sky, or past
+    -- reach, arrives too, with no cell, so what is held is eaten wherever the
+    -- player looks. An older engine ignores the option and asks only at a
+    -- block.
+    game.register_on_use(dispatch, { anywhere = true })
 end
 
 game.register_on_place(function(event)

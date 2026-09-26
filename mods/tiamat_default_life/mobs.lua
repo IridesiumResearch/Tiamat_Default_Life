@@ -132,6 +132,13 @@ local function kind_of(entity)
     return nil
 end
 
+--- Makes a record one of the swarm led by `leader` (which may be itself),
+--- with a place in it of its own.
+local function join_swarm(m, leader)
+    m.swarm, m.flock = true, leader
+    m.offset = { x = between(-3, 3), y = between(-1, 2), z = between(-3, 3) }
+end
+
 --- The state record for one of ours, made on first sight.
 local function adopt(id, entity)
     local kind = kind_of(entity)
@@ -152,6 +159,16 @@ local function adopt(id, entity)
         seen = nil,             -- { uuid, pos, d2 } of the nearest player
         height = between(C.crow_cruise_min, C.crow_cruise_max),   -- a navigator's share of the sky
     }
+    -- A grudge, when the world opens again: whom it is after is in storage.
+    if kind.grudge then
+        local who = game.storage.get("grudge:" .. id)
+        if type(who) == "string" then m.grudge, m.angry = who, true end
+    end
+    -- One of a swarm, when the world opens again: its leader is in storage.
+    if kind.spawn.swarm then
+        local leader = game.storage.get("swarm:" .. id)
+        if math.type(leader) == "integer" then join_swarm(m, leader) end
+    end
     M.live[id] = m
     return m
 end
@@ -168,14 +185,19 @@ end
 
 -- Spawning ------------------------------------------------------------------------------
 
---- Puts `count` of a kind at a position. Returns the ids.
-function tdl.spawn_mob(kind_id, pos, count)
+--- Puts `count` of a kind at a position. Returns the ids. `opts.swarm` makes
+--- them one swarm, packed into a few blocks of air rather than laid out in rows.
+function tdl.spawn_mob(kind_id, pos, count, opts)
     local kind = M.kinds[kind_id]
     if kind == nil then return {} end
+    local swarm = opts and opts.swarm
     local ids = {}
     local leader = nil
     for i = 1, count or 1 do
         local at = { x = pos.x + (i - 1) % 3 - 1, y = pos.y, z = pos.z + (i - 1) // 3 }
+        if swarm then
+            at = { x = pos.x + (i - 1) % 3 - 1, y = pos.y + 1 + (i - 1) // 9, z = pos.z + (i - 1) // 3 % 3 - 1 }
+        end
         local spec = {
             pos = at,
             health = kind.health,
@@ -193,7 +215,11 @@ function tdl.spawn_mob(kind_id, pos, count)
             ids[#ids + 1] = id
             local entity = game.entity(id)
             local m = entity and adopt(id, entity)
-            if m and kind.flock then
+            if m and swarm then
+                leader = leader or id
+                join_swarm(m, leader)
+                game.storage.set("swarm:" .. id, leader)
+            elseif m and kind.flock then
                 leader = leader or id
                 m.flock = leader
                 m.offset = { x = between(-3, 3), y = between(0, 2), z = between(-3, 3) }
@@ -213,19 +239,26 @@ end)())
 --- Standing room at (x, z) near height y: the first solid block scanning
 --- down from above, with two clear blocks over it, where ground cover a
 --- body walks through counts as clear and water does not. Returns the feet
---- position and the ground material, or nil.
-local function ground_at(x, z, y)
+--- position, the ground material and how many clear blocks are over it, or nil.
+---
+--- `under_trees` looks through a tree to the ground beneath it: leaves and
+--- logs are never the ground, and nothing under them is clear until the scan
+--- is out of the tree. That is what spawning asks, so nothing is ever put
+--- down on a canopy; a bird or a bat gets up there on its own wings.
+local function ground_at(x, z, y, under_trees)
     local clear = 0
     for yy = y + 10, y - 20, -1 do
         local block = game.get_block{ x = x, y = yy, z = z }
         if block == nil then return nil end
-        if block.occupancy == 0 or PASSABLE[block.material] then
+        if under_trees and I.perches[block.material] then
+            clear = 0
+        elseif block.occupancy == 0 or PASSABLE[block.material] then
             clear = clear + 1
         else
             if clear >= 2 then
                 local feet = { x = x, y = yy + 1, z = z }
                 if game.get_fluid(feet).volume > 0 then return nil end
-                return { x = x + 0.5, y = yy + 1, z = z + 0.5 }, block.material
+                return { x = x + 0.5, y = yy + 1, z = z + 0.5 }, block.material, clear
             end
             clear = 0
         end
@@ -331,7 +364,7 @@ local function try_spawn_near(v)
         local dx = between(-dist, dist)
         local dz = (below(2) == 0 and 1 or -1) * (dist - math.abs(dx))
         local x, z = math.floor(pos.x) + dx, math.floor(pos.z) + dz
-        local feet, material = ground_at(x, z, math.floor(pos.y))
+        local feet, material, room = ground_at(x, z, math.floor(pos.y), true)
         if feet then
             local biome = biome_at(feet)
             -- The kinds that may appear here, by weight, under their caps.
@@ -340,7 +373,7 @@ local function try_spawn_near(v)
                 local kind = M.kinds[kid]
                 local range = kind.spawn.distance or { C.mob_spawn_min, C.mob_spawn_max }
                 if (counts[kid] or 0) < (kind.spawn.cap or 4) and dist >= range[1] and dist <= range[2]
-                    and may_spawn(kind, feet, material, biome) then
+                    and room >= (kind.spawn.headroom or 2) and may_spawn(kind, feet, material, biome) then
                     candidates[#candidates + 1] = kind
                     weight_sum = weight_sum + weight_in(kind, biome)
                 end
@@ -357,11 +390,19 @@ local function try_spawn_near(v)
                 local group = chosen.spawn.group or { 1, 1 }
                 local n = between(group[1], group[2])
                 n = math.min(n, (chosen.spawn.cap or 4) - (counts[chosen.id] or 0))
+                -- Now and then a swarm instead: over the kind's own cap, which
+                -- is for ones and twos, but never over everything's.
+                local swarm = chosen.spawn.swarm
+                if swarm and below(100) < swarm.chance then
+                    n = math.min(between(swarm.group[1], swarm.group[2]), C.mob_cap_total - total)
+                else
+                    swarm = nil
+                end
                 -- A navigator appears already in the air, flying across the
                 -- country the player is in: toward them, a little to one side.
                 local at = feet
                 if chosen.navigates then at = { x = feet.x, y = feet.y + C.crow_cruise_min, z = feet.z } end
-                local ids = tdl.spawn_mob(chosen.id, at, n)
+                local ids = tdl.spawn_mob(chosen.id, at, n, { swarm = swarm ~= nil })
                 local m = chosen.navigates and ids[1] and M.live[ids[1]]
                 if m then
                     local hx = pos.x - feet.x + between(-12, 12)
@@ -373,8 +414,8 @@ local function try_spawn_near(v)
                     end
                 end
                 if #ids > 0 then
-                    game.log(string.format("tiamat_default_life: %d %s appeared at %d, %d, %d (%s)",
-                        #ids, chosen.name, x, math.floor(feet.y), z, biome or "no biome"))
+                    game.log(string.format("tiamat_default_life: %d %s appeared at %d, %d, %d (%s)%s",
+                        #ids, chosen.name, x, math.floor(feet.y), z, biome or "no biome", swarm and ", a swarm" or ""))
                 end
                 return
             end
@@ -434,6 +475,8 @@ function tdl.hurt_mob(id, amount, by)
             game.cue{ cue = one_of(m.kind.sound_death), pos = entity.pos, radius = 24 }
         end
         if m.stalking then game.storage.set("stalk:" .. id, nil) end
+        if m.swarm then game.storage.set("swarm:" .. id, nil) end
+        if m.grudge then game.storage.set("grudge:" .. id, nil) end
         game.despawn_entity(id)
         M.live[id] = nil
         return true
@@ -457,6 +500,23 @@ function tdl.hurt_mob(id, amount, by)
             -- remembered with the world so a restart does not free you.
             m.stalking = by
             game.storage.set("stalk:" .. id, by)
+        elseif m.kind.grudge then
+            -- It never lets go of whoever hit it (the first to), remembered
+            -- with the world.
+            if m.grudge == nil then
+                m.grudge = by
+                game.storage.set("grudge:" .. id, by)
+            end
+            m.state, m.threat, m.timer, m.angry = "hunt", m.grudge, C.mob_hunt_ticks, true
+        elseif m.swarm then
+            -- Hit one of a swarm and the whole swarm comes for you.
+            for _, om in pairs(M.live) do
+                if om == m or (m.flock ~= nil and om.swarm and om.flock == m.flock) then
+                    om.state, om.threat, om.timer = "hunt", by, C.swarm_anger_ticks
+                    om.angry, om.angry_until = true, now + C.swarm_anger_ticks
+                    om.roosting, om.treed = false, false
+                end
+            end
         elseif m.kind.hostile or m.kind.provoked then
             m.state, m.threat, m.timer = "hunt", by, m.kind.hunt_ticks or C.mob_hunt_ticks
             m.angry = true
@@ -511,6 +571,11 @@ local function hunts_now(kind, entity)
     return false
 end
 
+--- Whether a swarm is still after whoever hit one of it.
+local function riled(m)
+    return m.angry_until ~= nil and now < m.angry_until
+end
+
 --- A wander point around home, on the ground or in the air. A flyer that
 --- has landed goes a few steps from where it stands, not across its range.
 local function pick_wander(m, entity)
@@ -529,6 +594,19 @@ local function pick_wander(m, entity)
     m.target = { x = x, y = y, z = z }
 end
 
+--- A yaw turned from `yaw` toward `want` by at most `mob_turn_rate`, the
+--- short way round, and how far off `want` it was before the turn. Both are
+--- in -pi..pi, as `game.heading` answers; this is only adding and wrapping.
+local function turn_toward(yaw, want)
+    local d = want - yaw
+    if d > math.pi then d = d - 2 * math.pi elseif d < -math.pi then d = d + 2 * math.pi end
+    local off = math.abs(d)
+    if off <= C.mob_turn_rate then return want, off end
+    local turned = yaw + (d > 0 and C.mob_turn_rate or -C.mob_turn_rate)
+    if turned > math.pi then turned = turned - 2 * math.pi elseif turned < -math.pi then turned = turned + 2 * math.pi end
+    return turned, off
+end
+
 --- Walks a walker toward a point through the engine's steering, facing where
 --- it goes and animating from what the body did last tick. Returns false once
 --- it has arrived, or has given up on getting there.
@@ -542,7 +620,10 @@ end
 --- pig, the sheep) is driven here instead and never jumps at a rise: it walks
 --- what the step allows, and hops only once it has been stuck in one place for
 --- `mob_hop_ticks`, which is a hole it has to climb out of.
-local function walk_to(id, m, entity, target, gait)
+---
+--- `facing`, if given, is the way it looks while it goes (the scarecrow,
+--- backing off while it watches you), and it goes at once without turning.
+local function walk_to(id, m, entity, target, gait, facing)
     local kind = m.kind
     local want = gait == "sprint" and kind.run_speed or kind.walk_speed
     local spec = {}
@@ -559,6 +640,23 @@ local function walk_to(id, m, entity, target, gait)
         m.stuck = 0
     else
         m.stuck = (m.stuck or 0) + 1
+    end
+
+    -- Facing: it turns toward where it is going at `mob_turn_rate` a tick,
+    -- and when that is well round from where it faces (a blow from behind,
+    -- a new way to wander) it spins on the spot first, quickly, then goes.
+    local tx, tz = target.x - entity.pos.x, target.z - entity.pos.z
+    local yaw, off = facing or entity.yaw, 0
+    if facing == nil and tx * tx + tz * tz > C.mob_arrive * C.mob_arrive then
+        yaw, off = turn_toward(entity.yaw, game.heading(tx, tz))
+    end
+    if off > C.mob_turn_hold and entity.on_ground then
+        m.stuck = 0
+        spec.drive = { walk = { x = 0, z = 0 } }
+        spec.yaw = yaw
+        spec.anim = gait == "sprint" and ANIM_RUN or ANIM_WALK
+        game.set_entity(id, spec)
+        return true
     end
 
     local going
@@ -586,7 +684,7 @@ local function walk_to(id, m, entity, target, gait)
     local anim = kind.hangs and ANIM_SNEAK or ANIM_IDLE
     if speed2 >= 0.0025 then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
     spec.anim = anim
-    spec.yaw = game.heading(target.x - entity.pos.x, target.z - entity.pos.z)
+    spec.yaw = yaw
     game.set_entity(id, spec)
     return going ~= false
 end
@@ -1011,8 +1109,7 @@ local function stalker(id, m, entity, dt)
         local length = math.sqrt(d2)
         local ux, uz = 0, 1
         if length > 0.001 then ux, uz = dx / length, dz / length end
-        walk_to(id, m, entity, { x = entity.pos.x - ux * 3, y = entity.pos.y, z = entity.pos.z - uz * 3 }, "walk")
-        game.set_entity(id, { yaw = face })
+        walk_to(id, m, entity, { x = entity.pos.x - ux * 3, y = entity.pos.y, z = entity.pos.z - uz * 3 }, "walk", face)
     else
         -- Between the two: it stands, and watches.
         game.set_entity(id, { drive = { walk = { x = 0, z = 0 } }, anim = ANIM_IDLE, yaw = face })
@@ -1033,6 +1130,28 @@ local function step(id, dt)
     if (now + m.perceive_at) % PERCEIVE_EVERY == 0 then perceive(m, entity) end
     if not tick_fire(id, m, entity, dt) then return end
 
+    -- A bird or bat on foot that finds itself in the air (off a ledge, the
+    -- ground dug from under it) flies at once, rather than standing on nothing.
+    if kind.flyer and m.landed and not entity.on_ground then take_off(id, m) end
+
+    -- A kind that `keeps_off` (the ghost) is never met: somebody coming
+    -- within that many blocks, or the night ending, and it is gone in a
+    -- breath of mist, seen from as far off as it was.
+    if kind.keeps_off and (now + m.perceive_at) % PERCEIVE_EVERY == 0
+        and (not is_night() or not far_from_everyone(entity.pos, kind.keeps_off)) then
+        local h = kind.collider.height / 3
+        game.emit_particles{
+            pos = { x = entity.pos.x, y = entity.pos.y + h * 0.5, z = entity.pos.z },
+            count = 24, size = 0.5, lifetime = 2.0,
+            colour = { r = 0.85, g = 0.92, b = 0.95, a = 0.35 },
+            area = { x = 0.4, y = h * 0.5, z = 0.4 },
+            velocity = { y = 0.3 }, spread = 0.4, gravity = -0.2, collide = false, radius = 96,
+        }
+        game.despawn_entity(id)
+        M.live[id] = nil
+        return
+    end
+
     if kind.still and stalker(id, m, entity, dt) then return end
 
     -- A voice now and then.
@@ -1042,10 +1161,22 @@ local function step(id, dt)
         if kind.sound then game.cue{ cue = one_of(kind.sound), pos = entity.pos, radius = 24, entity = id } end
     end
 
+    -- A grudge: whenever whoever it is after is about, alive and within its
+    -- reach of the world, it is after them, however far and however long.
+    if m.grudge then
+        local v = tdl.get(m.grudge)
+        if v and not v.dead and U.body(m.grudge) and not tdl.is_invulnerable(m.grudge) then
+            m.state, m.threat, m.angry = "hunt", m.grudge, true
+            m.timer = math.max(m.timer, C.mob_hunt_ticks)
+        end
+    end
+
     -- Noticing: the fierce start hunting; the timid shy away from a player
-    -- who comes close.
-    if m.state ~= "flee" and m.state ~= "hunt" and m.seen then
-        if kind.hostile and hunts_now(kind, entity) then
+    -- who comes close; one that keeps clear walks off.
+    if m.state ~= "flee" and m.state ~= "hunt" and m.state ~= "withdraw" and m.seen then
+        if kind.keeps_clear and m.seen.d2 < U.square(kind.keeps_clear.near) then
+            m.state, m.threat, m.timer = "withdraw", m.seen.uuid, 400
+        elseif kind.hostile and (m.swarm and riled(m) or not m.swarm and hunts_now(kind, entity)) then
             m.state, m.threat, m.timer = "hunt", m.seen.uuid, C.mob_hunt_ticks
         elseif kind.shy and m.seen.d2 < U.square((m.treed or m.landed) and kind.wary or kind.shy) then
             m.state, m.threat, m.timer = "flee", m.seen.uuid, C.mob_flee_ticks // 2
@@ -1078,6 +1209,19 @@ local function step(id, dt)
         return
     end
 
+    -- Keeping clear: walking, not running, away from whoever came near, until
+    -- it is `far` from them (or has been at it a while).
+    if m.state == "withdraw" then
+        local from = U.body(m.threat)
+        if from and m.timer > 0 and U.dist2(from.pos, entity.pos) < U.square(kind.keeps_clear.far) then
+            move_to(id, m, entity, away_from(entity, from.pos, false), false)
+        else
+            m.state, m.threat, m.timer = "idle", nil, between(20, 60)
+            stand(id, m)
+        end
+        return
+    end
+
     -- On fire: running anywhere, fast, until it goes out.
     if m.state == "panic" then
         if (m.burning or 0) <= 0 and m.in_fire == nil then
@@ -1096,7 +1240,8 @@ local function step(id, dt)
         local prey = U.body(m.threat)
         local v = m.threat and tdl.get(m.threat)
         if prey and v and not v.dead and not tdl.is_invulnerable(m.threat) and m.timer > 0
-            and (m.angry or hunts_now(kind, entity)) then
+            and (m.swarm and riled(m) or not m.swarm and (m.angry or hunts_now(kind, entity)))
+            and (kind.chase == nil or m.grudge or U.dist2(prey.pos, entity.pos) <= U.square(kind.chase)) then
             -- Reach is measured to the body's middle, not its feet: a flyer
             -- hovers at chest height and would otherwise never be close.
             local middle = { x = prey.pos.x, y = prey.pos.y + 0.9, z = prey.pos.z }
@@ -1109,6 +1254,7 @@ local function step(id, dt)
                     local length = math.sqrt(dx * dx + dz * dz)
                     local push = length > 0.001 and { x = dx / length * 0.4, y = 0.3, z = dz / length * 0.4 } or nil
                     tdl.damage(m.threat, bite.damage, "physical", { push = push, cause = bite.cause })
+                    if bite.effect then tdl.effects.apply(v, bite.effect[1], bite.effect[2]) end
                     game.cue{ cue = "bite", pos = entity.pos, radius = 16 }
                     m.swing = C.mob_swing_ticks
                     -- Hit and run: a flyer wheels away after a bite.
@@ -1137,11 +1283,26 @@ local function step(id, dt)
     -- there (`stay`: walking and eating, never flying off alone) until the
     -- leader lifts off again.
     m.stay = false
-    if kind.flock and m.flock and m.flock ~= id then
+    if (kind.flock or m.swarm) and m.flock and m.flock ~= id then
         local leader = game.entity(m.flock)
         if leader and not leader.item then
             local lm = M.live[m.flock]
-            if lm and lm.state == "hunt" and hunts_now(kind, entity) and m.seen then
+            if m.swarm and lm and (lm.roosting or lm.state == "perch") then
+                -- Its leader has gone up to roost: so does it, under a ceiling
+                -- of its own near the leader's. The roost itself is below.
+                m.stay = true
+                if not m.roosting and m.state ~= "perch" then
+                    local r = C.swarm_roost_spread
+                    local c = ceiling_above({ x = leader.pos.x + between(-r, r), y = leader.pos.y - 2,
+                                              z = leader.pos.z + between(-r, r) })
+                    if c then
+                        m.state, m.target, m.timer = "perch", c, C.fly_land_ticks
+                    else
+                        fly_to(id, m, entity, leader.pos, kind.speed or 0.3, false)
+                        return
+                    end
+                end
+            elseif not m.swarm and lm and lm.state == "hunt" and hunts_now(kind, entity) and m.seen then
                 m.state, m.threat, m.timer = "hunt", lm.threat, C.mob_hunt_ticks
                 return
             end
@@ -1161,9 +1322,16 @@ local function step(id, dt)
             else
                 if m.landed then take_off(id, m) end
                 if m.treed then m.treed, m.state = false, "idle" end
+                if m.roosting or m.state == "perch" or m.state == "roost" then
+                    m.roosting, m.state = false, "idle"
+                end
+                -- A swarm churns: each bat changes its place in it now and then.
+                if m.swarm and (now + m.perceive_at) % C.swarm_churn == 0 then
+                    m.offset = { x = between(-3, 3), y = between(-1, 2), z = between(-3, 3) }
+                end
                 local at = { x = leader.pos.x + m.offset.x, y = leader.pos.y + m.offset.y, z = leader.pos.z + m.offset.z }
                 if U.dist2(at, entity.pos) > 2 then
-                    move_to(id, m, entity, at, false)
+                    move_to(id, m, entity, at, m.swarm and U.dist2(at, entity.pos) > 16)
                 else
                     stand(id, m)
                 end
@@ -1235,8 +1403,11 @@ local function step(id, dt)
             m.target = ground_at(math.floor(entity.pos.x), math.floor(entity.pos.z), math.floor(entity.pos.y))
         end
         if m.target == nil or m.timer <= 0 then
+            -- No ground in reach, or too long about it: it flies on, this
+            -- tick, so it is never a bird in the air with its wings still.
             m.state, m.timer = "wander", between(60, 200)
             pick_wander(m, entity)
+            move_to(id, m, entity, m.target, false)
             return
         end
         glide_down(id, m, entity, m.target, kind.speed or 0.3)
@@ -1309,15 +1480,17 @@ end)
 
 if C.dev_commands then
     tdl.command("spawn", "admin", function(uuid, rest)
-        local kind, n = string.match(rest, "^(%a+)%s*(%d*)$")
+        local kind, n = string.match(rest, "^([%a_]+)%s*(%d*)$")
         local body = U.body(uuid)
+        local swarm = kind == "swarm"
+        if swarm then kind = "bat" end
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scarecrow|crow|bat> [count]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_troll|swamp_hag|scarecrow|ghost|crow|bat|swarm> [count]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),
                      z = body.pos.z + body.facing.z * 4 }
-        local ids = tdl.spawn_mob(kind, at, tonumber(n) or 1)
+        local ids = tdl.spawn_mob(kind, at, tonumber(n) or (swarm and 12 or 1), { swarm = swarm })
         tdl.say(uuid, #ids .. " " .. kind .. (#ids == 1 and "" or "s") .. " spawned.")
     end)
     tdl.command("mobs", "admin", function(uuid)
@@ -1422,6 +1595,8 @@ if C.dev_commands then
         local n = 0
         -- As far as a crow may be before it leaves: everything a player could see.
         for _, id in ipairs(tdl.mobs_near(body.pos, C.crow_leave)) do
+            if M.live[id] and M.live[id].swarm then game.storage.set("swarm:" .. id, nil) end
+            if M.live[id] and M.live[id].grudge then game.storage.set("grudge:" .. id, nil) end
             game.despawn_entity(id)
             M.live[id] = nil
             n = n + 1

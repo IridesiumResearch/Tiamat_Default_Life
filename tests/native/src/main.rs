@@ -769,6 +769,36 @@ fn main() {
     assert!(r.text("toast").contains("full"));
     println!("ok  eating an apple, and being too full to");
 
+    // Right mouse with food in hand eats it, as X does: at a block, and at
+    // nothing (open sky; engine protocol 76, `anywhere`). Raw meat feeds, and
+    // sits badly.
+    r.say("heal");
+    r.say("starve 4");
+    r.hold("tiamat_default_life:raw_meat");
+    r.tick(16);
+    let meat = r.material("tiamat_default_life:raw_meat");
+    let held = r.inventory.views.lock().unwrap()["player:main"].iter().find(|s| s.material == meat).cloned();
+    let at_block = Some(tiamat_core::script::UseAim {
+        cell: tiamat_core::coords::SubNodePos::new(300, 189, 300),
+        material: r.material("tiamat_default_world:grass"),
+    });
+    for (aim, food, where_) in [(at_block, 7.0, "at a block"), (None, 10.0, "at open sky")] {
+        let outcome = r.vm.use_block(&tiamat_core::script::UseEvent {
+            player: PLAYER,
+            domain: "overworld".into(),
+            aim,
+            held: held.clone(),
+        });
+        r.tick(16);
+        assert_eq!(r.number("food"), food, "raw meat eaten {where_}, three more: {outcome:?}");
+    }
+    assert!(r.text("fx").contains("poison"), "and it sits badly");
+    r.tick(150);
+    r.say("heal");
+    r.say("feed");
+    r.tick(1);
+    println!("ok  right mouse eats what is in hand, at a block or at open sky: raw meat feeds, and poisons");
+
     // A hot stew warms: the warmth effect shows and the body drifts warm.
     r.say("starve 10");
     r.hold("tiamat_default_life:hot_stew");
@@ -1106,16 +1136,9 @@ fn mob_check(r: &mut Rig) {
     r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
     r.tick(1);
     assert_eq!(r.mobs()[0].1.health.unwrap().current, 9, "a fist is one point");
-    // One badge over it, for the one who hit it: nine points left of ten, two
-    // to a heart, so five hearts.
-    {
-        let badges = r.particles.badges.lock().unwrap();
-        assert_eq!(badges.len(), 1, "one row of hearts, not a heap of pixels");
-        let badge = &badges[0];
-        assert_eq!(badge.badge.entity, cow);
-        assert_eq!(badge.badge.count, 5, "five hearts");
-        assert_eq!(badge.player, Some(PlayerUuid::from_bytes(PLAYER)), "for the hitter only");
-    }
+    // No hearts over it: a row of them over every mob hit was a nuisance, and
+    // `mob_hearts` is off.
+    assert!(r.particles.badges.lock().unwrap().is_empty(), "no health bar over a mob");
     let meat = r.material("tiamat_default_life:raw_meat");
     let meat_before = r.inventory.units_of("player:main", meat);
     r.hold("core_gear:sword");
@@ -1142,7 +1165,7 @@ fn mob_check(r: &mut Rig) {
     }
     r.tick(5);
     assert!(r.inventory.units_of("player:main", meat) > meat_before, "and in the bag");
-    println!("ok  a cow punched showed its hearts, ran off, slain by sword, and its meat picked up");
+    println!("ok  a cow punched ran off with no hearts over it, slain by sword, and its meat picked up");
 
     // A cow's pace is the ENTITY's, not a gait's: the engine walks it at the
     // multiple the mod set, and jumping is the engine's own business now.
@@ -1206,7 +1229,7 @@ fn mob_check(r: &mut Rig) {
     println!("ok  a cow never jumps at a rise, and hops once when stuck: {hops} hops in 400 ticks of being stuck");
 
     // A bear leaves you be, standing right beside it. Hurt it and it turns:
-    // ten hearts of three over it, then it comes for you and swipes, playing
+    // it comes for you and swipes, playing
     // its swing clip, for seven points a blow.
     r.say("heal");
     r.say("spawn bear 1");
@@ -1222,12 +1245,7 @@ fn mob_check(r: &mut Rig) {
     r.hold_nothing();
     r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(bear), owner: None });
     r.tick(1);
-    {
-        let badges = r.particles.badges.lock().unwrap();
-        assert_eq!(badges.len(), 1);
-        // Thirty points, three to a heart: ten hearts, twenty-nine left.
-        assert_eq!(badges[0].badge.count, 10, "ten hearts over a bear");
-    }
+    assert!(r.particles.badges.lock().unwrap().is_empty(), "no health bar over a bear either");
     r.say("mob");
     assert!(r.said().contains("hunt"), "a hurt bear hunts: {}", r.said());
     let mut swiped = false;
@@ -1274,6 +1292,45 @@ fn mob_check(r: &mut Rig) {
     r.say("cull");
     r.tick(1);
     println!("ok  a cow set alight panicked and burned, and burned to death its meat was cooked");
+
+    // Hit, a creature spins round quickly to run rather than flipping about
+    // in one tick: never more than the turn rate (0.6) in a tick, and when
+    // the way it must go is well behind it, it turns on the spot first. Two
+    // starting yaws half a turn apart: one of them is behind the way it runs.
+    let wrap = |d: f32| (d + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+    let mut spun_on_the_spot = false;
+    for start in [0.0f32, std::f32::consts::PI] {
+        r.say("cull");
+        r.say("spawn cow 1");
+        r.tick(1);
+        let (cow, _) = r.mobs()[0].clone();
+        {
+            let mut store = r.entities.0.lock().unwrap();
+            let e = store.entities.get_mut(&cow).unwrap();
+            e.transform = Transform::from_world(104.5, 64.0, 100.5);
+            e.transform.yaw = start;
+            e.on_ground = true;
+        }
+        r.hold_nothing();
+        r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
+        let mut last = start;
+        for _ in 0..12 {
+            r.tick(1);
+            let (yaw, walk) = {
+                let store = r.entities.0.lock().unwrap();
+                let e = &store.entities[&cow];
+                (e.transform.yaw, e.drive.walk)
+            };
+            let turned = wrap(yaw - last).abs();
+            assert!(turned <= 0.6 + 1e-3, "a hit cow turns at most 0.6 a tick, not {turned}");
+            spun_on_the_spot |= turned > 0.3 && walk == [0.0, 0.0];
+            last = yaw;
+        }
+    }
+    assert!(spun_on_the_spot, "hit from the way it faces, it spins round on the spot before it runs");
+    r.say("cull");
+    r.tick(1);
+    println!("ok  a cow hit spins round, at most 0.6 a tick, on the spot when it must run the other way");
 
     // A bat at night: it hunts the player, bites, and wheels away.
     *r.sounds.time.lock().unwrap() = 0.9;
@@ -1372,6 +1429,131 @@ fn mob_check(r: &mut Rig) {
     *r.world.floor.lock().unwrap() = None;
     println!("ok  a bat roosts hanging under a ceiling, lets go when hurt, and crawls and eats on the ground");
 
+    // A swarm of bats: a dozen in one, each remembering its swarm with the
+    // world. It leaves you be, even at night, until you hit one of it; then
+    // the whole swarm comes for you.
+    *r.sounds.time.lock().unwrap() = 0.9;
+    r.say("heal");
+    r.say("spawn swarm");
+    r.tick(1);
+    let swarm: Vec<u64> = r.mobs().iter().map(|(id, _)| *id).collect();
+    assert_eq!(swarm.len(), 12, "a swarm is a dozen");
+    for id in &swarm {
+        assert!(r.storage.get(MOD, &format!("swarm:{id}")).is_some(), "each bat remembers its swarm");
+    }
+    for _ in 0..60 {
+        for id in &swarm {
+            r.put_mob(*id, 101.0, 65.5, 100.5);
+        }
+        r.tick(1);
+    }
+    assert_eq!(r.number("hp"), 27.0, "a swarm left alone leaves you alone, even at night");
+    r.hold_nothing();
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(swarm[3]), owner: None });
+    let bites = r.plays("bite");
+    for _ in 0..20 {
+        for id in &swarm {
+            r.put_mob(*id, 101.0, 65.5, 100.5);
+        }
+        r.tick(1);
+    }
+    let bitten = r.plays("bite") - bites;
+    assert!(bitten >= 3, "hit one and the swarm bites, more than the one: {bitten} bites");
+    r.say("cull");
+    r.tick(1);
+    for id in &swarm {
+        assert!(r.storage.get(MOD, &format!("swarm:{id}")).is_none(), "culled, the swarm is forgotten");
+    }
+    *r.sounds.time.lock().unwrap() = 0.5;
+    r.say("heal");
+    println!("ok  a bat swarm leaves you be until one is hit, then {bitten} bites from the swarm");
+
+    // A ghost: at night, a long way off, it stays; anyone within forty
+    // blocks and it is gone in a breath of mist. By day it does not stay.
+    let ghost_near = |r: &mut Rig, x: f64, ticks: u32| -> bool {
+        r.say("spawn ghost 1");
+        let ghost = r.mobs().iter().map(|(id, _)| *id).max().expect("a ghost");
+        for _ in 0..ticks {
+            if !r.mobs().iter().any(|(id, _)| *id == ghost) {
+                return false;
+            }
+            r.put_mob(ghost, x, 64.0, 100.5);
+            r.tick(1);
+        }
+        r.mobs().iter().any(|(id, _)| *id == ghost)
+    };
+    *r.sounds.time.lock().unwrap() = 0.9;
+    assert!(ghost_near(r, 160.5, 40), "sixty blocks off at night, a ghost stays");
+    r.say("cull");
+    let bursts = r.particles.bursts.lock().unwrap().len();
+    assert!(!ghost_near(r, 130.5, 40), "thirty blocks off, it is gone");
+    assert!(r.particles.bursts.lock().unwrap().len() > bursts, "in a breath of mist");
+    r.say("cull");
+    *r.sounds.time.lock().unwrap() = 0.5;
+    assert!(!ghost_near(r, 160.5, 40), "and by day, however far off, it is gone");
+    r.say("cull");
+    r.tick(1);
+    println!("ok  a ghost keeps forty blocks off: far off at night it stays, nearer or by day it is gone in mist");
+
+    // A swamp hag in the dark: she comes for you, and her staff poisons.
+    *r.sounds.time.lock().unwrap() = 0.9;
+    r.say("heal");
+    r.say("spawn swamp_hag 1");
+    r.tick(1);
+    let hag = r.mobs().iter().map(|(id, _)| *id).max().expect("a hag");
+    for _ in 0..60 {
+        r.put_mob(hag, 101.5, 64.0, 100.5);
+        r.tick(1);
+    }
+    assert!(r.number("hp") < 27.0, "struck by her staff: {}", r.number("hp"));
+    assert!(r.text("fx").contains("poison"), "and poisoned");
+    r.say("cull");
+    r.tick(150);
+    assert!(!r.text("fx").contains("poison"), "and the poison wears off");
+    r.say("heal");
+    r.tick(1);
+    *r.sounds.time.lock().unwrap() = 0.5;
+    println!("ok  a swamp hag in the dark strikes with her staff, and it poisons");
+
+    // A cave troll: come near and it lumbers off; hit it and it hunts you,
+    // and keeps on, remembered with the world.
+    r.say("heal");
+    r.say("spawn cave_troll 1");
+    r.tick(1);
+    let troll = r.mobs().iter().map(|(id, _)| *id).max().expect("a troll");
+    // Five blocks off: it walks off (the engine steers it, so what it is
+    // doing is read back with `mob`).
+    {
+        let mut store = r.entities.0.lock().unwrap();
+        let e = store.entities.get_mut(&troll).unwrap();
+        e.transform = Transform::from_world(105.5, 64.0, 100.5);
+        e.on_ground = true;
+    }
+    r.tick(30);
+    r.say("mob cave_troll");
+    assert!(r.said().contains("withdraw"), "five blocks off, a troll walks away: {}", r.said());
+    assert_eq!(r.number("hp"), 27.0, "and harms nobody");
+    // Hit, it hunts you; long after a hunt would have run out, it still is.
+    r.hold_nothing();
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(troll), owner: None });
+    r.tick(1);
+    assert!(r.storage.get(MOD, &format!("grudge:{troll}")).is_some(), "it remembers who hit it");
+    r.say("god");
+    for _ in 0..600 {
+        r.put_mob(troll, 112.5, 64.0, 100.5);
+        r.tick(1);
+    }
+    r.say("god");
+    r.put_mob(troll, 112.5, 64.0, 100.5);
+    r.tick(12);
+    r.say("mob cave_troll");
+    assert!(r.said().contains("hunt"), "six hundred ticks on, it is still coming for you: {}", r.said());
+    r.say("cull");
+    r.tick(1);
+    assert!(r.storage.get(MOD, &format!("grudge:{troll}")).is_none(), "culled, the grudge is forgotten");
+    r.say("heal");
+    println!("ok  a cave troll walks off from anyone near, and hit, hunts them for good");
+
     // The scarecrow: it stands where it is put and does not move; hit it and
     // it follows at a distance, never striking; against an apple tree it eats.
     let grass = r.material("tiamat_default_world:grass");
@@ -1397,20 +1579,22 @@ fn mob_check(r: &mut Rig) {
     r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(scarecrow), owner: None });
     r.tick(1);
     let hp = r.number("hp");
-    // Far off (the player is at 100.5, 100.5): it comes on.
-    put(&r, 130.5, 100.5);
-    r.tick(3);
+    // Far off (the player is at 100.5, 100.5): it comes on, once it has
+    // spun round to face the way (a few ticks at the turn rate; putting it
+    // there resets its yaw, so it is put once and left to turn).
+    put(&r, 160.5, 100.5);
+    r.tick(10);
     let toward = drive_of(&r).walk;
-    assert!(toward[0] < 0.0, "twenty-nine blocks off, it comes toward you: {toward:?}");
-    // Close: it backs away.
-    put(&r, 103.5, 100.5);
+    assert!(toward[0] < 0.0, "sixty blocks off, it comes toward you: {toward:?}");
+    // Close: it backs away, still facing you, without turning first.
+    put(&r, 106.5, 100.5);
     r.tick(3);
     let away = drive_of(&r).walk;
-    assert!(away[0] > 0.0, "three blocks off, it steps back: {away:?}");
+    assert!(away[0] > 0.0, "six blocks off, it steps back: {away:?}");
     // Between: it stands, and turns to watch you.
-    put(&r, 109.5, 100.5);
+    put(&r, 127.5, 100.5);
     r.tick(3);
-    assert_eq!(drive_of(&r).walk, [0.0, 0.0], "nine blocks off, it stands");
+    assert_eq!(drive_of(&r).walk, [0.0, 0.0], "twenty-seven blocks off, it stands");
     let _ = yaw_of(&r);
     // It never strikes, however long it keeps you company.
     for _ in 0..200 {
@@ -1443,7 +1627,7 @@ fn mob_check(r: &mut Rig) {
     r.say("cull");
     r.tick(1);
     *r.world.floor.lock().unwrap() = None;
-    println!("ok  a scarecrow stands still, then hit follows at six to twelve blocks, never strikes, eats at an apple tree");
+    println!("ok  a scarecrow stands still, then hit follows at eighteen to thirty-six blocks, never strikes, eats at an apple tree");
 
     // A crow, by day and by night. The fake world has no physics, so it is
     // held where the test wants it, well away from the player, and `plan`

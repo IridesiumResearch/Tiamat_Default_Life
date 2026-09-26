@@ -26,8 +26,15 @@
 --   still             never moves of its own accord: no wandering, no running from fire
 --   stalks            { near, far } blocks: hit it and it follows you for good, between
 --                     the two, and never strikes (see "The still and the stalking")
+--   keeps_clear       { near, far } blocks: someone nearer than `near` and it walks off
+--                     until it is `far` from them (the cave troll)
+--   grudge            hit it and it hunts whoever did for good, remembered with the
+--                     world; it strikes nobody who has not
+--   chase             blocks: a hunter lets go of anyone further off than this
+--   keeps_off         blocks: never met. A player nearer than this, or the day, and it
+--                     is gone in a breath of mist (the ghost)
 --   eats, eat_ticks, eat_every   blocks it eats when it touches them; how long; how often
---   bite              { damage, range (blocks), cooldown (ticks), cause }
+--   bite              { damage, range (blocks), cooldown (ticks), cause, effect = { name, ticks } }
 --   sight             blocks it notices a player from
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
 --   sound, sound_death, voice_min, voice_max   a cue, or a list of cues (takes of one voice)
@@ -45,7 +52,9 @@
 --   spawn             { biomes = { [biome id] = weight } | { biome ids } | land = true, ground = { block ids },
 --                       time = "day" | "night" | "any", sun_min, sun_max,
 --                       dark = true: at night, or by day where sun <= sun_max (a monster),
---                       group = { min, max }, weight, cap,
+--                       group = { min, max }, weight, cap, chance (in a hundred: a rare kind),
+--                       swarm = { chance, group }: sometimes a swarm, over the cap (bats),
+--                       headroom = blocks clear over the ground it needs (default 2),
 --                       distance = { min, max } blocks from the player, if not the usual }
 --
 -- WHERE a creature appears is its biomes: the world's own answer for the
@@ -294,19 +303,21 @@ tdl.register_mob{
 -- and wider across its legs than it is long (`--axis z`): a block and a
 -- third across, its feeding clip under `sneak` and a strike under `swing`.
 -- The first monster. It appears only in the dark: on any land at night, and
--- in the caves at any hour. It hunts whoever it sees in the dark and bites
--- for 2; in daylight it leaves you be.
+-- in the caves at any hour, and not often (`chance`). It hunts whoever it
+-- sees in the dark, within ten blocks, and bites for 2, and lets you go once
+-- you are fourteen off; in daylight it leaves you be. Slower than you walk,
+-- so a spider is a thing you can get away from.
 tdl.register_mob{
     id = "spider", name = "Spider", health = 12,
     collider = { width = 3.0, height = 1.6 },
     model = "models/spider.glb", texture = "models/spider.png", grazes = true,
-    walk_speed = 1.4, run_speed = 4.8,
+    walk_speed = 1.05, run_speed = 3.6,
     hostile = { when = "dark", sun_max = 3 },
     bite = { damage = 2, range = 1.8, cooldown = 30, cause = "were bitten by a spider" },
-    sight = 16, wander_radius = 12, pause_min = 40, pause_max = 200,
+    sight = 10, chase = 14, wander_radius = 12, pause_min = 40, pause_max = 200,
     sound = { "hiss", "hiss_2" }, sound_death = "hiss", voice_min = 300, voice_max = 1200,
     drops = {},
-    spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3,
+    spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3, chance = 20,
               time = "any", group = { 1, 2 }, weight = 3, cap = 6 },
 }
 
@@ -318,7 +329,7 @@ tdl.register_mob{
 --
 -- It stands in a field and does not move. It turns up very rarely, and only
 -- in the fields. Hit it and it follows you from then on, never letting you
--- further than twelve blocks off or nearer than six, keeping pace however
+-- further than thirty-six blocks off or nearer than eighteen, keeping pace however
 -- you run, and turning to watch you when it stands. It never strikes. Only
 -- when it happens to come up against an apple tree does it stop, and eat.
 tdl.register_mob{
@@ -326,13 +337,97 @@ tdl.register_mob{
     collider = { width = 1.8, height = 6.2 },
     model = "models/scarecrow.glb", texture = "models/scarecrow.png", jumps = "stuck",
     walk_speed = 3.0, run_speed = 5.6,
-    still = true, stalks = { near = 6, far = 12 },
+    still = true, stalks = { near = 18, far = 36 },
     eats = { G .. "apple_log", G .. "apple_leaves" }, eat_ticks = 70, eat_every = 400,
     sight = 12,
     drops = {},
-    spawn = { biomes = { rolling_grasslands = RARE, river_valleys = RARE }, chance = 10,
+    spawn = { biomes = { rolling_grasslands = RARE, river_valleys = RARE }, chance = 1,
               ground = { G .. "grass" },
               time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
+}
+
+-- The scurrier: models/scurrier.glb, from an export that was already skinned,
+-- a low black thing on four long limbs with violet eyes, a block and a fifth
+-- long and under a block tall (`--length 3.6 --axis z`, a shade wider than it
+-- is long); its feeding clip under `sneak` and a lunge under `swing`. It
+-- lives deep in the caves and nowhere else, and it is very seldom there. In
+-- the dark it hunts whoever it sees, fast on its feet, if not quite as fast
+-- as you can sprint. It makes no sound.
+tdl.register_mob{
+    id = "scurrier", name = "Scurrier", health = 10,
+    collider = { width = 2.6, height = 2.4 },
+    model = "models/scurrier.glb", texture = "models/scurrier.png", grazes = true,
+    walk_speed = 1.6, run_speed = 5.0,
+    hostile = { when = "dark", sun_max = 3 },
+    bite = { damage = 3, range = 1.8, cooldown = 24, cause = "were caught by a scurrier" },
+    sight = 18, wander_radius = 14, pause_min = 30, pause_max = 160,
+    drops = {},
+    spawn = { biomes = C.cave_biomes, sun_max = 2, chance = 5,
+              time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
+}
+
+-- The cave troll: models/cave_troll.glb, from an export that was already
+-- skinned, a hunched giant of mossy stone in a loincloth, three and a half
+-- blocks tall (`--length 5.5 --axis z`, sized along its depth, its arms
+-- being wide); its rig keyed every bone at every frame, which the tool
+-- thinned to fit the engine's model limit. It lives in the caves, very
+-- seldom, where there is room for it (`headroom`). It wants nothing to do
+-- with you: come within ten blocks and it lumbers off until it is fifteen
+-- away. Hit it and that is over. It comes for you and does not stop, not
+-- when you run, not when you die, not when the world is closed and opened
+-- again; only one of you dying to the other ends it.
+tdl.register_mob{
+    id = "cave_troll", name = "Cave Troll", health = 80,
+    collider = { width = 4.5, height = 10.0 },
+    model = "models/cave_troll.glb", texture = "models/cave_troll.png", grazes = true,
+    walk_speed = 1.2, run_speed = 4.4,
+    keeps_clear = { near = 10, far = 15 }, grudge = true,
+    bite = { damage = 10, range = 3.5, cooldown = 40, cause = "were crushed by a cave troll" },
+    sight = 16, wander_radius = 12, pause_min = 100, pause_max = 400,
+    sound = { "growl_2", "growl_3" }, sound_death = "growl_3", voice_min = 800, voice_max = 3000,
+    drops = {},
+    spawn = { biomes = C.cave_biomes, sun_max = 2, chance = 4, headroom = 4,
+              time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
+}
+
+-- The swamp hag: models/swamp_hag.glb, from an export that was already
+-- skinned, a green crone in a hooded cloak with a lantern on her staff, two
+-- blocks tall (`--length 3.0 --axis z`); her gathering clip under `sneak` and
+-- a blow of the staff under `swing`. Only in the wet country, the fens and
+-- the mangroves, and very, very seldom. In the dark she hunts whoever she
+-- sees; her staff strikes for 3 and leaves a poison behind it.
+tdl.register_mob{
+    id = "swamp_hag", name = "Swamp Hag", health = 20,
+    collider = { width = 2.2, height = 5.8 },
+    model = "models/swamp_hag.glb", texture = "models/swamp_hag.png", grazes = true, jumps = "stuck",
+    walk_speed = 1.1, run_speed = 3.8,
+    hostile = { when = "dark", sun_max = 3 },
+    bite = { damage = 3, range = 2.4, cooldown = 36, cause = "were cursed by a swamp hag",
+             effect = { "poison", 100 } },
+    sight = 14, chase = 20, wander_radius = 10, pause_min = 60, pause_max = 300,
+    drops = {},
+    spawn = { biomes = { peat_fen = 1, mangrove_coast = 1 }, chance = 2,
+              time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
+}
+
+-- The ghost: models/ghost.glb, from an export that was already skinned, a
+-- pale hooded shape trailing into drips, two blocks tall (`--length 2.6
+-- --axis z`, sized along its depth, since its arms are out); its rig keys
+-- every bone in every clip, so most of its channels were dropped as holding
+-- still. It is seen on any land, at night only, very seldom, and always a
+-- long way off: it appears far from you, drifts about, and is gone in a
+-- breath of mist the moment anyone comes within `keeps_off` blocks, or the
+-- night ends. It never harms anybody, and nobody has ever touched one.
+tdl.register_mob{
+    id = "ghost", name = "Ghost", health = 10,
+    collider = { width = 2.4, height = 5.8 },
+    model = "models/ghost.glb", texture = "models/ghost.png", jumps = "stuck",
+    walk_speed = 0.8, run_speed = 1.6,
+    keeps_off = 40,
+    sight = 12, wander_radius = 10, pause_min = 60, pause_max = 300,
+    drops = {},
+    spawn = { land = true, time = "night", chance = 5,
+              group = { 1, 1 }, weight = 1, cap = 1, distance = { 56, 88 } },
 }
 
 -- The bear: the woods' own, and nobody's quarry. It ambles, forages with
@@ -357,7 +452,9 @@ tdl.register_mob{
                   temperate_woodlands = RARE, silverwood = RARE, frostpine_coast = RARE, alpine_highlands = RARE,
               },
               ground = { G .. "loam", G .. "leaf_litter", G .. "snow" },
-              time = "any", sun_min = 4, group = { 1, 1 }, weight = 1, cap = 2 },
+              -- A bear is a thing you are lucky (or not) to meet: a fifth of the
+              -- draws that land on one come to anything, and never two at once.
+              chance = 20, time = "any", sun_min = 4, group = { 1, 1 }, weight = 1, cap = 1 },
 }
 
 -- The stag: a red deer, antlers and all. models/stag.glb, from an export
@@ -418,6 +515,11 @@ tdl.register_mob{
 -- and hangs there on its `idle` clip; now and then it comes down instead and
 -- crawls (`walk`) and eats (`sneak`) on the ground. Anyone it hunts, it lets
 -- go for.
+--
+-- Now and then (`swarm.chance` in a hundred of the times bats turn up) it is
+-- a swarm instead: a dozen or so churning round one leader, roosting when it
+-- roosts, each under a ceiling of its own. A swarm leaves you be until you
+-- hit one of it, and then all of it comes for you (mobs.lua, "Swarms").
 tdl.register_mob{
     id = "bat", name = "Bat", health = 3,
     collider = { width = 1.0, height = 1.0 },
@@ -430,7 +532,8 @@ tdl.register_mob{
     sound = { "squeak", "squeak", "flap" }, voice_min = 60, voice_max = 300,
     drops = {},
     -- The ordinary caves, lit and dark.
-    spawn = { biomes = tdl.config.cave_biomes, time = "any", sun_max = 2, group = { 2, 4 }, weight = 3, cap = 6 },
+    spawn = { biomes = tdl.config.cave_biomes, time = "any", sun_max = 2, group = { 2, 4 }, weight = 3, cap = 6,
+              swarm = { chance = 15, group = { 8, 14 } } },
 }
 
 return {}

@@ -183,11 +183,28 @@ end)
 -- Using a bed with the place control: the same as X beside it, aimed. The
 -- engine calls this only with an empty hand or an unplaceable item held, so
 -- a player carrying blocks still builds against a bed.
+--
+-- And eating with it: food or medicine in hand, the place control at any
+-- block eats it or takes it, as X does. A bed aimed at is still slept in.
+-- At nothing — open sky, or past reach — the engine asks too (hooks.lua
+-- registers `anywhere`), with no cell in the event, so this eats there as
+-- well.
 tdl.on_use(function(event)
-    if event.material ~= I.bed then return end
-    local v = tdl.get(event.player)
+    local uuid = event.player
+    local v = tdl.get(uuid)
     if v == nil or v.dead then return end
-    sleep(event.player, v, { x = event.x // 3, y = event.y // 3, z = event.z // 3 })
+    if event.material == I.bed then
+        sleep(uuid, v, { x = event.x // 3, y = event.y // 3, z = event.z // 3 })
+        return ""
+    end
+    local held = event.held
+    local def = held and I.by_material[held.material]
+    if not (def and (def.kind == "food" or def.kind == "medicine")) then return end
+    if tdl.is_ghost(uuid) then return "" end
+    if (use_cd[uuid] or 0) <= tdl.now then
+        use_cd[uuid] = tdl.now + USE_COOLDOWN
+        consume(uuid, v, held, def)
+    end
     return ""
 end)
 

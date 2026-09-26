@@ -37,7 +37,8 @@ All are namespaced `tiamat_default_life:` by the engine.
   `warm_coat`, `cool_cloak`.
 - **Creatures** (entity models, and the kind read back off an entity):
   `cow`, `sheep`, `pig`, `horse`, `goat`, `bunny`, `fox`, `squirrel`, `wolf`,
-  `mammoth`, `spider`, `scarecrow`, `bear`, `stag`, `crow`, `bat`.
+  `mammoth`, `spider`, `scurrier`, `cave_troll`, `swamp_hag`, `scarecrow`, `ghost`, `bear`,
+  `stag`, `crow`, `bat`.
 - **Sounds** (each also bound as a cue of the same name, so a sound pack can
   rebind it): `hurt`, `eat`, `drink`, `heal`, `bubble`, `gasp`, `burn`,
   `death`, `thud`, `rested`, `boom`, `bite`, `moo`, `baa`, `oink`, `oink_2`,

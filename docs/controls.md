@@ -47,7 +47,7 @@ fly (`game.set_player_abilities`), which is not making anybody an operator.
 | Key | Action | Notes |
 |---|---|---|
 | **X** | Use what you hold: eat, bandage, antidote. Empty-handed, at the bed you look at or one beside you: sleep. | |
-| **Right mouse** on a bed | Sleep in it. | The engine's place control, with nothing placeable in hand. |
+| **Right mouse** | Holding food or medicine: eat it or take it, wherever you look. At a bed: sleep in it. | The engine's place control, with nothing placeable in hand; at open sky or past reach too, since `hooks.lua` registers `on_use` with `anywhere` (engine protocol 76). |
 | **O** | Wardrobe: the inventory screen on its Wardrobe tab (Tiamat Default UI), or a plain dialog without it. | Was G, which is the engine's debug block row. O for outfit. |
 
 ## The engine's keys, as they are and as they should be

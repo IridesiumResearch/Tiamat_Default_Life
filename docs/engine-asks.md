@@ -5,9 +5,12 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-09-24)
+## Where these stand (2026-09-26)
 
-**Two are open: 17 and 18.** Everything before them landed, and the mod uses every answer. Open asks are
+**Two are open: 17 and 18.** Everything before them landed, and the mod uses every answer.
+One thing landed that was never numbered: the place control at nothing (open sky, or a
+block past reach) reaches a mod that asks, engine a6d34e1 (protocol 76), so food is eaten
+with the right mouse wherever you look. Open asks are
 copied, without the history, to the engine's
 `docs/engine-asks/tiamat_default_life.md`, so the engine side finds every
 mod's open asks in one place. This file keeps everything, landed items
@@ -17,6 +20,7 @@ included.
 |---|---|---|
 | 18 riding | **Open.** | the horse is in the world and cannot be ridden. |
 | 17 using an entity | **Open.** | nothing to right-click a horse with. |
+| (unnumbered) a use at nothing | Landed, engine a6d34e1, protocol 76. | `hooks.lua` registers `on_use` with `{ anywhere = true }`; right mouse eats what is held at open sky too. |
 | 16 a model's skin is not drawn | Landed, engine b5ed249. | every animal painted, first world or fifth; checked by replaying the rejoin through the engine's renderer. |
 | 15 a picture over an entity | Landed, engine e5c0394 and 9c4e120. | `game.show_over`: one row of hearts, not sixty-five particles. |
 | 14 a mob's own speed | Landed, engine 033f4e6. | `speed` on the entity, scaled off the gait it walks in. |

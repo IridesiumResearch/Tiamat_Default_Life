@@ -179,7 +179,7 @@ C.explosion_push_up = 0.8
 -- nametag while this is true, and invisible when it is false: the engine
 -- draws nothing for a model name nobody registered.
 C.placeholder_models = true
-C.mob_hearts = true            -- a row of hearts over a mob for the player who hit it
+C.mob_hearts = false           -- a row of hearts over a mob for the player who hit it (off: it was a nuisance)
 C.mob_hearts_seconds = 1.2     -- how long it shows
 C.mob_heart_size = 0.32        -- blocks across, per heart
 C.mob_swing_ticks = 20         -- how long a mob plays its swing clip after a blow
@@ -187,6 +187,8 @@ C.mob_moving_speed2 = 0.0025   -- (cells per tick)^2; slower than this, a walker
 C.mob_stuck_ticks = 60         -- ticks of trying and not going before it gives up on where it was going
 C.mob_hop_ticks = 20           -- a kind that jumps only when stuck: ticks stuck before its one hop
 C.mob_arrive = 0.6             -- blocks from where it was going that count as there, for a kind driven here
+C.mob_turn_rate = 0.6          -- radians a walker turns in a tick: half a turn in about five ticks
+C.mob_turn_hold = 1.2          -- radians off its way at which it turns on the spot before it goes
 C.player_walk = 4.3            -- the engine's own gaits, blocks a second: what a kind's
 C.player_sprint = 5.6          -- speeds are a multiple of (`speed` on the entity)
 C.mob_spawn_every = 100        -- ticks between spawning passes, per player
@@ -224,6 +226,9 @@ C.crow_treed_max = 2400
 C.crow_leave = 112             -- flown this far past every player, it leaves the world
 C.roost_reach = 8              -- blocks up a bat looks for a ceiling to hang from
 C.roost_hang = 0.1             -- blocks a roosting bat's origin sits inside the ceiling, so its hanging feet meet it
+C.swarm_churn = 20             -- ticks between a swarming bat's changes of place in the swarm
+C.swarm_anger_ticks = 400      -- how long a swarm stays after whoever hit one of it
+C.swarm_roost_spread = 3       -- blocks round its leader a swarming bat looks for a ceiling of its own
 
 -- The world's blocks, by name. Every id is looked up with pcall at load, so
 -- a world without these still loads this mod; it just has no lava.

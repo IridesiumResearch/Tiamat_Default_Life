@@ -27,7 +27,7 @@ with its texture beside it as a `.png`.
 
 | Files | Source | Author | Licence | Licence in tree |
 |---|---|---|---|---|
-| `assets/source/Tiamat Life AI <Creature>.glb` (16: Bat, Bear, Bunny, Cow, Crow, Fox, Goat, Horse, Mammoth, Pig, Scarecrow, Sheep, Spider, Squirrel, Stag, Wolf) and `assets/source/Tiamat Life AI Pig.jpg` | AI-generated; generator to be confirmed | to be confirmed | to be confirmed (generator's terms) | none yet |
+| `assets/source/Tiamat Life AI <Creature>.glb` (20: Bat, Bear, Bunny, Cave Troll, Cow, Crow, Fox, Ghost, Goat, Horse, Mammoth, Pig, Scarecrow, Scurrier, Sheep, Spider, Squirrel, Stag, Swamp Hag, Wolf) and `assets/source/Tiamat Life AI Pig.jpg` | AI-generated; generator to be confirmed | to be confirmed | to be confirmed (generator's terms) | none yet |
 | `mods/tiamat_default_life/models/<creature>.glb` and `.png` (16 of each) | derived from the files above by `tools/skin_glb.py` | as above | as above | none yet |
 
 ## Creature voices and the underwater loop

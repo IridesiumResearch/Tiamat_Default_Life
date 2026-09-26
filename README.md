@@ -6,7 +6,9 @@ only when it matters, food that heals and clothing that keeps you warm; three
 kinds of world (Default, Creative, and a one-life Adventure) with admins over
 them; and everything that lives in the world, beginning with cows, sheep,
 pigs, horses, stags, goats, bunnies, foxes, squirrels, wolves, mammoths,
-bears, crows and bats, the first monster, the spider, and the scarecrow.
+bears, crows and bats, the first monster, the spider, the scurrier and the
+cave troll deep in the caves, the swamp hag in the fens, the scarecrow, and
+now and then, far off at night, a ghost.
 
 Written against the engine's public Lua API and nothing else. The rules that
 shape it are in [`AGENTS.md`](AGENTS.md) (vendored from the engine's `api/`),
@@ -162,7 +164,7 @@ settings screen.
 | Key | Action |
 |---|---|
 | **X** | Use what you are holding: eat food, take medicine. With an empty hand, at the bed you look at or one beside you: sleep. |
-| **Right mouse** on a bed | Sleep in it. |
+| **Right mouse** | Holding food or medicine: eat it or take it, as X does, wherever you look. At a bed: sleep in it. |
 | **O** | Wardrobe: the inventory screen on its Wardrobe tab, four worn slots over what you carry. Clothing there keeps you warm or cool. Again to close. |
 
 Every binding, the engine's included, with who may use it and what should
@@ -312,7 +314,7 @@ the generated placeholders from `tools/make_sounds.py`.
 Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
 `god`, `tp`, `revive`, `admins`, and the testing words `hurt
 [n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
-`choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]`,
+`choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n]` (`spawn swarm` for a bat swarm, `spawn cave_troll`),
 `mobs`, `mob [kind]`, `odds`, `plan <transit|circle|tree|land>` (the nearest
 crow), `ignite [ticks]`, `cull`. The testing words vanish altogether when `dev_commands =
 false` in `config.lua`.
@@ -334,11 +336,15 @@ Sixteen so far, in `creatures.lua` as data over the system in `mobs.lua`:
 | Squirrel | Common in the woods and silverwood; uncommon in the flower forest, redwoods and taiga; scarce on the frostpine coast and in the jungle. By day | Tiny, nervy, quick; bolts at five blocks. Two points; silent | nothing |
 | Wolf | Uncommon in the taiga and on the frostpine coast; scarce in the mountains, tundra and redwoods; rare in the frozen wastes and woods. Any hour, in packs of 2 to 4 | Leaves you be; hurt one and it hunts you for fifteen seconds, biting for 4. Fourteen points; barks (a dog's take, for now) | 1 to 2 raw meat |
 | Mammoth | Scarce in the frozen wastes and tundra; rare on the Icefall and the Rime Wall. By day, in ones to threes | Slow and enormous, four blocks long; hurt it and it tramples you for 9. Sixty points; trumpets | 4 to 8 raw meat |
-| Spider | The first monster: any land at night, and the ordinary caves at any hour; never in daylight | Hunts whoever it sees in the dark and bites for 2; in daylight leaves you be. Twelve points; hisses | nothing |
-| Scarecrow | Very rarely, and only in the fields: the grassland and river meadows. Any hour, alone | Stands in its field and never moves. Hit it and it follows you for good: never further than twelve blocks, never nearer than six, keeping pace however you run, turning to watch you when it stands still. It never strikes. Only when it happens to come up against an apple tree does it stop, and eat. Twenty points; silent | nothing |
-| Bear | Scarce in the taiga and redwoods; rare in the woods, silverwood, frostpine coast and mountains. Alone | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
+| Spider | The first monster: any land at night, and the ordinary caves at any hour, and not often; never in daylight | Hunts whoever it sees in the dark within ten blocks and bites for 2, slower than you walk, and lets you go at fourteen; in daylight leaves you be. Twelve points; hisses | nothing |
+| Scurrier | Only the ordinary caves, where it is dark, and extremely seldom; alone | Hunts whoever it sees in the dark, fast on its feet but not as fast as you sprint, and bites for 3. Ten points; silent | nothing |
+| Cave troll | The ordinary caves, where it is dark and there is room for it, very seldom; alone | Wants nothing to do with you: come within ten blocks and it walks off until it is fifteen away. Hit it and it hunts you for good, through death and a restart, and hits for 10. Eighty points; growls | nothing |
+| Swamp hag | The fens and the mangroves only, very, very seldom; alone | Hunts whoever she sees in the dark; her staff strikes for 3 and poisons. Twenty points; silent | nothing |
+| Ghost | Any land, at night only, extremely seldom, and always a long way off (56 to 88 blocks); alone | Drifts about far off. Come within forty blocks of it, or let the night end, and it is gone in a breath of mist. It never harms anybody | nothing |
+| Scarecrow | Very rarely, and only in the fields: the grassland and river meadows. Any hour, alone | Stands in its field and never moves. Hit it and it follows you for good: never further than thirty-six blocks, never nearer than eighteen, keeping pace however you run, turning to watch you when it stands still. It never strikes. Only when it happens to come up against an apple tree does it stop, and eat. Twenty points; silent | nothing |
+| Bear | Seldom: scarce in the taiga and redwoods, rare in the woods, silverwood, frostpine coast and mountains, and only a fifth of those come to anything; never more than one about | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
-| Bat | The ordinary caves, lit and dark, where it is dark enough | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat | nothing |
+| Bat | The ordinary caves, lit and dark, where it is dark enough; now and then a swarm of eight to fourteen | Hunts you in darkness, bites for a point, flutters off, comes back. At rest it hangs upside down from a ceiling, or comes down to crawl and eat. A swarm churns round its leader and roosts where it roosts, and leaves you be until you hit one of it, when all of it comes for you | nothing |
 
 Spawning happens in passes around each player: a spot on the ground
 twenty to eighty-eight blocks off, the world asked its biome, and then a
@@ -355,9 +361,9 @@ kind's biomes and weights are its `spawn.biomes` in `creatures.lua`. Say
 `dev_commands` is on.
 
 A fist does a point to a mob and the reference sword six. Hurt animals run;
-hurt hunters, and a hurt bear, turn on you. A blow hangs a row of hearts
-over the mob for a second, for whoever struck it (`game.show_over`): two
-points a heart, up to ten, following it as it runs. Cows and pigs amble at
+hurt hunters, and a hurt bear, turn on you. Nothing is drawn over a hurt
+mob: a row of hearts over each one hit was more nuisance than help, and
+`mob_hearts` in `config.lua` turns it back on. Cows and pigs amble at
 1.1 blocks a second and run at 2.8, bears at 1.3 and 4.6 (`walk_speed`,
 `run_speed` on a kind, which become `speed` on the entity). Cows, pigs
 and sheep never jump at a rise: they walk what a step allows, and hop only
@@ -379,7 +385,14 @@ it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--le
 mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the spider at
 `--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long; the
 scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
-wider than it is deep):
+wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the ghost
+at `--length 2.6 --axis z --rename eating=sneak`, its arms out; the cave troll at `--length 5.5
+--axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`.
+A channel that holds its bone at rest for a whole clip is dropped, since the engine starts every
+bone at rest: the ghost keys all 57 of its bones in every clip, which is over the engine's limit
+of 512 channels otherwise. So is a key the straight line between its neighbours already gives,
+and weights are written as bytes: the troll was sampled every frame and was over the engine's
+2 MB model limit otherwise):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak
