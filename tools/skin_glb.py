@@ -157,7 +157,7 @@ class Writer:
         self.views = []
         self.accessors = []
 
-    def add(self, values, kind, component, target=None, minmax=False):
+    def add(self, values, kind, component, target=None, minmax=False, normalized=False):
         fmt, size = COMPONENT[component]
         width = WIDTH[kind]
         while len(self.bin) % 4:
@@ -172,6 +172,8 @@ class Writer:
             view["target"] = target
         self.views.append(view)
         acc = {"bufferView": len(self.views) - 1, "componentType": component, "count": len(values), "type": kind}
+        if normalized:
+            acc["normalized"] = True
         if minmax:
             cols = list(zip(*values)) if width > 1 else [values]
             acc["min"] = [min(c) for c in cols]
@@ -377,7 +379,14 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
     a_nor = w.add(normals, "VEC3", 5126, 34962)
     a_uv = w.add(uvs, "VEC2", 5126, 34962)
     a_joint = w.add(bones, "VEC4", 5121, 34962)
-    a_weight = w.add(weights, "VEC4", 5126, 34962)
+    # Weights as bytes, 255 to one, which the engine reads as normalised: a
+    # quarter of the size of floats, and a big mesh is under the engine's
+    # model limit only so. Rounded so each vertex's four still sum to 255.
+    def to_bytes(wv):
+        out = [round(x * 255) for x in wv]
+        out[out.index(max(out))] += 255 - sum(out)
+        return tuple(out)
+    a_weight = w.add([to_bytes(wv) for wv in weights], "VEC4", 5121, 34962, normalized=True)
     wide = len(positions) > 65535
     a_index = w.add(indices, "SCALAR", 5125 if wide else 5123, 34963)
     # Column-major, as glTF stores a matrix.
@@ -388,6 +397,7 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
     a_bind = w.add(binds, "MAT4", 5126)
 
     animations = []
+    still, thinned = [0], [0]
     for anim in j.get("animations", []):
         name = anim.get("name", "")
         name = renames.get(name, name).lower()
@@ -414,6 +424,41 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
                     keys = [lift(rt, v, rs)[1] for v in keys]
                 else:
                     keys = [lift(rt, rq, v)[2] for v in keys]
+            # A channel that holds its bone at rest for the whole clip is
+            # dropped: the engine starts every bone at rest and a clip only
+            # overrides what it drives, so it changes nothing, and a big rig
+            # that keys every bone in every clip is over the engine's channel
+            # limit otherwise (the ghost). A rotation and its negation are one.
+            rest = out_nodes[new_index[node]][path]
+            def at_rest(v):
+                same = max(abs(a - b) for a, b in zip(v, rest))
+                if path == "rotation":
+                    same = min(same, max(abs(a + b) for a, b in zip(v, rest)))
+                return same < 1e-4
+            if all(at_rest(v) for v in keys):
+                still[0] += 1
+                continue
+            # Keys the straight line between their neighbours already gives,
+            # to within a hair, are dropped: exporters sample every frame, and
+            # a big rig's clips are most of its file otherwise (the cave troll).
+            if sampler.get("interpolation", "LINEAR") == "LINEAR" and len(keys) > 2:
+                if path == "rotation":
+                    # One hemisphere, so a key and its neighbours interpolate the short way.
+                    for i in range(1, len(keys)):
+                        if sum(a * b for a, b in zip(keys[i], keys[i - 1])) < 0:
+                            keys[i] = tuple(-c for c in keys[i])
+                kept = [0]
+                for i in range(1, len(keys) - 1):
+                    a, b = kept[-1], i + 1
+                    gap = times[b] - times[a]
+                    f = (times[i] - times[a]) / gap if gap else 0.0
+                    guess = [x + (y - x) * f for x, y in zip(keys[a], keys[b])]
+                    if max(abs(g - k) for g, k in zip(guess, keys[i])) > 1e-4:
+                        kept.append(i)
+                kept.append(len(keys) - 1)
+                thinned[0] += len(keys) - len(kept)
+                times = [times[i] for i in kept]
+                keys = [keys[i] for i in kept]
             a_in = w.add(times, "SCALAR", 5126, minmax=True)
             a_out = w.add(keys, "VEC4" if path == "rotation" else "VEC3", 5126)
             samplers.append({"input": a_in, "output": a_out, "interpolation": sampler.get("interpolation", "LINEAR")})
@@ -455,7 +500,9 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
     print("in cells: " + " x ".join(f"{hi2[a] - lo2[a]:.2f}" for a in range(3))
           + f"  (blocks: {(hi2[0]-lo2[0])/3:.2f} wide, {(hi2[1]-lo2[1])/3:.2f} tall, {(hi2[2]-lo2[2])/3:.2f} long); feet at y = {lo2[1]:.3f}")
     print("clips: " + ", ".join(f"{a['name']} ({len(a['channels'])} channels"
-                                + (f", x{speeds[a['name']]:g} speed" if a['name'] in speeds else "") + ")" for a in animations))
+                                + (f", x{speeds[a['name']]:g} speed" if a['name'] in speeds else "") + ")" for a in animations)
+          + (f"; {still[0]} channels holding a bone at rest dropped" if still[0] else "")
+          + (f"; {thinned[0]} keys on a straight line dropped" if thinned[0] else ""))
     print(f"wrote {target} ({total} bytes)")
 
 
