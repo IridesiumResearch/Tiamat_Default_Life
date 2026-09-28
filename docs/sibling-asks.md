@@ -67,14 +67,14 @@ both are exported (`docs/exports.md`), with `add_drop`, `add_feed`,
 so that a tool in bronze or iron, an engineered crop or a cooked meal is
 registered through the same code as this mod's own.
 
-### C1. The kitchen (2026-09-26): OPEN, and Craft's to build
+### C1. The kitchen (2026-09-26): ANSWERED by Craft, 2026-09-28
 
-Bread, hot stew and cured meat have no source in this mod, by decision:
-heat stations, milling and the recipe registry are Craft's. This mod's
-side is ready — wheat, salt (the world's), raw meat and produce exist, and
-`hearty` and `steady` are effects a cooked meal may carry through
-`add_food`. When Craft registers bread with `effects = { { "steady", ... } }`
-and a stew with `hearty`, the buffs are live.
+Bread (the kiln, from wheat) and hot stew (a fire and a copper pot) are
+Craft's to make, and it hands out THIS mod's items, so their buffs are
+written in this mod's own definitions: `steady` on bread and `hearty` on
+hot stew (items.lua), since an `add_food` from Craft would replace this
+mod's numbers wholesale (Craft's L9, answered 2026-09-28). Cured meat waits
+on Craft's salt recipe.
 
 ### C2. Leather, cord and cloth (2026-09-26): OPEN, and Craft's to build
 

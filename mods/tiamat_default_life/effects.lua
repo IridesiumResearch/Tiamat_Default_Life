@@ -55,7 +55,7 @@ effect("rested", { name = "Well rested" })
 -- From the kitchen: a meal that was cooked rather than picked. Hearty is a
 -- stew's, and takes the edge off a blow; steady is bread's, and slows the
 -- hunger that walking and working bring on.
-effect("hearty", { name = "Hearty", damage_scale = C.hearty_damage_scale })
+effect("hearty", { name = "Hearty", damage_scale = C.hearty_damage_scale, damage_kinds = { physical = true } })
 effect("steady", { name = "Steady", exhaust_scale = C.steady_exhaust_scale })
 
 --- Puts an effect on a player, or extends one already there to the longer
@@ -104,12 +104,16 @@ function E.tick(uuid, v, dt)
     end
 end
 
---- The multiplier active effects put on damage of a kind.
+--- The multiplier active effects put on damage of a kind. An effect with
+--- `damage_kinds` scales only those (a stew's heartiness softens a blow,
+--- not a fall); one without scales blows, blasts and falls.
+local BODILY = { physical = true, explosion = true, fall = true }
+
 function E.damage_scale(v, kind)
     local scale = 1.0
     for id in pairs(v.fx) do
         local def = E.defs[id]
-        if def.damage_scale and (kind == "physical" or kind == "explosion" or kind == "fall") then
+        if def.damage_scale and (def.damage_kinds or BODILY)[kind] then
             scale = scale * def.damage_scale
         end
     end

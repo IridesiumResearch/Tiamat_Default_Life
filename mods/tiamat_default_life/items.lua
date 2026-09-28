@@ -51,14 +51,18 @@ item("apple", "Apple", "Crisp. Two cookies.",
     { kind = "food", food = 4, saturation = 1, sound = "eat" })
 item("berries", "Berries", "Picked from a bramble. A bite.",
     { kind = "food", food = 2, saturation = 0, sound = "eat" })
-item("bread", "Bread", "A loaf. Filling.",
-    { kind = "food", food = 5, saturation = 3, sound = "eat" })
+-- Bread and hot stew come from Tiamat Default Craft's kiln and pot; what
+-- they DO is written here, buffs and all, since Craft hands out these very
+-- items rather than registering its own (its sibling ask L9).
+item("bread", "Bread", "A loaf. Filling, and hunger comes on slower after it.",
+    { kind = "food", food = 5, saturation = 3, sound = "eat", effects = { { "steady", tdl.config.steady_ticks } } })
 item("raw_meat", "Raw meat", "Better cooked. Eating it raw sits badly.",
     { kind = "food", food = 3, saturation = 0, sound = "eat", effects = { { "poison", tdl.config.raw_meat_poison_ticks } } })
 item("cooked_meat", "Cooked meat", "The staple. Four cookies and a full belly.",
     { kind = "food", food = 8, saturation = 6, sound = "eat", well_fed = true })
-item("hot_stew", "Hot stew", "Warms you through for a good while.",
-    { kind = "food", food = 6, saturation = 4, sound = "drink", temperature = "warm", well_fed = true })
+item("hot_stew", "Hot stew", "Warms you through for a good while, and takes the edge off a blow.",
+    { kind = "food", food = 6, saturation = 4, sound = "drink", temperature = "warm", well_fed = true,
+      effects = { { "hearty", tdl.config.hearty_ticks } } })
 item("cool_melon", "Cool melon", "Cools you down for a good while.",
     { kind = "food", food = 3, saturation = 1, sound = "eat", temperature = "cool" })
 item("honey", "Honey", "Sweet. Mends a little on its own.",

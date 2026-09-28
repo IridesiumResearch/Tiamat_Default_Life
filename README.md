@@ -277,12 +277,13 @@ happened.
 
 | Item | Does |
 |---|---|
-| Apple, berries, bread | Snacks: two cookies, one, two and a half. |
+| Apple, berries | Snacks: two cookies, and one. |
+| Bread | Two and a half cookies, and three minutes **steady**: hunger comes on a fifth slower. |
 | Turnip, rice, mushroom, egg | From the farm, raw: a cookie and a half for a turnip, a cookie for the rest. |
 | Milk | A bucket of it, from a cow or a goat: a cookie, and it settles a poisoned stomach. The bucket comes back. |
 | Cooked meat | The staple: four cookies and a full belly; leaves you **well fed** (faster healing for a while). |
 | Raw meat | A cookie and a half, and three seconds of poison. Cook it. |
-| Hot stew | Three cookies and a minute of **warmth**. |
+| Hot stew | Three cookies, a minute of **warmth**, and three minutes **hearty**: a blow hurts a little less. Leaves you well fed. |
 | Cool melon | A cookie and a half and a minute of **cooling**. |
 | Honey | Sweet: heals a heart and keeps healing briefly. |
 | Golden apple | Heals two hearts, keeps healing, and halves physical damage for twenty seconds. |
@@ -292,13 +293,12 @@ happened.
 | Bed | Sleep in it at night (X on it or beside it) to heal fully and make it home. When everyone here has slept, it is morning. Using it any time sets home. |
 | Campfire | Warm within three blocks. Burns if you stand in it. |
 
-Where each comes from is the farm, below. Two buffs are ready for the
-kitchen that is not here yet: **hearty** (a cooked meal: a little less hurt
-by a blow) and **steady** (bread: hunger comes on slower). Cooking, milling
-and curing are Tiamat Default Craft's, which registers what it makes through
-this mod's `add_food` (docs/exports.md); until it is here bread, hot stew
-and the golden apple have no source. Say `kit` in chat for one of everything
-while `config.dev_commands` is on.
+Where each comes from is the farm, below, and Tiamat Default Craft's
+kitchen: its kiln bakes bread from wheat and its pot makes hot stew, and
+they are these very items, so what they do is written here. A food Craft
+invents it registers through `add_food` (docs/exports.md). Cured meat and
+the golden apple have no source yet. Say `kit` in chat for one of
+everything while `config.dev_commands` is on.
 
 ## Farming
 

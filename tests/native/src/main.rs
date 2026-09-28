@@ -985,6 +985,23 @@ fn main() {
     assert!(r.text("toast").contains("full"));
     println!("ok  eating an apple, and being too full to");
 
+    // Bread makes you steady and hot stew hearty: Life's own items, with
+    // Life's own buffs, whoever cooked them.
+    r.say("starve 4");
+    r.hold("tiamat_default_life:bread");
+    r.tick(16);
+    r.press("use");
+    r.tick(1);
+    assert!(r.text("fx").contains("steady"), "bread: steady: {}", r.text("fx"));
+    r.say("starve 4");
+    r.hold("tiamat_default_life:hot_stew");
+    r.tick(16);
+    r.press("use");
+    r.tick(1);
+    assert!(r.text("fx").contains("hearty"), "stew: hearty: {}", r.text("fx"));
+    assert!(r.text("fx").contains("warmth") && r.text("fx").contains("well_fed"), "and warm and well fed: {}", r.text("fx"));
+    println!("ok  bread makes you steady, hot stew hearty");
+
     // Right mouse with food in hand eats it, as X does: at a block, and at
     // nothing (open sky; engine protocol 76, `anywhere`). Raw meat feeds, and
     // sits badly.
