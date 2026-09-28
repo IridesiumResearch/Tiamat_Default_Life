@@ -50,7 +50,16 @@ as players come near, one to a chunk at most, remembered with the world.
 It is a spawn pass, not worldgen, so a hive is never in a chunk nobody has
 walked to — which nobody can tell.
 
-## Tiamat Default Craft (not yet built)
+## Tiamat Default Progress
+
+Its asks of this mod (its `docs/sibling-asks.md`), all three answered
+2026-09-28: **L6**, the survival events, as `on_kill`, `on_death`, `on_eat`
+and `on_sleep`; **L7**, `mode()`, `is_ghost(uuid)` and `is_admin(uuid)`;
+**L8**, `add_stat(id, spec)` with `stat`, `set_stat` and `spend_stat`, a
+stat this mod keeps, fills back, saves and draws as a bar above the hearts
+in the adder's colour. Nothing is asked of it.
+
+## Tiamat Default Craft
 
 Its `docs/sibling-asks.md` asks this mod for `add_food` and `add_weapon`;
 both are exported (`docs/exports.md`), with `add_drop`, `add_feed`,

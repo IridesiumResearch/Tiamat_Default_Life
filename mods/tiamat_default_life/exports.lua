@@ -91,6 +91,83 @@ return {
         return true
     end,
 
+    --- The world's mode: "Default", "Creative" or "Adventure".
+    mode = function()
+        return tdl.mode
+    end,
+
+    --- Whether a player is a ghost (died in an Adventure world), or an admin.
+    is_ghost = function(uuid)
+        return type(uuid) == "string" and tdl.is_ghost(uuid) == true
+    end,
+    is_admin = function(uuid)
+        return type(uuid) == "string" and tdl.is_admin(uuid) == true
+    end,
+
+    --- Survival events. Each takes a function of yours, called when it
+    --- happens: `on_kill(fn(uuid, kind))` when a player's blow kills one of
+    --- this mod's creatures (`kind` its short id, "cow"); `on_death(fn(uuid))`;
+    --- `on_eat(fn(uuid, material))` with the food's qualified id;
+    --- `on_sleep(fn(uuid))` for a night slept through. Your function runs in
+    --- your sandbox. Answers whether it was taken.
+    on_kill = function(fn)
+        if type(fn) ~= "function" then return false end
+        tdl.on_event("kill", fn)
+        return true
+    end,
+    on_death = function(fn)
+        if type(fn) ~= "function" then return false end
+        tdl.on_event("death", fn)
+        return true
+    end,
+    on_eat = function(fn)
+        if type(fn) ~= "function" then return false end
+        tdl.on_event("eat", fn)
+        return true
+    end,
+    on_sleep = function(fn)
+        if type(fn) ~= "function" then return false end
+        tdl.on_event("sleep", fn)
+        return true
+    end,
+
+    --- A stat of yours on every player, kept, filled back, saved and drawn
+    --- by this mod: `id` qualified by you ("tiamat_magic:mana"); `spec = {
+    --- max, regen (points a tick), name, colour = { r, g, b }, start }`.
+    --- Then `stat(uuid, id)`, `set_stat(uuid, id, value)` and
+    --- `spend_stat(uuid, id, amount)` (true and taken, or false and
+    --- untouched). Answers whether it was taken.
+    add_stat = function(id, spec)
+        if not block_name(id) or type(spec) ~= "table" or tdl.stats.defs[id] then return false end
+        local max = real(spec.max, 1, 1e6)
+        local regen = spec.regen == nil and 0 or real(spec.regen, 0, 1e6)
+        local start = spec.start == nil and max or real(spec.start, 0, 1e6)
+        if not (max and regen and start) then return false end
+        local colour = { 120, 160, 255 }
+        if type(spec.colour) == "table" then
+            for i = 1, 3 do
+                local c = whole(spec.colour[i], 0, 255)
+                if c == nil then return false end
+                colour[i] = c
+            end
+        end
+        tdl.add_stat(id, { max = max, regen = regen, start = math.min(start, max), colour = colour,
+            name = type(spec.name) == "string" and #spec.name <= 24 and spec.name or nil })
+        return true
+    end,
+    stat = function(uuid, id)
+        if type(uuid) ~= "string" or type(id) ~= "string" then return nil end
+        return tdl.stats.get(uuid, id)
+    end,
+    set_stat = function(uuid, id, value)
+        if type(uuid) ~= "string" or type(id) ~= "string" or real(value, 0, 1e6) == nil then return false end
+        return tdl.stats.set(uuid, id, value)
+    end,
+    spend_stat = function(uuid, id, amount)
+        if type(uuid) ~= "string" or type(id) ~= "string" or real(amount, 0, 1e6) == nil then return false end
+        return tdl.stats.spend(uuid, id, amount)
+    end,
+
     --- Your item `material` is food: `spec = { food, saturation, heal,
     --- effects = { { id, ticks } }, cures = { id }, well_fed, temperature =
     --- "warm"|"cool", sound }`, the fields this mod's own foods have (items.lua).

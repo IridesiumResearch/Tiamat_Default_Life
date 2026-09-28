@@ -197,6 +197,9 @@ impl ent::Access for Entities {
 struct Inventory {
     views: Mutex<HashMap<String, Vec<Stack>>>,
     held: Mutex<Option<MaterialId>>,
+    /// A pack that is full: a give takes this many units at most and answers
+    /// the rest as left, which is what an interface mod's fixed pack does.
+    room: Mutex<Option<u32>>,
 }
 
 impl Inventory {
@@ -214,11 +217,21 @@ impl inventory::Access for Inventory {
     fn contents(&self, _: [u8; 32], view: &str) -> Vec<Stack> {
         self.views.lock().unwrap().get(view).cloned().unwrap_or_default()
     }
-    /// Answers the units it took, which is all of them: a player's view grows.
-    fn give(&self, _: [u8; 32], view: &str, _: Option<usize>, stack: Stack) -> u32 {
+    /// Answers the units that did NOT go in: none, since a view grows, unless
+    /// a test has said how much room there is.
+    fn give(&self, _: [u8; 32], view: &str, _: Option<usize>, mut stack: Stack) -> u32 {
+        let mut left = 0;
+        if let Some(room) = self.room.lock().unwrap().as_mut() {
+            let taken = stack.units.min(*room);
+            left = stack.units - taken;
+            if taken == 0 {
+                return left;
+            }
+            *room -= taken;
+            stack.units = taken;
+        }
         let mut views = self.views.lock().unwrap();
         let list = views.entry(view.to_owned()).or_default();
-        let units = stack.units;
         if let Some(existing) = list
             .iter_mut()
             .find(|s| s.material == stack.material && s.shape == stack.shape && s.detail == stack.detail)
@@ -227,7 +240,7 @@ impl inventory::Access for Inventory {
         } else {
             list.push(stack);
         }
-        units
+        left
     }
     fn held(&self, _: [u8; 32]) -> Option<Stack> {
         let material = (*self.held.lock().unwrap())?;
@@ -840,6 +853,42 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
         &dir,
     )
     .expect("the craft stand-in loads and Life's exports answer it");
+    // A stand-in for Tiamat Default Progress: it counts the survival events,
+    // reads the mode and the ghosts, and keeps a stat through this mod.
+    vm.note_dependencies("tiamat_default_progress", &[MOD.to_owned()]);
+    vm.load_mod(
+        "tiamat_default_progress",
+        r#"
+        local life = game.exports("tiamat_default_life")
+        assert(life.mode() == "Default" or life.mode() == "Creative" or life.mode() == "Adventure")
+        assert(life.is_ghost("00") == false and life.is_admin(7) == false)
+        local counts = { kill = 0, death = 0, eat = 0, sleep = 0 }
+        local last = ""
+        assert(life.on_kill(function(uuid, kind) counts.kill = counts.kill + 1 last = kind end) == true)
+        assert(life.on_death(function(uuid) counts.death = counts.death + 1 end) == true)
+        assert(life.on_eat(function(uuid, material) counts.eat = counts.eat + 1 last = material end) == true)
+        assert(life.on_sleep(function(uuid) counts.sleep = counts.sleep + 1 end) == true)
+        assert(life.on_kill("not a function") == false)
+        assert(life.add_stat("tiamat_default_progress:mana", { max = 20, regen = 0.1, name = "Mana", colour = { 80, 120, 255 } }) == true)
+        assert(life.add_stat("tiamat_default_progress:mana", { max = 20 }) == false, "not twice")
+        assert(life.add_stat("bad", { max = 20 }) == false)
+        assert(life.add_stat("tiamat_default_progress:charge", { max = 0 }) == false)
+        game.register_on_chat(function(e)
+            if e.text == "events" then
+                game.chat_to(e.player, string.format("kill=%d death=%d eat=%d sleep=%d last=%s", counts.kill, counts.death, counts.eat, counts.sleep, last))
+                return false
+            elseif e.text == "spend" then
+                game.chat_to(e.player, tostring(life.spend_stat(e.player, "tiamat_default_progress:mana", 15)))
+                return false
+            elseif e.text == "mana" then
+                game.chat_to(e.player, tostring(life.stat(e.player, "tiamat_default_progress:mana")))
+                return false
+            end
+        end)
+        "#,
+        &dir,
+    )
+    .expect("the progress stand-in loads and Life's exports answer it");
     vm.freeze().unwrap();
     // The server hands out fluid numbers once every mod has loaded; the
     // world's water is 1 here, the number the fake world answers with.
@@ -1234,6 +1283,7 @@ fn main() {
 
     mob_check(&mut r);
     farm_check(&mut r);
+    progress_check(&mut r);
     ui_check();
     climate_check();
     modes_check();
@@ -2174,6 +2224,68 @@ const BOB: [u8; 32] = [9; 32];
 
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
+/// What Progress reads through the exports: the survival events, counted
+/// by its stand-in over everything above, and a stat kept, spent, filled
+/// back, drawn and saved.
+fn progress_check(r: &mut Rig) {
+    r.say("events");
+    let events = r.said();
+    for what in ["kill=", "death=", "eat=", "sleep="] {
+        let n: u32 = events.split(what).nth(1).and_then(|s| s.split(' ').next()).and_then(|s| s.parse().ok()).unwrap_or(0);
+        assert!(n >= 1, "{what} counted over the run: {events}");
+    }
+    assert!(events.contains("last=tiamat_default_life:"), "the last meal by its qualified id: {events}");
+
+    // The stat: full from the start, drawn, spent, and filled back a tenth a tick.
+    r.tick(1);
+    assert_eq!(r.number("stat1"), 20.0, "mana starts full and reaches the HUD");
+    assert_eq!(r.number("stat1_max"), 20.0);
+    assert_eq!(r.text("stats"), "Mana:80,120,255");
+    r.say("spend");
+    assert_eq!(r.said(), "true");
+    r.say("spend");
+    assert_eq!(r.said(), "false", "fifteen twice is more than twenty");
+    r.tick(1);
+    assert!(r.number("stat1") < 6.0, "{}", r.number("stat1"));
+    r.tick(200);
+    assert_eq!(r.number("stat1"), 20.0, "and it is full again");
+    // Saved with the vitals, and back after a leave and a rejoin.
+    r.say("spend");
+    r.tick(1);
+    r.say("mana");
+    let before: f64 = r.said().parse().expect("a number");
+    assert!(before < 6.0, "{before}");
+    r.vm.player_leave(&LeaveEvent { player: PLAYER, name: "tester".into() });
+    r.tick(1);
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "tester".into() });
+    r.say("mana");
+    let after: f64 = r.said().parse().expect("a number");
+    assert!((after - before).abs() < 0.5, "mana survives leaving and rejoining: {before} vs {after}");
+    r.tick(200);
+    println!("ok  progress reads the events, and a stat is kept, spent, filled, drawn and saved");
+
+    // A full pack: a pickup the pack refuses stays on the ground, and one it
+    // half takes leaves the rest lying there, once.
+    let apple = r.material("tiamat_default_life:apple");
+    let had = r.inventory.units_of("player:main", apple);
+    *r.inventory.room.lock().unwrap() = Some(0);
+    r.say("craftdrop");
+    r.tick(80);
+    assert_eq!(r.entities.items(MOD).len(), 1, "a pickup a full pack refused stays on the ground");
+    *r.inventory.room.lock().unwrap() = Some(20);
+    r.tick(40);
+    let hay = r.material("tiamat_default_craft:hay");
+    let ground: Vec<Stack> = r.entities.items(MOD);
+    assert_eq!(ground.len(), 1, "what did not fit is still a pickup");
+    assert_eq!(ground[0].units, 54 - 20, "the units the pack could not take");
+    *r.inventory.room.lock().unwrap() = None;
+    r.tick(40);
+    assert!(r.entities.items(MOD).is_empty(), "room again, and the rest is picked up");
+    assert_eq!(r.inventory.units_of("player:main", apple), had, "and nothing was doubled");
+    let _ = hay;
+    println!("ok  a pickup a full pack cannot take stays on the ground, and a half-taken one leaves the rest");
+}
+
 /// The farm, end to end: tilling, sowing, growing by random tick, harvest,
 /// water, foraging for the first seed, and the animals' domestic lives.
 fn farm_check(r: &mut Rig) {
@@ -2777,6 +2889,14 @@ fn hud_check(r: &Rig) {
     thirds.insert("hot".into(), Value::Flag(true));
     thirds.insert("shield".into(), Value::Text("ok".into()));
     states.push(("partial hearts and cookies", thirds));
+
+    let mut bars = full.clone();
+    bars.insert("stats".into(), Value::Text("Mana:80,120,255;Charge:255,200,80".into()));
+    bars.insert("stat1".into(), Value::Number(12.5));
+    bars.insert("stat1_max".into(), Value::Number(20.0));
+    bars.insert("stat2".into(), Value::Number(0.0));
+    bars.insert("stat2_max".into(), Value::Number(100.0));
+    states.push(("two stat bars", bars));
 
     let mut ghost = full.clone();
     ghost.insert("hp".into(), Value::Number(0.0));

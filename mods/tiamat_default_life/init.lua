@@ -37,6 +37,7 @@ load("modes")                -- the world's mode, its admins, its ghosts: tdl.co
 -- now and the HUD it pushes already shows the result.
 load("environment")          -- what the world is doing to each body: v.env, falls
 load("vitals")               -- health, hunger, air, temperature: tdl.get / tdl.damage / tdl.heal
+load("stats")                -- another mod's stat on a player (mana), regenerated, saved and drawn
 load("drops")                -- stacks lying on the ground, and picking them up
 load("screens")              -- the wardrobe and the death screen, in Tiamat Default UI's look
 load("death")                -- dying, dropping, respawning
@@ -54,7 +55,7 @@ load("crops")                -- wheat, turnip, rice, melon, mushrooms, as data
 -- the bottom rows: the bubbles and thermometer row tops out at 206 virtual
 -- pixels (ROW_Y + ROW_GAP in hud.lua), and a little air over it. An engine
 -- from before the table form takes the plain file name.
-if not pcall(game.register_hud_script, { file = "hud.lua", reserve = 216 }) then
+if not pcall(game.register_hud_script, { file = "hud.lua", reserve = 280 }) then
     game.register_hud_script("hud.lua")
 end
 

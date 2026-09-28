@@ -102,6 +102,7 @@ function tdl.die(uuid, kind, cause)
     if v == nil or v.dead then return end
     v.dead = true
     v.deaths = v.deaths + 1
+    tdl.emit("death", uuid)
 
     local body = U.body(uuid)
     local pos = body and body.pos or v.pos

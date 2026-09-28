@@ -479,6 +479,7 @@ function tdl.hurt_mob(id, amount, by)
         if tdl.husbandry then tdl.husbandry.forget(id, m) end
         game.despawn_entity(id)
         M.live[id] = nil
+        if by then tdl.emit("kill", by, m.kind.id) end
         return true
     end
     game.set_entity(id, { health = left })

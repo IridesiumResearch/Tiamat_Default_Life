@@ -30,10 +30,17 @@ in `depends` or `optional_depends`. Source: `mods/tiamat_default_life/exports.lu
 | `add_crop(def)` | `def = { id, stages = { "mod:block", ... } (2..8 of YOUR blocks, sprouting first, ripe last), seed = "mod:item", produce = "mod:item", produce_min, produce_max, seed_min, seed_max, soil = "tilled"\|"wet"\|{ "mod:block", ... }, light = "sun"\|"dark", biomes = { ids }, name }` | Your crop is sown, grown by random tick and harvested by this mod's rules, exactly as its own are. Register the stage blocks yourself (a texture is a file of the registering mod) and do NOT random-tick them: this mod does, and the engine allows one handler per material. Registration window only. |
 | `add_harvest_tool(material, yield)` | `material` your item's name; `yield` a number 1..8 | A ripe crop dug with it gives `yield` times a hand's produce (this mod's sickle gives two). |
 | `add_tilling_tool(material)` | `material` your item's name | Grass or earth right-clicked with it is tilled ground. |
+| `mode()` | | The world's mode: `"Default"`, `"Creative"` or `"Adventure"`. |
+| `is_ghost(uuid)`, `is_admin(uuid)` | `uuid` a player's hex UUID | Whether the player is a ghost (died in an Adventure world; a ghost may touch nothing), or an admin. |
+| `on_kill(fn)`, `on_death(fn)`, `on_eat(fn)`, `on_sleep(fn)` | `fn` a function of yours | Survival events: `fn(uuid, kind)` when a player's blow kills one of this mod's creatures (`kind` its short id); `fn(uuid)` on a death; `fn(uuid, material)` on a meal, with the food's qualified id; `fn(uuid)` on a night slept through. Your function runs in your sandbox. |
+| `add_stat(id, spec)` | `id` qualified by you (`"tiamat_magic:mana"`); `spec = { max, regen, name, colour = { r, g, b }, start }`, `regen` points a tick, `start` defaulting to `max` | A stat on every player that this mod keeps, fills back, saves with the vitals and draws as a bar above the hearts, in your colour with your name (up to a handful; they stack). |
+| `stat(uuid, id)`, `set_stat(uuid, id, value)`, `spend_stat(uuid, id, amount)` | | Read it; set it (clamped to 0..max); take `amount` off it if there is that much (`true`), else leave it (`false`). |
 | `drop(pos, stack, opts)` | `pos = { x, y, z }`; `stack = { material, units \| count, shape, detail }`; `opts = { velocity = { x, y, z }, owner = uuid }` | Puts a stack on the ground in this mod's care: picked up by whoever walks over it, gone after five minutes. Answers the entity id, or `nil`. |
 
 None of them raise: anything malformed answers `false` (or `nil`, for
-`drop`). Tiamat Weather is one reader (its `docs/exports-contract.md`);
+`drop` and `stat`). Tiamat Default Progress reads the mode, the ghosts,
+the events and the stat (its `docs/sibling-asks.md`, L6 to L8). Tiamat
+Weather is one reader (its `docs/exports-contract.md`);
 Tiamat Default Craft, which will cook, mill and forge, is the other
 (`add_food`, `add_weapon`, and the farm tools in bronze and iron), and
 until it exists this mod's own hoe, sickle, shears and bucket stand in.

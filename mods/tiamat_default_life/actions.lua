@@ -66,6 +66,7 @@ local function consume(uuid, v, held, def)
     end
     tdl.cue(uuid, def.sound or "eat")
     if def.kind == "food" then
+        tdl.emit("eat", uuid, def.id)
         tdl.toast(uuid, "You ate " .. string.lower(def.name) .. ".", 40)
     else
         tdl.toast(uuid, "You used " .. string.lower(def.name) .. ".", 40)
@@ -135,6 +136,7 @@ local function sleep(uuid, v, bed)
     E.apply(v, "rested", C.rested_ticks)
     v.slept_at = tdl.now
     tdl.cue(uuid, "rested")
+    tdl.emit("sleep", uuid)
     if everyone_slept() and game.set_time_of_day(C.wake_time) then
         for other in pairs(tdl.online()) do
             tdl.toast(other, other == uuid and "You slept well, and it is morning. This bed is home."

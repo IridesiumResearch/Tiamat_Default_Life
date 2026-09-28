@@ -52,6 +52,7 @@ local function fresh()
         temp = 0,
         fx = {},
         deaths = 0,
+        stats = {},
         -- Bookkeeping, not saved.
         hurt_cd = 0, last_hit = 0, last_damage = -1000, invuln = 40, dead = false,
         regen_acc = 0, starve_acc = 0, air_acc = 0, drown_acc = 0, fire_acc = 0, temp_acc = 0, temp_dmg_acc = 0,
@@ -75,6 +76,7 @@ local function load(uuid)
         v.temp = U.clamp(r.temp or 0, -1, 1)
         v.deaths = r.deaths or 0
         E.decode(v, r.fx)
+        if tdl.stats then tdl.stats.decode(v, r.st) end
     end
     return v
 end
@@ -82,6 +84,7 @@ end
 local function save(uuid, v)
     game.storage.set(key(uuid), U.encode{
         hp = v.hp, food = v.food, air = v.air, temp = v.temp, deaths = v.deaths, fx = E.encode(v),
+        st = tdl.stats and tdl.stats.encode(v) or nil,
     })
 end
 
@@ -391,7 +394,7 @@ end
 
 local function push_hud(uuid, v)
     local temp = U.round(v.temp * 100) / 100
-    game.set_hud(uuid, {
+    local values = {
         hp = v.hp,
         food = math.min(v.food, C.visible_food),
         air = v.air,
@@ -412,7 +415,9 @@ local function push_hud(uuid, v)
         ghost = tdl.is_ghost(uuid),
         creative = tdl.mode == "Creative",
         god = tdl.is_god(uuid),
-    })
+    }
+    if tdl.stats then tdl.stats.hud(v, values) end
+    game.set_hud(uuid, values)
 end
 
 --- What the body may do, which the client predicts with: cold slows you, an

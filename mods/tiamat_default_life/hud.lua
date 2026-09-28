@@ -196,6 +196,35 @@ local function effects(list, above)
     end
 end
 
+--- Bars for the stats other mods keep through this one (mana, charge):
+--- above the hearts, one over another, each in its own colour with its
+--- name beside it. `list` is "Name:r,g,b;..." in order, and the values
+--- are `stat1`, `stat1_max`, `stat2`, ...
+local BAR_W = COUNT * PITCH - 2
+local BAR_H = 12
+local BAR_GAP = 18
+
+local function stat_bars(v, list)
+    if list == nil or list == "" then return end
+    local n = 0
+    for name, r, g, b in string.gmatch(list, "([^:;]*):(%d+),(%d+),(%d+)") do
+        local value, max = v["stat" .. (n + 1)], v["stat" .. (n + 1) .. "_max"]
+        if value and max and max > 0 then
+            local y = ROW_Y + ROW_GAP * 2 + n * BAR_GAP
+            local x = -HALF_WIDTH
+            hud.rect{ anchor = "bottom", x = x, y = y, w = BAR_W, h = BAR_H, colour = { 0, 0, 0, 150 } }
+            local fill = math.floor((BAR_W - 2) * math.min(value, max) / max)
+            if fill > 0 then
+                hud.rect{ anchor = "bottom", x = x + 1, y = y - 1, w = fill, h = BAR_H - 2,
+                    colour = { tonumber(r), tonumber(g), tonumber(b), 255 } }
+            end
+            hud.text{ anchor = "bottom", x = x + BAR_W + 6, y = y - 1, text = name .. " " .. math.floor(value + 0.5) .. "/" .. max,
+                size = 14, colour = DIM }
+            n = n + 1
+        end
+    end
+end
+
 --- A line of text over the hotbar, for a moment.
 local function toast(text)
     if text == nil or text == "" then return end
@@ -245,6 +274,7 @@ hud.on_draw(function(state)
             thermometer(v.temp, v.hot, v.cold, v.extreme)
         end
     end
+    stat_bars(v, v.stats)
     if v.ghost then
         local line = "You died in this world. It goes on without you."
         hud.text{ anchor = "bottom", x = -(#line * 9.6) / 2, y = ROW_Y + ROW_GAP * 2, text = line, size = 20, colour = { 200, 200, 210, 255 } }

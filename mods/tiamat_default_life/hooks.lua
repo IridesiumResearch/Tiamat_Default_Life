@@ -20,6 +20,7 @@ local places = {}
 local steps = {}
 local uses = {}
 local entity_uses = {}
+local events = {}
 
 -- Runs `fn(dt_ticks)` every tick, after everything subscribed before it.
 ---@param fn fun(dt_ticks: integer)
@@ -93,6 +94,24 @@ end
 -- then not asked.
 function tdl.on_use_entity(fn)
     entity_uses[#entity_uses + 1] = fn
+end
+
+-- Survival events, for the mods that count them (Progress): "kill",
+-- "death", "eat", "sleep". A listener is called with what happened; one
+-- another mod handed in runs in that mod's sandbox, so an error in it is
+-- theirs and answers nil here.
+---@param name string
+---@param fn function
+function tdl.on_event(name, fn)
+    events[name] = events[name] or {}
+    local list = events[name]
+    list[#list + 1] = fn
+end
+
+function tdl.emit(name, ...)
+    for _, fn in ipairs(events[name] or {}) do
+        fn(...)
+    end
 end
 
 game.register_on_tick(function(dt_ticks)

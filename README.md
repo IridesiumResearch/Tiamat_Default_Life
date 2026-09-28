@@ -194,7 +194,9 @@ chat.
 
 ## What the numbers mean
 
-- **Health**: 9 hearts of 3 points, 27 in all. They break a third at a time.
+- **Stats another mod adds** (mana, charge: `add_stat` in docs/exports.md) are bars above the hearts, in that mod's colour, filled back at its rate and saved with the rest.
+
+**Health**: 9 hearts of 3 points, 27 in all. They break a third at a time.
 - **Hunger**: 9 cookies of 2 points, 18 visible, and 9 more hidden points
   of saturation on top. With saturation you heal a point a second; with the
   cookies nearly full, a point every four seconds; below that, not at all.
