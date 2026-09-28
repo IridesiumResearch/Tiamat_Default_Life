@@ -375,21 +375,21 @@ tdl.register_mob{
               time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
 }
 
--- The cave rat: models/cave_rat.glb, from an export that was already
--- skinned, under a block long (`--length 2.4 --axis z`); its nibbling clip
--- under `sneak`. The caves' vermin: common in the ordinary caves at any
--- hour, in twos to fours, skittish, and harmless. Silent, until the
--- library has a squeak that is not a bat's.
+-- The cave rat: a GIANT one, the size of a spider, models/cave_rat.glb from
+-- an export that was already skinned (`--length 3.5 --axis z`, a block and
+-- a sixth nose to tail); its nibbling clip under `sneak`. A loner: it
+-- turns up alone in the ordinary caves at any hour, common, skittish, and
+-- harmless. Silent, until the library has a squeak that is not a bat's.
 tdl.register_mob{
-    id = "cave_rat", name = "Cave rat", health = 3,
-    collider = { width = 0.8, height = 1.4 },
+    id = "cave_rat", name = "Cave rat", health = 6,
+    collider = { width = 1.2, height = 2.0 },
     model = "models/cave_rat.glb", texture = "models/cave_rat.png", grazes = true, jumps = "stuck",
     walk_speed = 1.0, run_speed = 4.6,
-    shy = 4, sight = 8, wander_radius = 6, pause_min = 20, pause_max = 120,
-    drops = { { "raw_meat", 0, 1 }, { "bone", 0, 1 } },
-    -- The commonest thing in a cave, by a distance: three times a bat's draw.
+    shy = 4, sight = 8, wander_radius = 8, pause_min = 20, pause_max = 120,
+    drops = { { "raw_meat", 1, 1 }, { "bone", 0, 1 } },
+    -- Twice a bat's draw, and never two together.
     spawn = { biomes = C.cave_biomes, sun_max = 8,
-              time = "any", group = { 2, 4 }, weight = 9, cap = 12 },
+              time = "any", group = { 1, 1 }, weight = 6, cap = 4 },
 }
 
 -- The scurrier: models/scurrier.glb, from an export that was already skinned,

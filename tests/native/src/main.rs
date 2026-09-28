@@ -59,12 +59,12 @@ impl storage::Access for Storage {
             }
         }
     }
-    fn keys(&self, mod_id: &str) -> Vec<String> {
+    fn keys(&self, mod_id: &str, prefix: &str) -> Vec<String> {
         self.0
             .lock()
             .unwrap()
             .keys()
-            .filter(|(m, _)| m == mod_id)
+            .filter(|(m, k)| m == mod_id && k.starts_with(prefix))
             .map(|(_, k)| k.clone())
             .collect()
     }
@@ -214,7 +214,7 @@ impl inventory::Access for Inventory {
     fn contents(&self, _: [u8; 32], view: &str) -> Vec<Stack> {
         self.views.lock().unwrap().get(view).cloned().unwrap_or_default()
     }
-    fn give(&self, _: [u8; 32], view: &str, stack: Stack) -> bool {
+    fn give(&self, _: [u8; 32], view: &str, _: Option<usize>, stack: Stack) -> bool {
         let mut views = self.views.lock().unwrap();
         let list = views.entry(view.to_owned()).or_default();
         if let Some(existing) = list
@@ -237,10 +237,14 @@ impl inventory::Access for Inventory {
             .find(|s| s.material == material)
             .cloned()
     }
+    fn slot(&self, _: [u8; 32], view: &str, slot: usize) -> Option<Stack> {
+        self.views.lock().unwrap().get(view)?.get(slot).cloned()
+    }
     fn take(
         &self,
         _: [u8; 32],
         view: &str,
+        _: Option<usize>,
         material: MaterialId,
         shape: Option<Shape>,
         detail: Option<&str>,

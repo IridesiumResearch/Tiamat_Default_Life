@@ -443,7 +443,7 @@ function Stream:next_bool() end
 ---@field description string? One-line description.
 ---@field hardness number? Seconds to break with a bare hand. Default 0.75. Must not be negative. One SUB-NODE of it costs a thirteen-and-a-half-th of this, so chiselling a block out cell by cell takes twice as long as smashing it whole.
 ---@field dominance number? How strongly this material imposes its hardness on a block it is only part of. Default 1.0. Must be positive. See below.
----@field drops table<string, integer>? Overrides what breaking it yields: block id to UNITS (27 to a block). Omit for the ordinary rule — the block drops itself, 27 units whole or one per occupied sub-node. Bare ids are namespaced with your mod id.
+---@field drops table<string, integer>? Overrides what breaking it yields: block id to UNITS PER FULL BLOCK (27 to a block); a dig that takes part of a block pays that share, as the block comes apart. Omit for the ordinary rule — the block drops itself, 27 units whole or one per occupied sub-node. Bare ids are namespaced with your mod id; a namespaced id may be ANY mod's block (a drop names a block, it does not register one). A name nobody registered is logged and left out. `{}` drops nothing.
 ---@field tags string[]? Arbitrary tags for other mods to match on.
 ---@field textures Tiamat.BlockTextures? Which images clients draw this block with.
 ---@field sounds { step: string }? What this block sounds like underfoot. The client plays its own footsteps from its own movement, so this is the only way it can know. Unqualified ids mean your own mod's.
@@ -515,6 +515,7 @@ function Stream:next_bool() end
 ---@field name string? Display name.
 ---@field brush string? What shape it removes: `"block"` (default) or `"subnode"`.
 ---@field speed_multiplier number? How much faster than a bare hand. Default 1.0, must be positive.
+---@field speeds table<string, number>? Its speed on particular blocks, by id, where it is not `speed_multiplier`: `{ ["tiamat_default_world:stone"] = 4.5, dirt = 0.5 }` — a bare name is your own. Each must be positive. A block nobody registered is dropped, and digs at the general speed.
 ---@field default boolean? Whether this is what a player digs with holding nothing. The engine has no bare hand of its own, so a world whose mods register no default is one nobody can dig in. Lowest id wins if several mods mark one.
 
 ---Fields accepted by `game.register_sky`.
@@ -659,7 +660,12 @@ function game.set_sky_modifier(player, modifier) end
 ---Defaults: white, `radius` 256, `intensity` 1, one tick up, six down. Wrong
 ---numbers are clamped (intensity up to 4, radius up to 1024, attack up to 100
 ---ticks, decay up to 400).
----@param spec { pos: Tiamat.BlockPos, radius?: number, intensity?: number, colour?: number[]|{ r: number, g: number, b: number }, attack_ticks?: integer, decay_ticks?: integer }
+---
+---`player` sends the flash to that one player and nobody else, provided they
+---are in the domain and within `radius` — it narrows, never widens. A player
+---in a cave under a storm saw every flash lean the sky down the tunnel; the
+---mod knows who is under open sky, and sends each strike to them alone.
+---@param spec { pos: Tiamat.BlockPos, radius?: number, intensity?: number, colour?: number[]|{ r: number, g: number, b: number }, attack_ticks?: integer, decay_ticks?: integer, player?: string }
 ---@return integer told
 function game.flash(spec) end
 
@@ -866,6 +872,15 @@ function game.break_container(name) end
 ---@param name string
 ---@return string|nil holder
 function game.container_holder(name) end
+
+---The names of the containers that exist, starting with `prefix`, in name
+---order. A kiln burns on the tick whether or not anybody is looking, so the
+---tick has to know where every kiln is: the engine keys containers by name and
+---the name says where, so this is that index — no need to keep a second one
+---in `game.storage` that drifts the first time they disagree.
+---@param prefix string `""` for every container there is.
+---@return string[] names
+function game.containers(prefix) end
 
 ---Registers an inventory view: a place stacks may sit, given to every player.
 ---Registration window only.
@@ -1407,6 +1422,37 @@ function game.line_of_sight(from, to) end
 ---@param callback fun(event: { player: string, name: string })
 function game.register_on_player_join(callback) end
 
+---Called when a player's feet cross into another block.
+---
+---**Registration window only.**
+---
+---Once per tick in which the feet's block changed — not per tick, not per
+---cell — after the body has moved, on the simulation thread inside the tick.
+---A fast fall may pass several blocks in one tick; you hear the one it ended
+---in, with `from` the last one you heard. A biome or a depth is discovered by
+---being there, and this is how a mod hears "there" without polling every
+---player every few ticks. `from` is absent the first time a player is placed,
+---which is the tick after they join (after your `on_player_join`) and again
+---after a move between domains. An observation: every mod that registered
+---hears it whatever any returns, and an error disables your mod.
+---
+---```lua
+---game.register_on_player_move(function(e)
+---    if e.y < -60 then discover(e.player, "the deep") end
+---end)
+---```
+---@param callback fun(event: Tiamat.MoveEvent)
+function game.register_on_player_move(callback) end
+
+---A player's feet crossing into another block.
+---@class Tiamat.MoveEvent
+---@field player string The player's UUID in hex.
+---@field x integer The block the feet are in now.
+---@field y integer
+---@field z integer
+---@field domain string The space they are in.
+---@field from { x: integer, y: integer, z: integer }? The block they were in, or nil the first time.
+
 ---Called when a player presses or releases one of YOUR registered actions.
 ---
 ---Charter rule 11: you are told WHAT was done, never which key did it. There is
@@ -1513,7 +1559,11 @@ function game.inventory(player, view) end
 ---Returns false for a player who is not connected, or for a quantity of zero.
 ---An inventory never refuses for lack of room — it grows.
 ---@param player string A player UUID in hex.
----@param spec { material: string|integer, units: integer?, count: integer?, shape: integer?, detail: string?, view: string? }
+---`slot` names ONE slot of the view, one-based, and then the stack goes in whole
+---or not at all — an empty slot takes it, one holding the same thing with room
+---merges, anything else is refused. What rewriting a tool's `detail` needs, so
+---the pick lands back in the hand rather than wherever the pack has room.
+---@param spec { material: string|integer, units: integer?, count: integer?, shape: integer?, detail: string?, view: string?, slot: integer? }
 ---@return boolean gave
 function game.give(player, spec) end
 
@@ -1532,6 +1582,23 @@ function game.give(player, spec) end
 ---@param player string A player UUID in hex.
 ---@return table|nil held
 function game.held(player) end
+
+---The stack in one slot of a player's view, or nil for an empty slot, a view
+---that does not exist, a slot past its end, or a player who is not connected.
+---
+---`game.held` is the main hand; this is any slot, counted from 1 as the
+---screens number them. The off-hand is slot 28 of `"player:main"`, so a
+---station worked in the world — a hammer in the main hand, the bloom in the
+---off-hand, a right-click a blow — reads the bloom here, takes it with
+---`game.take(player, { ..., slot = 28 })` and gives the bar back into the same
+---slot with `game.give(player, { ..., slot = 28 })`.
+---
+---The same table `game.held` answers: `material`, `units`, `shape`, `detail`.
+---@param player string A player UUID in hex.
+---@param view string A view name, such as `"player:main"`.
+---@param n integer The slot, from 1.
+---@return table|nil stack
+function game.slot(player, view, n) end
 
 ---The heading of a direction across the ground, in radians.
 ---
@@ -1571,7 +1638,8 @@ function game.heading(dx, dz) end
 ---left in the same view. A mod that does want any of them reads `game.inventory`,
 ---which reports each stack's detail, and asks for the ones it wants by name.
 ---@param player string A player UUID in hex.
----@param spec { material: string|integer, units: integer?, count: integer?, shape: integer?, detail: string?, view: string? }
+---`slot` names ONE slot of the view, one-based, to take from that slot alone.
+---@param spec { material: string|integer, units: integer?, count: integer?, shape: integer?, detail: string?, view: string?, slot: integer? }
 ---@return integer units How many units were removed.
 function game.take(player, spec) end
 
@@ -1879,7 +1947,7 @@ function game.bind_sound(cue, sound) end
 ---```lua
 ---game.cue{ cue = "door_open", pos = pos, radius = 12 }
 ---```
----@param spec { cue: string, pos: { x: number, y: number, z: number }, radius?: number, gain?: number, entity?: integer }
+---@param spec { cue: string, pos: { x: number, y: number, z: number }, radius?: number, gain?: number, entity?: integer, player?: string } `player`, a UUID in hex, sends the cue to that one player alone, provided they are within `radius`.
 ---@return integer told
 function game.cue(spec) end
 
@@ -2483,6 +2551,7 @@ function game.set_clouds(uuid, spec) end
 ---@field radius number? How far it carries, in blocks. Default 16, capped at 512. Players outside are not sent it at all.
 ---@field gain number? Loudness multiplier on the sound's registered gain. Default 1.
 ---@field entity integer? An entity to follow, if the sound should move with one.
+---@field player string? A player's UUID in hex. Sends the sound to that one player and nobody else, provided they are within `radius` — it narrows, never widens. How thunder is kept out of a cave: the mod sends each clap to the players it knows are under open sky.
 
 ---Plays a sound for everyone close enough to hear it.
 ---
@@ -3053,8 +3122,31 @@ function game.set_block(position, block, occupancy, options) end
 ---dug answers what it holds before anything is removed, so a hook can decide by
 ---the whole block rather than by the one material the event names. Writes from
 ---a veto are still refused.
----@param callback fun(event: Tiamat.DigEvent): boolean|string|nil
+---
+---**Or say what the dig yields.** Return a table with `drops` to replace the
+---block's own rule for this dig alone — rubble by hand, ore by pick:
+---
+---```lua
+---game.register_on_dig_complete(function(e)
+---    local held = game.held(e.player)
+---    if ore[e.material] and not (held and picks[held.material]) then
+---        return { drops = { rubble = 27 } }   -- a unit per cell, whatever it was
+---    end
+---end)
+---```
+---
+---The units are per full block, as in `register_block`, and are paid as the
+---block comes apart; a dig that takes nine cells pays a third. A table
+---without `drops` is a plain allowance. Where several mods answer, the last
+---answer wins. A `drops` the engine cannot read (a negative count, a
+---non-string key) counts as an error: your mod is disabled and the dig goes
+---ahead with the block's own rule.
+---@param callback fun(event: Tiamat.DigEvent): boolean|string|Tiamat.DigAnswer|nil
 function game.register_on_dig_complete(callback) end
+
+---What an `on_dig_complete` hook may answer instead of a plain allowance.
+---@class Tiamat.DigAnswer
+---@field drops table<string, integer>? What THIS dig yields: block id to units per full block, the shape `register_block`'s `drops` takes, replacing the block's own rule for this dig alone. Bare ids are your mod's; a namespaced id is any mod's block.
 
 ---Registers a veto on digs BEGINNING: the tick a dig is first seen, before
 ---any of the block has come off.
@@ -3163,8 +3255,24 @@ function game.register_on_place(callback) end
 ---    return ""
 ---end, { anywhere = true })
 ---```
+---**A use at a block reaches that block's handler first.** A callback
+---registered with `materials = { "campfire_lit", ... }` is asked about a use
+---at one of those blocks BEFORE any callback registered without a list, and
+---is not asked about a use at any other block. Among themselves the listed
+---handlers keep load order. So a mod that eats whatever is held, loaded
+---first, no longer eats the meat a player holds out over another mod's fire:
+---the fire's mod lists its fires and hears the use first, and the eating
+---mod hears only what no block claimed. Bare ids are your own; a namespaced
+---id may be any mod's block. A use at nothing has no block, so the list does
+---not apply to it — add `anywhere = true` to hear those too.
+---
+---```lua
+---game.register_on_use(function(e)
+---    if e.held and raw[e.held.material] then cook(e) return "" end
+---end, { materials = { "campfire_lit", "kiln_lit" } })
+---```
 ---@param callback fun(event: Tiamat.UseEvent): boolean|string|nil
----@param options { anywhere: boolean }? `anywhere = true` to hear a use at nothing as well. Any other key is an error at load.
+---@param options { anywhere?: boolean, materials?: string[] }? `anywhere = true` to hear a use at nothing as well; `materials` to be asked first, and only, about uses at those blocks. Any other key is an error at load.
 function game.register_on_use(callback, options) end
 
 ---Somebody hitting something.
@@ -3382,6 +3490,21 @@ function game.get_block_id(id) end
 ---@param material integer
 ---@return string? id The qualified block id, e.g. "core_blocks:stone".
 function game.block_of(material) end
+
+---What a block's registration said its hardness was, by numeric material:
+---seconds to break with a bare hand, the default for a block that said nothing.
+---`nil` for a material nobody registered.
+---@param material integer
+---@return number|nil hardness
+function game.hardness(material) end
+
+---The tags a block was registered with, by numeric material — `{ "ore" }`,
+---say — so a mod can class the world's blocks by rule rather than name them
+---one by one. An empty list for a block with none; `nil` for a material nobody
+---registered.
+---@param material integer
+---@return string[]|nil tags
+function game.tags(material) end
 
 ---Generates a heightmap for a chunk from fractal noise.
 ---
@@ -4100,13 +4223,22 @@ function game.player_entity(player) end
 ---Names are a per-server claim and can be rebound to someone else; the UUID is
 ---the identity, and every engine system keys on it.
 ---
+---**How big it may get.** There is no fixed ceiling. A key is a row in the
+---world file, loaded once at start and held in memory; only the keys that
+---changed since the last save are written, on the same two-second debounce
+---as chunks, so a mod with ten thousand keys pays for the ones it touched and
+---not for the ten thousand. What grows with the count is `keys()`, which walks
+---them all — give it a prefix. Per-player state is a prefix: a record kept
+---under `uuid .. ":" .. fact` is read back with `keys(uuid .. ":")`.
+---
 ---```lua
 ---game.storage.set("imprint", uuid)     -- a UUID string, not a display name
 ---game.storage.set("greeted", true)
 ---local who = game.storage.get("imprint")
 ---for _, key in ipairs(game.storage.keys()) do ... end
+---for _, key in ipairs(game.storage.keys(uuid .. ":")) do ... end   -- one player's
 ---```
----@field storage { get: fun(key: string): string|number|boolean|nil, set: fun(key: string, value: string|number|boolean|nil), keys: fun(): string[] }
+---@field storage { get: fun(key: string): string|number|boolean|nil, set: fun(key: string, value: string|number|boolean|nil), keys: fun(prefix?: string): string[] }
 
 --- PLANS ------------------------------------------------------------------
 

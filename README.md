@@ -410,7 +410,7 @@ goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
 | Wolf | Uncommon in the taiga and on the frostpine coast; scarce in the mountains, tundra and redwoods; rare in the frozen wastes and woods. Any hour, in packs of 2 to 4 | Leaves you be; hurt one and it hunts you for fifteen seconds, biting for 4. Fourteen points; barks (a dog's take, for now) | 1 to 2 raw meat |
 | Mammoth | Scarce in the frozen wastes and tundra; rare on the Icefall and the Rime Wall. By day, in ones to threes | Slow and enormous, four blocks long; hurt it and it tramples you for 9. Sixty points; trumpets | 4 to 8 raw meat |
 | Spider | The first monster: any land at night, and the ordinary caves at any hour, and not often; never in daylight | Hunts whoever it sees in the dark within ten blocks and bites for 2, slower than you walk, and lets you go at fourteen; in daylight leaves you be. Twelve points; hisses | nothing |
-| Cave rat | The ordinary caves, the commonest thing in them, at any hour, in twos to fours | Nibbles about the cave floor and bolts from you at four blocks. Harmless. Three points; silent | 0 to 1 raw meat, 0 to 1 bone |
+| Cave rat | The ordinary caves, common, at any hour, always alone | A giant, the size of a spider. Nibbles about the cave floor and bolts from you at four blocks. Harmless. Six points; silent | 1 raw meat, 0 to 1 bone |
 | Scurrier | Only the ordinary caves, where it is dark, and extremely seldom; alone | Hunts whoever it sees in the dark, fast on its feet but not as fast as you sprint, and bites for 3. Ten points; silent | nothing |
 | Cave troll | The ordinary caves, where it is dark and there is room for it, very seldom; alone | Wants nothing to do with you: come within ten blocks and it walks off until it is fifteen away. Hit it and it hunts you for good, through death and a restart, and hits for 10. Eighty points; growls | nothing |
 | Swamp hag | The fens and the mangroves only, very, very seldom; alone | Hunts whoever she sees in the dark; her staff strikes for 3 and poisons. Twenty points; silent | nothing |
@@ -460,7 +460,7 @@ it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--le
 mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the spider at
 `--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long; the
 scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
-wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 2.4 --axis z --rename eating=sneak`; the ghost
+wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 3.5 --axis z --rename eating=sneak`; the ghost
 at `--length 2.6 --axis z --rename eating=sneak`, its arms out; the cave troll at `--length 5.5
 --axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`.
 A channel that holds its bone at rest for a whole clip is dropped, since the engine starts every
