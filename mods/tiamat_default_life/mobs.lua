@@ -798,14 +798,16 @@ end
 --- creature that catches fire panics, unless it is busy hunting. Returns
 --- false if the fire killed it.
 local function tick_fire(id, m, entity, dt)
-    if (entity.submerged or 0) > 0 then
-        m.burning, m.in_fire, m.fire_acc = 0, nil, 0
-        return true
-    end
     if (now + m.perceive_at) % FIRE_EVERY == 0 then
         local feet = U.block_at(entity.pos)
         m.in_fire = U.material_in(I.contact_fire, feet)
             or U.material_in(I.contact_fire, { x = feet.x, y = feet.y - 1, z = feet.z })
+            or I.fluid_fire(feet) or I.fluid_fire({ x = feet.x, y = feet.y - 1, z = feet.z })
+    end
+    -- In water, out: but a body in LAVA is in a fluid too, and stays lit.
+    if (entity.submerged or 0) > 0 and m.in_fire == nil then
+        m.burning, m.in_fire, m.fire_acc = 0, nil, 0
+        return true
     end
     local fire = m.in_fire
     local hit = 0

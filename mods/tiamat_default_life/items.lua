@@ -384,19 +384,48 @@ M.forage = U.materials(C.forage)
 -- the first tick, when every block in the world is registered; one added
 -- after that is resolved at once. A name nothing registered is logged and
 -- dropped.
-local pending = { contact_fire = {}, heat_sources = {} }
+local pending = { contact_fire = {}, heat_sources = {}, contact_fluids = {} }
 local started = false
+
+-- Fluids that burn, by the number the engine gives each fluid once every
+-- mod has loaded (`game.fluid_id`), so they are resolved on the first tick
+-- like the names above. Lava is the world's; a mod may add its own.
+M.contact_fluids = {}
+for name, spec in pairs(C.contact_fluids) do pending.contact_fluids[name] = spec end
+
+--- The burning a hot fluid at a block does, or nil: the fluid's own
+--- `{ damage, ticks, after }`. Standing in lava, for a player or a creature.
+function M.fluid_fire(pos)
+    local here = game.get_fluid(pos)
+    if here.volume > 0 and here.fluid then return M.contact_fluids[here.fluid] end
+    return nil
+end
 
 local function resolve(table_name)
     for name, value in pairs(pending[table_name]) do
-        local material = U.material(name)
-        if material then
-            M[table_name][material] = value
+        local id
+        if table_name == "contact_fluids" then
+            id = game.fluid_id and game.fluid_id(name) or nil
+        else
+            id = U.material(name)
+        end
+        if id then
+            M[table_name][id] = value
+            pending[table_name][name] = nil
+        elseif table_name == "contact_fluids" then
+            -- A fluid's number arrives once the world is open, which may be
+            -- after the first tick: keep asking, a name a tick, until it does.
         else
             game.log("tiamat_default_life: " .. name .. " is not a block; not added to " .. table_name)
+            pending[table_name][name] = nil
         end
-        pending[table_name][name] = nil
     end
+end
+
+--- Standing in fluid `name` burns: `{ damage, ticks, after }`, as C.contact_fluids.
+function M.add_contact_fluid(name, spec)
+    pending.contact_fluids[name] = { damage = spec.damage, ticks = spec.ticks, after = spec.after }
+    if started then resolve("contact_fluids") end
 end
 
 --- Standing in `name` burns: `{ damage, ticks, after }`, as C.contact_fire.
@@ -412,10 +441,14 @@ function M.add_heat_source(name, strength)
 end
 
 tdl.on_tick(function()
-    if started then return end
+    if started then
+        if next(pending.contact_fluids) ~= nil then resolve("contact_fluids") end
+        return
+    end
     started = true
     resolve("contact_fire")
     resolve("heat_sources")
+    resolve("contact_fluids")
 end)
 
 return M

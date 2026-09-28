@@ -389,6 +389,8 @@ impl uihost::Access for Dialogs {
 struct World {
     blocks: Mutex<HashMap<(i32, i32, i32), (MaterialId, u32)>>,
     fluids: Mutex<HashMap<(i32, i32, i32), u32>>,
+    /// Blocks whose fluid is lava (2) rather than water (1).
+    lava: Mutex<std::collections::HashSet<(i32, i32, i32)>>,
     edits: Mutex<Vec<(BlockPos, String)>>,
     /// Solid ground everywhere at and below a height, of one material.
     floor: Mutex<Option<(i32, MaterialId)>>,
@@ -460,7 +462,10 @@ impl sight::Access for World {
 impl fluid::Access for World {
     fn fluid_at(&self, _: &str, pos: BlockPos) -> Fluid {
         match self.fluids.lock().unwrap().get(&(pos.x, pos.y, pos.z)) {
-            Some(volume) => Fluid::new(FluidId(1), *volume),
+            Some(volume) => {
+                let lava = self.lava.lock().unwrap().contains(&(pos.x, pos.y, pos.z));
+                Fluid::new(FluidId(if lava { 2 } else { 1 }), *volume)
+            }
             None => Fluid::EMPTY,
         }
     }
@@ -473,9 +478,13 @@ impl fluid::Access for World {
         }
         true
     }
-    /// The world's water is the one fluid here, number 1.
+    /// The world's water is fluid 1 here, and its lava 2.
     fn fluid_id(&self, name: &str) -> Option<FluidId> {
-        (name == "tiamat_default_world:water").then_some(FluidId(1))
+        match name {
+            "tiamat_default_world:water" => Some(FluidId(1)),
+            "tiamat_default_world:lava" => Some(FluidId(2)),
+            _ => None,
+        }
     }
 }
 
@@ -744,11 +753,12 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
                 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'apple_log', 'fern', 'tall_grass',
                 'ladys_mantle', 'ladys_mantle_bloom', 'mycelium', 'mulch', 'moss', 'black_mud', 'reeds', 'heather',
                 'lichen', 'glow_cap', 'mushroom_cap', 'monstera', 'pitcher_plant', 'apple_leaves', 'apple_blossom',
-                'poppy', 'water' }) do
+                'poppy', 'water', 'lava' }) do
             game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass'
                 or id == 'ladys_mantle' or id == 'ladys_mantle_bloom' or id == 'poppy' or id == 'heather') }
         end
         game.register_fluid{ id = "water", material = "water" }
+        game.register_fluid{ id = "lava", material = "lava" }
         local here = "rolling_grasslands"
         local aliases = {}
         game.register_on_chat(function(e)
@@ -892,7 +902,7 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
     vm.freeze().unwrap();
     // The server hands out fluid numbers once every mod has loaded; the
     // world's water is 1 here, the number the fake world answers with.
-    vm.set_fluid_ids(&[("tiamat_default_world:water".to_owned(), FluidId(1))]);
+    vm.set_fluid_ids(&[("tiamat_default_world:water".to_owned(), FluidId(1)), ("tiamat_default_world:lava".to_owned(), FluidId(2))]);
 
     // Noon, so nothing is cold unless a scenario makes it so.
     *sounds.time.lock().unwrap() = 0.5;
@@ -1144,6 +1154,28 @@ fn main() {
     assert!(!r.text("fx").contains("burning"), "burning went out");
     println!("ok  lava burned and the fire went out");
 
+    // Lava proper is a FLUID, and a block full of it is air to get_block: a
+    // body in it is "in fluid" to the engine, and it burns rather than gets
+    // wet. Out of it, into water, the burning goes out as it always did.
+    r.world.clear();
+    r.say("heal");
+    r.tick(1);
+    r.world.fluids.lock().unwrap().insert((100, 64, 100), 27);
+    r.world.lava.lock().unwrap().insert((100, 64, 100));
+    r.entities.body(|b| b.submerged = 0.5);
+    r.tick(45);
+    assert!(r.number("hp") <= 27.0 - 12.0, "in lava: {}", r.number("hp"));
+    assert!(r.text("fx").contains("burning"), "and burning");
+    assert!(!r.flag("wet"), "lava is not wet");
+    r.world.lava.lock().unwrap().clear();
+    r.tick(2);
+    assert!(!r.text("fx").contains("burning"), "the same block as water puts it out");
+    r.entities.body(|b| b.submerged = 0.0);
+    r.world.clear();
+    r.say("heal");
+    r.tick(1);
+    println!("ok  lava the fluid burns a body standing in it, and is not wet");
+
     // Weather's fire, put in the fire table through our export: it hurts,
     // sets you alight, and flames show on the body while it burns.
     r.say("heal");
@@ -1313,10 +1345,14 @@ fn mob_check(r: &mut Rig) {
     kinds.dedup();
     assert!(kinds.len() >= 2, "more than one kind: {kinds:?}");
     for (_, mob) in &spawned {
-        // Every kind is its own model now; none is the named stand-in.
+        // Every kind is its own model now, but the hen, which has none yet
+        // and wears the named stand-in until it does.
         let model = mob.model.as_deref().unwrap_or("");
-        assert!(model.starts_with("tiamat_default_life:"), "its own body, not a stand-in: {model}");
-        assert_eq!(mob.nametag, None, "a cow looks like a cow and needs no name over it");
+        if mob.nametag.is_some() {
+            assert_eq!(model, "engine:humanoid", "a named body is the stand-in");
+        } else {
+            assert!(model.starts_with("tiamat_default_life:"), "its own body, not a stand-in: {model}");
+        }
         assert!(mob.health.is_some(), "a mob has health");
         let [_, y, _] = mob.transform.to_world();
         if mob.model.as_deref() == Some("tiamat_default_life:crow") {
@@ -2267,22 +2303,20 @@ fn progress_check(r: &mut Rig) {
     // A full pack: a pickup the pack refuses stays on the ground, and one it
     // half takes leaves the rest lying there, once.
     let apple = r.material("tiamat_default_life:apple");
+    let hay = r.material("tiamat_default_craft:hay");
     let had = r.inventory.units_of("player:main", apple);
+    let hay_on_ground = |r: &Rig| -> Vec<u32> { r.entities.items(MOD).iter().filter(|s| s.material == hay).map(|s| s.units).collect() };
     *r.inventory.room.lock().unwrap() = Some(0);
     r.say("craftdrop");
     r.tick(80);
-    assert_eq!(r.entities.items(MOD).len(), 1, "a pickup a full pack refused stays on the ground");
+    assert_eq!(hay_on_ground(r), vec![54], "a pickup a full pack refused stays on the ground");
     *r.inventory.room.lock().unwrap() = Some(20);
     r.tick(40);
-    let hay = r.material("tiamat_default_craft:hay");
-    let ground: Vec<Stack> = r.entities.items(MOD);
-    assert_eq!(ground.len(), 1, "what did not fit is still a pickup");
-    assert_eq!(ground[0].units, 54 - 20, "the units the pack could not take");
+    assert_eq!(hay_on_ground(r), vec![54 - 20], "what did not fit is still a pickup, the units the pack could not take");
     *r.inventory.room.lock().unwrap() = None;
     r.tick(40);
-    assert!(r.entities.items(MOD).is_empty(), "room again, and the rest is picked up");
+    assert!(hay_on_ground(r).is_empty(), "room again, and the rest is picked up");
     assert_eq!(r.inventory.units_of("player:main", apple), had, "and nothing was doubled");
-    let _ = hay;
     println!("ok  a pickup a full pack cannot take stays on the ground, and a half-taken one leaves the rest");
 }
 

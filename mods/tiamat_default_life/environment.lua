@@ -36,6 +36,20 @@ local function sample_fluid(v, body)
     env.submerged = share >= C.submerged_head
     env.wet = share > 0
     env.swimming = share >= C.submerged_swimming
+    -- A body in lava is in a fluid, and the engine says so; but lava is
+    -- not wet. It burns instead, and puts nothing out.
+    if share > 0 then
+        local hot = I.fluid_fire(U.block_at(body.pos))
+        if hot then
+            env.hot_fluid = hot
+            env.wet, env.submerged, env.swimming = false, false, false
+            env.fire = hot
+        else
+            env.hot_fluid = nil
+        end
+    else
+        env.hot_fluid = nil
+    end
 end
 
 local function sample_blocks(v, body)
@@ -47,7 +61,7 @@ local function sample_blocks(v, body)
     -- Fire: the block the feet are in, the one they stand on, the head.
     local below = { x = feet.x, y = feet.y - 1, z = feet.z }
     env.fire = material_in(I.contact_fire, feet) or material_in(I.contact_fire, below)
-        or material_in(I.contact_fire, head)
+        or material_in(I.contact_fire, head) or env.hot_fluid or I.fluid_fire(below)
 end
 
 local function sample_sources(v, body)

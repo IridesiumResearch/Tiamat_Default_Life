@@ -65,6 +65,16 @@ return {
         return true
     end,
 
+    --- Standing in fluid `fluid` (a `"mod:fluid"` name) burns, on the same
+    --- terms: lava is the world's, and this is how a mod adds its own.
+    add_contact_fluid = function(fluid, spec)
+        if not block_name(fluid) or type(spec) ~= "table" then return false end
+        local damage, ticks, after = whole(spec.damage, 1, 27), whole(spec.ticks, 1, 1200), whole(spec.after, 0, 1200)
+        if not (damage and ticks and after) then return false end
+        I.add_contact_fluid(fluid, { damage = damage, ticks = ticks, after = after })
+        return true
+    end,
+
     --- Sets `target` on fire for `ticks` (at most a minute): a player's UUID,
     --- or the entity id of one of this mod's creatures. Burning is a point
     --- every half second until it runs out or they reach water. Answers

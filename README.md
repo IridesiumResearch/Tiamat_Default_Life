@@ -242,7 +242,7 @@ gone wrong.
 Physical (punches; a `core_gear:sword` does six), falls (past three blocks,
 a little over a point a block (1.15), as far as the engine measured the fall, which
 a flight down is not; none landing in water), fire and
-lava (standing on the world's magma, in a campfire or in Tiamat Weather's
+lava (standing in the world's lava or on its magma, in a campfire or in Tiamat Weather's
 fire, and burning for a while after, in flames anyone can see), poison (to your last heart), wither (all the way), starvation
 (to your last heart), drowning, freezing and overheating, explosions
 (`tdl.explode{ pos, radius, damage, blocks }`), radiation (a block list in

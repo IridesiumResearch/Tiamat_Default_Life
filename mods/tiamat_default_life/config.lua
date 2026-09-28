@@ -237,6 +237,12 @@ C.swarm_roost_spread = 3       -- blocks round its leader a swarming bat looks f
 --
 -- Standing IN one of these burns. `damage`/`ticks` are the contact hit and
 -- `after` is how long the burning status lasts once out of it.
+-- Fluids that burn, by FLUID id: lava is a fluid, and a block full of it is
+-- air to `get_block`, so it is found through `get_fluid` and never here.
+-- A hot fluid is not wet: it puts nothing out.
+C.contact_fluids = {
+    ["tiamat_default_world:lava"] = { damage = C.lava_damage, ticks = C.lava_ticks, after = C.burn_after_lava },
+}
 C.contact_fire = {
     ["tiamat_default_world:magma"] = { damage = C.lava_damage, ticks = C.lava_ticks, after = C.burn_after_lava },
     ["tiamat_default_life:campfire"] = { damage = C.campfire_damage, ticks = C.campfire_ticks, after = C.burn_after_campfire },
