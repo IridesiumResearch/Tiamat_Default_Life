@@ -20,6 +20,7 @@ local U = tdl.util
 local REACH = 1.5              -- blocks
 local SETTLE = 60              -- ticks a dropper waits before taking it back
 local DESPAWN = 20 * 60 * 5    -- five minutes
+local RETRY = 20               -- ticks before a pickup a full pack refused is tried again
 
 local tracked = {}             -- entity id -> { owner, ticks }
 
@@ -69,16 +70,31 @@ tdl.on_tick(function(dt)
                     if person and person.owner then
                         local mine = person.owner == watch.owner
                         local v = tdl.get(person.owner)
-                        if not (mine and watch.ticks < SETTLE) and v and not v.dead and not tdl.is_ghost(person.owner) then
-                            game.give(person.owner, {
+                        if not (mine and watch.ticks < SETTLE) and watch.ticks >= (watch.retry or 0)
+                            and v and not v.dead and not tdl.is_ghost(person.owner) then
+                            -- A pack can be full (an interface mod may fix its size):
+                            -- `give` answers what did not go in, and that much stays
+                            -- on the ground. All of it: the pickup is left alone for
+                            -- a second before it is tried again. Some of it: the
+                            -- remainder is a new pickup where the old one lay.
+                            local gave, left = game.give(person.owner, {
                                 material = item.item.material,
                                 shape = item.item.shape,
                                 units = item.item.units,
                                 detail = item.item.detail,
                             })
-                            game.despawn_entity(id)
-                            tracked[id] = nil
-                            break
+                            left = left or (gave and 0 or item.item.units)
+                            if left >= item.item.units then
+                                watch.retry = watch.ticks + RETRY
+                            else
+                                game.despawn_entity(id)
+                                tracked[id] = nil
+                                if left > 0 then
+                                    tdl.drop(item.pos, { material = item.item.material, units = left,
+                                        shape = item.item.shape, detail = item.item.detail })
+                                end
+                                break
+                            end
                         end
                     end
                 end
