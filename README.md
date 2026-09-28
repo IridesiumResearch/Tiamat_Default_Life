@@ -390,7 +390,7 @@ false` in `config.lua`.
 
 ## Creatures
 
-Twenty-two so far, in `creatures.lua` as data over the system in `mobs.lua`.
+Twenty-three so far, in `creatures.lua` as data over the system in `mobs.lua`.
 Beside its meat each leaves the makings of things: hide (cattle, horses,
 goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
 (most), sinew (horses, wolves, stags, mammoths), wool (sheep), feathers
@@ -414,6 +414,7 @@ goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
 | Scurrier | Only the ordinary caves, where it is dark, and extremely seldom; alone | Hunts whoever it sees in the dark, fast on its feet but not as fast as you sprint, and bites for 3. Ten points; silent | nothing |
 | Cave troll | The ordinary caves, where it is dark and there is room for it, very seldom; alone | Wants nothing to do with you: come within ten blocks and it walks off until it is fifteen away. Hit it and it hunts you for good, through death and a restart, and hits for 10. Eighty points; growls | nothing |
 | Swamp hag | The fens and the mangroves only, very, very seldom; alone | Hunts whoever she sees in the dark; her staff strikes for 3 and poisons. Twenty points; silent | nothing |
+| The Mortal | The deep woods (the woodlands, silverwood, the redwoods, the taiga) and the top of the Rime Wall at the edge of the world; very seldom, alone | A tall antlered figure of old wood that stands where it is and almost never moves. Come within four blocks and it throws one of everything this mod has, at random, at your feet, once every five minutes. Hit it twice and it takes it; the third blow, it walks to you and strikes once, and nobody survives that. Two hundred points; silent | nothing |
 | Ghost | Any land, at night only, extremely seldom, and always a long way off (56 to 88 blocks); alone | Drifts about far off. Come within forty blocks of it, or let the night end, and it is gone in a breath of mist. It never harms anybody | nothing |
 | Scarecrow | Very rarely, and only in the fields: the grassland and river meadows. Any hour, alone | Stands in its field and never moves. Hit it and it follows you for good: never further than thirty-six blocks, never nearer than eighteen, keeping pace however you run, turning to watch you when it stands still. It never strikes. Only when it happens to come up against an apple tree does it stop, and eat. Twenty points; silent | nothing |
 | Bear | Seldom: scarce in the taiga and redwoods, rare in the woods, silverwood, frostpine coast and mountains, and only a fifth of those come to anything; never more than one about | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
@@ -460,14 +461,17 @@ it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--le
 mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the spider at
 `--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long; the
 scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
-wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 3.5 --axis z --rename eating=sneak`; the ghost
+wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 3.5 --axis z --rename eating=sneak`; the mortal at `--length 1.05 --axis z --rename eating=sneak`, sized along its depth; the ghost
 at `--length 2.6 --axis z --rename eating=sneak`, its arms out; the cave troll at `--length 5.5
 --axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`.
 A channel that holds its bone at rest for a whole clip is dropped, since the engine starts every
 bone at rest: the ghost keys all 57 of its bones in every clip, which is over the engine's limit
 of 512 channels otherwise. So is a key the straight line between its neighbours already gives,
 and weights are written as bytes: the troll was sampled every frame and was over the engine's
-2 MB model limit otherwise):
+2 MB model limit otherwise. A mesh that is not part of the rig — a studio floor exported with the
+creature — is left out. A rig over the engine's sixty-four bones is folded down to it, the leaf bone
+carrying the fewest vertices into its parent each time, which is how the mortal's eighty-six
+became sixty-four: fingers and the tips of its antlers follow the hand and the crown now):
 
 ```
 python tools/skin_glb.py "assets/source/Tiamat Life AI Cow.glb" mods/tiamat_default_life/models/cow.glb --length 6.0 --rename eating=sneak

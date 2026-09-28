@@ -31,6 +31,10 @@
 --   grudge            hit it and it hunts whoever did for good, remembered with the
 --                     world; it strikes nobody who has not
 --   chase             blocks: a hunter lets go of anyone further off than this
+--   gives             it drops one of this mod's items, at random, for a player who comes
+--                     within `gift_reach` (config.lua), once per player per `gift_ticks`
+--   patience          blows it takes before it strikes back; then `smite` = { damage, range,
+--                     cause }: it walks to whoever did it and strikes ONCE, and forgets
 --   keeps_off         blocks: never met. A player nearer than this, or the day, and it
 --                     is gone in a breath of mist (the ghost)
 --   eats, eat_ticks, eat_every   blocks it eats when it touches them; how long; how often
@@ -453,6 +457,31 @@ tdl.register_mob{
     sight = 14, chase = 20, wander_radius = 10, pause_min = 60, pause_max = 300,
     drops = {},
     spawn = { biomes = { peat_fen = 1, mangrove_coast = 1 }, chance = 2,
+              time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
+}
+
+-- The mortal: models/mortal.glb, from an export that was already skinned, a
+-- tall antlered figure of old wood with moss on its shoulders, two and a
+-- half blocks tall (`--length 1.05 --axis z`, sized along its depth, since
+-- it is a plank of a thing); the tool folded its fingers and the tips of
+-- its antlers into their parents to fit the engine's sixty-four bones, and
+-- left its studio floor out. It stands in the deep woods, and on top of
+-- the Rime Wall at the very edge of the world, very seldom, and almost
+-- never moves. Come near and it gives you something: one of everything
+-- this mod has, at random, dropped at your feet, once in a while. Hit it
+-- and it takes the first two blows; the third, it walks to you and strikes
+-- once, and nobody survives that. Then it stands again.
+tdl.register_mob{
+    id = "mortal", name = "The Mortal", health = 200,
+    collider = { width = 2.2, height = 7.0 },
+    model = "models/mortal.glb", texture = "models/mortal.png", jumps = "stuck",
+    walk_speed = 2.0, run_speed = 4.0,
+    still = true, gives = true, patience = 3,
+    smite = { damage = 999, range = 3.2, cause = "were struck down by the Mortal" },
+    sight = 12,
+    drops = {},
+    spawn = { biomes = { temperate_woodlands = RARE, silverwood = RARE, redwood_stands = RARE, taiga = RARE, rime_wall = RARE },
+              chance = 2, ground = { G .. "loam", G .. "leaf_litter", G .. "snow" },
               time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
 }
 

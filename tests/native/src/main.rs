@@ -214,9 +214,11 @@ impl inventory::Access for Inventory {
     fn contents(&self, _: [u8; 32], view: &str) -> Vec<Stack> {
         self.views.lock().unwrap().get(view).cloned().unwrap_or_default()
     }
-    fn give(&self, _: [u8; 32], view: &str, _: Option<usize>, stack: Stack) -> bool {
+    /// Answers the units it took, which is all of them: a player's view grows.
+    fn give(&self, _: [u8; 32], view: &str, _: Option<usize>, stack: Stack) -> u32 {
         let mut views = self.views.lock().unwrap();
         let list = views.entry(view.to_owned()).or_default();
+        let units = stack.units;
         if let Some(existing) = list
             .iter_mut()
             .find(|s| s.material == stack.material && s.shape == stack.shape && s.detail == stack.detail)
@@ -225,7 +227,7 @@ impl inventory::Access for Inventory {
         } else {
             list.push(stack);
         }
-        true
+        units
     }
     fn held(&self, _: [u8; 32]) -> Option<Stack> {
         let material = (*self.held.lock().unwrap())?;
@@ -1718,6 +1720,41 @@ fn mob_check(r: &mut Rig) {
     assert!(r.storage.get(MOD, &format!("grudge:{troll}")).is_none(), "culled, the grudge is forgotten");
     r.say("heal");
     println!("ok  a cave troll walks off from anyone near, and hit, hunts them for good");
+
+    // The Mortal: it stands, gives whoever comes near something, takes two
+    // blows, and on the third walks over and ends you.
+    r.say("heal");
+    r.say("cull");
+    r.say("spawn mortal 1");
+    r.tick(1);
+    let mortal = r.mobs().iter().map(|(id, _)| *id).max().expect("the mortal");
+    let mortal_drive = |r: &Rig| r.entities.0.lock().unwrap().entities[&mortal].drive.walk;
+    let items_before = r.entities.items(MOD).len();
+    r.put_mob(mortal, 103.0, 64.0, 100.5);
+    r.entities.0.lock().unwrap().entities.get_mut(&mortal).unwrap().on_ground = true;
+    r.tick(12);
+    assert!(r.entities.items(MOD).len() > items_before, "come near, and it throws you something");
+    assert_eq!(mortal_drive(&r), [0.0, 0.0], "and it does not move");
+    let gifts = r.entities.items(MOD).len();
+    r.tick(60);
+    assert_eq!(r.entities.items(MOD).len(), gifts, "one gift, not a shower");
+    r.hold_nothing();
+    for _ in 0..2 {
+        r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(mortal), owner: None });
+        r.tick(12);
+    }
+    assert_eq!(r.number("hp"), 27.0, "two blows, and it takes them");
+    assert_eq!(mortal_drive(&r), [0.0, 0.0], "without moving");
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(mortal), owner: None });
+    r.put_mob(mortal, 110.0, 64.0, 100.5);
+    r.tick(3);
+    assert!(mortal_drive(&r)[0] < 0.0, "the third, and it comes for you: {:?}", mortal_drive(&r));
+    r.put_mob(mortal, 102.0, 64.0, 100.5);
+    r.tick(2);
+    assert!(r.flag("shielded"), "one strike, and you are dead and back at your bed");
+    r.say("cull");
+    r.tick(1);
+    println!("ok  the Mortal stands, gives a gift, takes two blows and kills on the third");
 
     // The scarecrow: it stands where it is put and does not move; hit it and
     // it follows at a distance, never striking; against an apple tree it eats.

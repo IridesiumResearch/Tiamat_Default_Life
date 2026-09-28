@@ -55,7 +55,7 @@ All are namespaced `tiamat_default_life:` by the engine.
   `sinew`.
 - **Creatures** (entity models, and the kind read back off an entity):
   `cow`, `sheep`, `pig`, `hen`, `horse`, `goat`, `bunny`, `fox`, `squirrel`, `wolf`,
-  `mammoth`, `spider`, `scurrier`, `cave_rat`, `cave_troll`, `swamp_hag`, `scarecrow`, `ghost`, `bear`,
+  `mammoth`, `spider`, `scurrier`, `cave_rat`, `cave_troll`, `swamp_hag`, `scarecrow`, `mortal`, `ghost`, `bear`,
   `stag`, `crow`, `bat`; and, for the kinds that breed, a young body
   `<kind>_young` (the same model at half size), which is how a young one is
   told from a grown one across a restart.

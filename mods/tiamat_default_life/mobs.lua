@@ -500,6 +500,14 @@ function tdl.hurt_mob(id, amount, by)
             -- remembered with the world so a restart does not free you.
             m.stalking = by
             game.storage.set("stalk:" .. id, by)
+        elseif m.kind.patience then
+            -- It takes so many blows, and then it comes for whoever struck
+            -- the last one, once (the mortal; "The still and the stalking").
+            m.struck = (m.struck or 0) + 1
+            if m.struck >= m.kind.patience then
+                m.struck = 0
+                m.smiting = by
+            end
         elseif m.kind.grudge then
             -- It never lets go of whoever hit it (the first to), remembered
             -- with the world.
@@ -1069,9 +1077,73 @@ local function touching_food(m, entity)
     return false
 end
 
+--- One tick of a kind that gives (the mortal): a gift at the feet of a
+--- player who comes near, once per player per `gift_ticks`; a walk to and
+--- one strike at whoever struck it once too often; else it stands and
+--- watches whoever is nearest. Answers true when it has handled the tick.
+local function giver(id, m, entity, dt)
+    local kind = m.kind
+    if m.state == "panic" then m.state = "idle" end
+
+    -- The smite: to them, and one blow that ends it.
+    local prey = m.smiting and U.body(m.smiting)
+    local v = m.smiting and tdl.get(m.smiting)
+    if prey and v and not v.dead and not tdl.is_invulnerable(m.smiting) then
+        local smite = kind.smite
+        local middle = { x = prey.pos.x, y = prey.pos.y + 0.9, z = prey.pos.z }
+        if U.dist2(middle, entity.pos) <= smite.range * smite.range then
+            tdl.damage(m.smiting, smite.damage, "physical", { force = true, cause = smite.cause })
+            game.cue{ cue = "bite", pos = entity.pos, radius = 24 }
+            m.swing = C.mob_swing_ticks
+            m.smiting = nil
+            stand(id, m)
+        else
+            walk_to(id, m, entity, prey.pos, "sprint")
+        end
+        return true
+    elseif m.smiting then
+        m.smiting = nil
+    end
+
+    -- The gift, for whoever is nearest, if they are near enough and it is
+    -- not too soon: one of everything this mod has, at random, thrown to
+    -- their feet.
+    local seen = m.seen
+    if seen and kind.gives and seen.d2 <= U.square(C.gift_reach) and (now + m.perceive_at) % PERCEIVE_EVERY == 0 then
+        m.gifted = m.gifted or {}
+        if (m.gifted[seen.uuid] or 0) <= now then
+            m.gifted[seen.uuid] = now + C.gift_ticks
+            local pool = {}
+            for _, def in pairs(I.defs) do
+                if string.find(def.id, "^" .. game.mod_id .. ":") then pool[#pool + 1] = def end
+            end
+            table.sort(pool, function(a, b) return a.id < b.id end)
+            local gift = pool[between(1, #pool)]
+            local dx, dz = seen.pos.x - entity.pos.x, seen.pos.z - entity.pos.z
+            local length = math.sqrt(dx * dx + dz * dz)
+            local vx, vz = 0, 0
+            if length > 0.001 then vx, vz = dx / length * 0.25, dz / length * 0.25 end
+            tdl.drop({ x = entity.pos.x, y = entity.pos.y + 1.5, z = entity.pos.z },
+                { material = gift.material, units = 27 }, { velocity = { x = vx, y = 0.3, z = vz } })
+            m.swing = C.mob_swing_ticks
+        end
+    end
+
+    -- Otherwise it stands, and turns to whoever is nearest.
+    local spec = { drive = { walk = { x = 0, z = 0 } }, anim = ANIM_IDLE }
+    if (m.swing or 0) > 0 then
+        m.swing = m.swing - dt
+        spec.anim = ANIM_SWING
+    end
+    if seen then spec.yaw = game.heading(seen.pos.x - entity.pos.x, seen.pos.z - entity.pos.z) end
+    game.set_entity(id, spec)
+    return true
+end
+
 --- One tick of a still kind. Answers true when it has handled the tick.
 local function stalker(id, m, entity, dt)
     local kind = m.kind
+    if kind.gives or kind.patience then return giver(id, m, entity, dt) end
     if m.stalking == nil and kind.stalks and m.stalk_read == nil then
         m.stalk_read = true
         local who = game.storage.get("stalk:" .. id)
@@ -1491,7 +1563,7 @@ if C.dev_commands then
         local swarm = kind == "swarm"
         if swarm then kind = "bat" end
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_rat|cave_troll|swamp_hag|scarecrow|ghost|crow|bat|hen|swarm> [count] [young]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_rat|cave_troll|swamp_hag|scarecrow|mortal|ghost|crow|bat|hen|swarm> [count] [young]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),
