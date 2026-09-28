@@ -378,7 +378,7 @@ tdl.register_mob{
 -- The cave rat: models/cave_rat.glb, from an export that was already
 -- skinned, under a block long (`--length 2.4 --axis z`); its nibbling clip
 -- under `sneak`. The caves' vermin: common in the ordinary caves at any
--- hour, in twos and threes, skittish, and harmless. Silent, until the
+-- hour, in twos to fours, skittish, and harmless. Silent, until the
 -- library has a squeak that is not a bat's.
 tdl.register_mob{
     id = "cave_rat", name = "Cave rat", health = 3,
@@ -387,8 +387,9 @@ tdl.register_mob{
     walk_speed = 1.0, run_speed = 4.6,
     shy = 4, sight = 8, wander_radius = 6, pause_min = 20, pause_max = 120,
     drops = { { "raw_meat", 0, 1 }, { "bone", 0, 1 } },
-    spawn = { biomes = C.cave_biomes, sun_max = 6,
-              time = "any", group = { 2, 3 }, weight = 4, cap = 6 },
+    -- The commonest thing in a cave, by a distance: three times a bat's draw.
+    spawn = { biomes = C.cave_biomes, sun_max = 8,
+              time = "any", group = { 2, 4 }, weight = 9, cap = 12 },
 }
 
 -- The scurrier: models/scurrier.glb, from an export that was already skinned,
@@ -552,14 +553,14 @@ tdl.register_mob{
               time = "any", sun_min = 8, group = { 3, 6 }, weight = 3, cap = 12, distance = { 56, 88 } },
 }
 
--- Bats: the dark's own. Caves by day, anywhere by night; they bite and
--- flutter off, and bite again. Its body is models/bat.glb, a skinned export
+-- Bats: the dark's own, and no threat to anybody: a bat flutters about
+-- its cave and leaves you be. Hit one and it bites back once or twice,
+-- fluttering off between, and then loses interest. Its body is models/bat.glb, a skinned export
 -- with its wings spread, sized along its body (`--axis z`): a fifth of a
 -- block nose to tail and a block and a third across the wings. It flutters
 -- on its `run` clip and bites on `swing`. With a ceiling over it, it goes up
 -- and hangs there on its `idle` clip; now and then it comes down instead and
--- crawls (`walk`) and eats (`sneak`) on the ground. Anyone it hunts, it lets
--- go for.
+-- crawls (`walk`) and eats (`sneak`) on the ground.
 --
 -- Now and then (`swarm.chance` in a hundred of the times bats turn up) it is
 -- a swarm instead: a dozen or so churning round one leader, roosting when it
@@ -572,7 +573,7 @@ tdl.register_mob{
     flyer = true, flutters = true, hangs = true, lands = true,
     speed = 0.4, speed_fast = 0.65, walk_speed = 0.3, roost_min = 400, roost_max = 1600,
     sight = 16, wander_radius = 10, fly_low = 2, fly_high = 6,
-    hostile = { when = "dark", sun_max = 3 },
+    provoked = true, hunt_ticks = 80,
     bite = { damage = 1, range = 1.4, cooldown = 30, cause = "were bitten to death by bats" },
     sound = { "squeak", "squeak", "flap" }, voice_min = 60, voice_max = 300,
     drops = {},

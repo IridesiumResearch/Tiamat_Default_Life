@@ -1484,7 +1484,8 @@ fn mob_check(r: &mut Rig) {
     r.tick(1);
     println!("ok  a cow hit spins round, at most 0.6 a tick, on the spot when it must run the other way");
 
-    // A bat at night: it hunts the player, bites, and wheels away.
+    // A bat at night, on the shoulder: it leaves you be. Hit, it bites back
+    // and wheels away, and soon loses interest.
     *r.sounds.time.lock().unwrap() = 0.9;
     r.say("heal");
     r.say("spawn bat 1");
@@ -1493,6 +1494,13 @@ fn mob_check(r: &mut Rig) {
     assert_eq!(bats.len(), 1, "one bat");
     let (bat, body) = bats[0].clone();
     assert_eq!(body.model.as_deref(), Some("tiamat_default_life:bat"), "a bat is its own model");
+    for _ in 0..60 {
+        r.put_mob(bat, 101.0, 65.5, 100.5);
+        r.tick(1);
+    }
+    assert_eq!(r.number("hp"), 27.0, "a bat, unprovoked, bites nobody");
+    r.hold_nothing();
+    r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(bat), owner: None });
     let bites = r.plays("bite");
     // Put it on the shoulder: the fake world has no physics to fly it there.
     // It flutters on its run clip, and bites on its swing.
@@ -1506,16 +1514,17 @@ fn mob_check(r: &mut Rig) {
         fluttered |= anim == tiamat_core::ent::AnimTag::RUN;
         swung |= anim == tiamat_core::ent::AnimTag::SWING;
     }
-    assert!(r.number("hp") < 27.0, "bitten: {}", r.number("hp"));
+    assert!(r.number("hp") < 27.0, "hit, it bit back: {}", r.number("hp"));
     assert!(r.plays("bite") > bites);
     assert!(fluttered && swung, "it flutters, and its bite plays its swing");
-    // Daylight, and it loses interest.
-    *r.sounds.time.lock().unwrap() = 0.5;
+    // And it loses interest.
+    r.tick(100);
     r.say("heal");
     r.put_mob(bat, 101.0, 65.5, 100.5);
     r.tick(60);
-    assert_eq!(r.number("hp"), 27.0, "a bat in daylight is harmless");
-    println!("ok  a bat bit at night and left off by day");
+    assert_eq!(r.number("hp"), 27.0, "and soon leaves you be again");
+    *r.sounds.time.lock().unwrap() = 0.5;
+    println!("ok  a bat leaves you be, bites back when hit, and soon forgets it");
     r.say("cull");
     r.tick(1);
 
