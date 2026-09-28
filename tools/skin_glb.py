@@ -236,8 +236,12 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
             return cache[index]
         return world
 
-    # The parts: every node with a mesh, and the bone it hangs from.
+    # The parts: every node with a mesh, and the bone it hangs from. A mesh
+    # that is neither skinned nor under the rig at all is scenery the
+    # modelling tool exported with the creature (a studio floor), and is left
+    # out rather than becoming a 200-block plane under its feet.
     parts = []
+    scenery = []
     for index, node in enumerate(nodes):
         if "mesh" not in node:
             continue
@@ -249,8 +253,18 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
         while bone is not None and bone not in joint_slot:
             bone = parent.get(bone)
         if bone is None:
+            up, under_rig = index, False
+            while up is not None:
+                if up in chain or up == root:
+                    under_rig = True
+                up = parent.get(up)
+            if not under_rig:
+                scenery.append(node.get("name", f"node{index}"))
+                continue
             bone = root
         parts.append((index, joint_slot[bone]))
+    if scenery:
+        print("left out, not part of the rig: " + ", ".join(scenery))
 
     ibms = []
     if "inverseBindMatrices" in skin:
@@ -351,6 +365,41 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
                 quat_norm(quat_mul(over_q, q)), tuple(c * over_s for c in s))
 
     positions, normals, uvs, bones, weights, indices = gather(world_with(stand))
+
+    # A rig over the engine's limit of 64 joints is folded down to it: the
+    # leaf bone carrying the fewest vertices is merged into its parent (its
+    # vertices follow the parent from then on, and its own clips are lost),
+    # again and again until the rig fits. Fingers, the tips of a crown, the
+    # ends of boughs: what moves least and costs a joint each.
+    MAX_JOINTS = 64
+    pruned = []
+    if len(joints) > MAX_JOINTS:
+        slot_of = list(range(len(joints)))          # old slot -> the slot it now counts as
+        alive = set(range(len(joints)))
+        def resolve(slot):
+            while slot_of[slot] != slot:
+                slot = slot_of[slot]
+            return slot
+        count = [0] * len(joints)
+        for jv, wv in zip(bones, weights):
+            for slot, w in zip(jv, wv):
+                if w > 0:
+                    count[slot] += 1
+        while len(alive) > MAX_JOINTS:
+            has_child = {parent.get(joints[s]) for s in alive if parent.get(joints[s]) in joint_slot}
+            has_child = {joint_slot[p] for p in has_child if p in joint_slot}
+            leaves = [s for s in alive if s not in has_child and joints[s] != root]
+            leaf = min(leaves, key=lambda s: (count[s], s))
+            up = joint_slot[parent[joints[leaf]]]
+            slot_of[leaf] = up
+            count[up] += count[leaf]
+            alive.discard(leaf)
+            pruned.append(nodes[joints[leaf]].get("name", str(leaf)))
+        kept = [n for s, n in enumerate(joints) if s in alive]
+        renumber = {s: new for new, s in enumerate(sorted(alive))}
+        bones = [tuple(renumber[resolve(s)] if w > 0 else 0 for s, w in zip(jv, wv)) for jv, wv in zip(bones, weights)]
+        joints = kept
+        joint_slot = {node: slot for slot, node in enumerate(joints)}
 
     # The new skeleton: the bones alone, the root carrying what stood above it.
     new_index = {old: new for new, old in enumerate(joints)}
@@ -494,7 +543,8 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
 
     lo2 = [min(p[a] for p in positions) for a in range(3)]
     hi2 = [max(p[a] for p in positions) for a in range(3)]
-    print(f"parts {len(parts)} ({sum(1 for _, slot in parts if slot is None)} already skinned) -> one mesh: {len(positions)} vertices, {len(indices) // 3} triangles, {len(joints)} bones")
+    print(f"parts {len(parts)} ({sum(1 for _, slot in parts if slot is None)} already skinned) -> one mesh: {len(positions)} vertices, {len(indices) // 3} triangles, {len(joints)} bones"
+          + (f"; {len(pruned)} leaf bones folded into their parents to fit the engine's 64: {', '.join(pruned)}" if pruned else ""))
     print(f"as exported: {span[0]:.2f} x {span[1]:.2f} x {span[2]:.2f}; long axis {'xyz'[long_axis]}, "
           f"head toward {'-' if facing_back else '+'}; turned {turn:.0f} degrees, scaled x{k:.2f}")
     print("in cells: " + " x ".join(f"{hi2[a] - lo2[a]:.2f}" for a in range(3))
