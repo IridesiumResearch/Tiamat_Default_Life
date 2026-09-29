@@ -753,7 +753,7 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
                 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'apple_log', 'fern', 'tall_grass',
                 'ladys_mantle', 'ladys_mantle_bloom', 'mycelium', 'mulch', 'moss', 'black_mud', 'reeds', 'heather',
                 'lichen', 'glow_cap', 'mushroom_cap', 'monstera', 'pitcher_plant', 'apple_leaves', 'apple_blossom',
-                'poppy', 'water', 'lava' }) do
+                'poppy', 'water', 'lava', 'sand' }) do
             game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass'
                 or id == 'ladys_mantle' or id == 'ladys_mantle_bloom' or id == 'poppy' or id == 'heather') }
         end
@@ -1823,6 +1823,47 @@ fn mob_check(r: &mut Rig) {
     assert!(r.storage.get(MOD, &format!("grudge:{troll}")).is_none(), "culled, the grudge is forgotten");
     r.say("heal");
     println!("ok  a cave troll walks off from anyone near, and hit, hunts them for good");
+
+    // The sea: dolphins appear in deep water and nowhere else, swim held up
+    // while in it, and get no lift out of it; nothing of the land appears on
+    // water.
+    r.say("heal");
+    r.say("cull");
+    r.world.clear();
+    *r.world.floor.lock().unwrap() = Some((40, r.material("tiamat_default_world:sand")));
+    for x in 40..160 {
+        for z in 40..160 {
+            for y in 41..=63 {
+                r.world.fluids.lock().unwrap().insert((x, y, z), 27);
+            }
+        }
+    }
+    r.say("biome deep_ocean");
+    r.tick(100 * 10);
+    let sea = r.mobs();
+    assert!(!sea.is_empty(), "dolphins in the sea");
+    for (_, e) in &sea {
+        assert_eq!(e.model.as_deref(), Some("tiamat_default_life:dolphin"), "nothing but dolphins at sea: {:?}", e.model);
+        let [_, y, _] = e.transform.to_world();
+        assert!((41.0..=63.0).contains(&y), "in the water, not on the sea floor or over it: {y}");
+    }
+    let (dolphin, _) = sea[0].clone();
+    r.entities.0.lock().unwrap().entities.get_mut(&dolphin).unwrap().submerged = 1.0;
+    r.put_mob(dolphin, 100.5, 55.0, 100.5);
+    r.tick(1);
+    let v = r.entities.0.lock().unwrap().entities[&dolphin].velocity.0;
+    assert!(v[1] > -0.2, "in the water it is held up against gravity: {v:?}");
+    r.entities.0.lock().unwrap().entities.get_mut(&dolphin).unwrap().submerged = 0.0;
+    r.put_mob(dolphin, 100.5, 70.0, 100.5);
+    r.tick(1);
+    let v = r.entities.0.lock().unwrap().entities[&dolphin].velocity.0;
+    assert_eq!(v[1], 0.0, "out of it, no lift: it does not swim through the air: {v:?}");
+    r.say("cull");
+    r.say("biome rolling_grasslands");
+    r.world.clear();
+    *r.world.floor.lock().unwrap() = None;
+    r.tick(1);
+    println!("ok  dolphins appear in deep water only, and swim held up in it and never out of it");
 
     // The Mortal: it stands, gives whoever comes near something, takes two
     // blows, and on the third walks over and ends you.

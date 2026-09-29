@@ -261,6 +261,33 @@ local function ground_at(x, z, y, under_trees)
     return nil
 end
 
+-- The world's water, as a fluid number, asked for on first use: the engine
+-- hands fluid numbers out once every mod has loaded.
+local WATER = nil
+local function water_fluid()
+    if WATER == nil and game.fluid_id then WATER = game.fluid_id("tiamat_default_world:water") end
+    return WATER
+end
+
+--- Swimming room at (x, z) near height y: the top of a body of water, at
+--- least two blocks deep, with nothing solid over it. Returns a spot a
+--- block under the surface, or nil. What a creature of the sea appears at.
+local function water_at(x, z, y)
+    local water = water_fluid()
+    if water == nil then return nil end
+    local top = game.surface_at{ x = x, z = z, from = y + 10, depth = 40 }
+    if top == nil or top.fluid ~= water then return nil end
+    local under = { x = x, y = top.y - 1, z = z }
+    if game.get_fluid(under).volume < 27 then return nil end
+    return { x = x + 0.5, y = top.y - 1, z = z + 0.5 }
+end
+
+--- Whether a point is in water: what a swimmer keeps to.
+local function in_water(pos)
+    local here = game.get_fluid(U.block_at(pos))
+    return here.volume > 0 and (here.fluid == nil or here.fluid == water_fluid())
+end
+
 --- Somewhere to hang from: the nearest solid block above a point, within a
 --- few blocks, or nil. Returns the middle of that block's underside.
 local function ceiling_above(pos)
@@ -362,6 +389,12 @@ local function try_spawn_near(v)
         local dz = (below(2) == 0 and 1 or -1) * (dist - math.abs(dx))
         local x, z = math.floor(pos.x) + dx, math.floor(pos.z) + dz
         local feet, material, room = ground_at(x, z, math.floor(pos.y), true)
+        -- No ground here: the sea, maybe, for the kinds that live in it.
+        local wet = false
+        if feet == nil then
+            feet = water_at(x, z, math.floor(pos.y))
+            wet, room = feet ~= nil, 2
+        end
         if feet then
             local biome = biome_at(feet)
             -- The kinds that may appear here, by weight, under their caps.
@@ -370,6 +403,7 @@ local function try_spawn_near(v)
                 local kind = M.kinds[kid]
                 local range = kind.spawn.distance or { C.mob_spawn_min, C.mob_spawn_max }
                 if (counts[kid] or 0) < (kind.spawn.cap or 4) and dist >= range[1] and dist <= range[2]
+                    and (kind.spawn.water == true) == wet
                     and room >= (kind.spawn.headroom or 2) and may_spawn(kind, feet, material, biome) then
                     candidates[#candidates + 1] = kind
                     weight_sum = weight_sum + weight_in(kind, biome)
@@ -600,6 +634,19 @@ local function pick_wander(m, entity)
     if kind.flyer then
         y = m.home.y + between(kind.fly_low or 3, kind.fly_high or 9)
     end
+    if kind.swims then
+        -- Somewhere in the water round home, a few tries; home itself if none.
+        for _ = 1, 4 do
+            local at = { x = x, y = m.home.y + between(-3, 0), z = z }
+            if in_water(at) then
+                m.target = at
+                return
+            end
+            x, z = m.home.x + between(-r, r), m.home.z + between(-r, r)
+        end
+        m.target = { x = m.home.x, y = m.home.y, z = m.home.z }
+        return
+    end
     m.target = { x = x, y = y, z = z }
 end
 
@@ -770,8 +817,41 @@ local function take_off(id, m)
     game.set_entity(id, { drive = { walk = { x = 0, z = 0 } } })
 end
 
+--- Swims a swimmer toward a point: velocity set every tick, as a flyer's
+--- is, held against gravity only while it is IN the water, so it never
+--- swims through the air. A beached one gets no lift: it falls, and flops
+--- toward home. It plays its walk clip cruising and its run clip fast.
+local function swim_to(id, m, entity, target, speed, fast)
+    local dx, dy, dz = target.x - entity.pos.x, target.y - entity.pos.y, target.z - entity.pos.z
+    local flat = math.sqrt(dx * dx + dz * dz)
+    local vx, vz = 0, 0
+    if flat > 0.01 then vx, vz = dx / flat * speed, dz / flat * speed end
+    local vy = U.clamp(dy * 0.15, -speed, speed)
+    local lift = C.fly_lift
+    if (entity.submerged or 0) <= 0 then
+        vy, lift = 0, 0
+    elseif vy > 0 and not in_water({ x = entity.pos.x, y = entity.pos.y + 1.2, z = entity.pos.z }) then
+        -- At the surface: no higher.
+        vy = 0
+    end
+    local anim = fast and ANIM_RUN or ANIM_WALK
+    if (m.swing or 0) > 0 then
+        m.swing = m.swing - 1
+        anim = ANIM_SWING
+    end
+    game.set_entity(id, {
+        velocity = { x = vx, y = vy + lift, z = vz },
+        yaw = flat > 0.05 and game.heading(dx, dz) or nil,
+        anim = anim,
+    })
+    return flat > 1.0 or math.abs(dy) > 1.0
+end
+
 local function move_to(id, m, entity, target, fast)
     local kind = m.kind
+    if kind.swims then
+        return swim_to(id, m, entity, target, fast and (kind.speed_fast or 0.5) or (kind.speed or 0.3), fast)
+    end
     if kind.flyer and not m.landed then
         return fly_to(id, m, entity, target, fast and (kind.speed_fast or 0.5) or (kind.speed or 0.3), fast)
     end
@@ -781,6 +861,13 @@ end
 --- Stands still, on the ground. A flyer in the air has nothing to stand on
 --- and is left to its last velocity.
 local function stand(id, m)
+    if m.kind.swims then
+        -- Holding still in the water; out of it, nothing to hold on to.
+        local entity = game.entity(id)
+        local lift = entity and (entity.submerged or 0) > 0 and C.fly_lift or 0
+        game.set_entity(id, { velocity = { x = 0, y = lift, z = 0 }, anim = ANIM_IDLE })
+        return
+    end
     if not m.kind.flyer or m.landed then
         local anim = ((m.grazing and m.state == "idle") or m.kind.hangs) and ANIM_SNEAK or ANIM_IDLE
         -- A blow just struck: its swing clip, for as long as the swing lasts.
@@ -1502,8 +1589,8 @@ local function step(id, dt)
             m.state = "wander"
             m.timer = m.landed and between(40, 100) or between(60, 200)
             pick_wander(m, entity)
-        elseif kind.flyer and not m.landed then
-            -- A flyer never idles on the ground: it circles.
+        elseif (kind.flyer and not m.landed) or kind.swims then
+            -- A flyer never idles on the ground, nor a swimmer in the water: it circles.
             if m.target == nil then pick_wander(m, entity) end
             move_to(id, m, entity, m.target, false)
         else
@@ -1566,7 +1653,7 @@ if C.dev_commands then
         local swarm = kind == "swarm"
         if swarm then kind = "bat" end
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_rat|cave_troll|swamp_hag|scarecrow|mortal|ghost|crow|bat|hen|swarm> [count] [young]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_rat|cave_troll|swamp_hag|scarecrow|mortal|ghost|crow|bat|hen|crab|sea_turtle|dolphin|swarm> [count] [young]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),

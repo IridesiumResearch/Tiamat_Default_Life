@@ -392,7 +392,7 @@ false` in `config.lua`.
 
 ## Creatures
 
-Twenty-three so far, in `creatures.lua` as data over the system in `mobs.lua`.
+Twenty-six so far, in `creatures.lua` as data over the system in `mobs.lua`.
 Beside its meat each leaves the makings of things: hide (cattle, horses,
 goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
 (most), sinew (horses, wolves, stags, mammoths), wool (sheep), feathers
@@ -413,6 +413,9 @@ goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
 | Mammoth | Scarce in the frozen wastes and tundra; rare on the Icefall and the Rime Wall. By day, in ones to threes | Slow and enormous, four blocks long; hurt it and it tramples you for 9. Sixty points; trumpets | 4 to 8 raw meat |
 | Spider | The first monster: any land at night, and the ordinary caves at any hour, and not often; never in daylight | Hunts whoever it sees in the dark within ten blocks and bites for 2, slower than you walk, and lets you go at fourteen; in daylight leaves you be. Twelve points; hisses | nothing |
 | Cave rat | The ordinary caves, common, at any hour, always alone | A giant, the size of a spider. Nibbles about the cave floor and bolts from you at four blocks. Harmless. Six points; silent | 1 raw meat, 0 to 1 bone |
+| Crab | The beaches and the mangrove mud, commonly; the cliffs, the cinder and frostpine coasts less; any hour, in ones to threes | Scuttles about and off from you; hit it and it pinches back for a point. Four points | 0 to 1 raw meat |
+| Sea turtle | Ashore on the sandy beaches, less in the mangroves, by day, in ones and twos | Slow on the sand and in no hurry; wanders off from you at two blocks | 1 to 2 raw meat |
+| Dolphin | The open ocean and the shallows, commonly; the kelp forest less; pods of two to four at any hour | The first creature of the sea: cruises round where it appeared and never leaves the water. Harmless. Ten points | nothing |
 | Scurrier | Only the ordinary caves, where it is dark, and extremely seldom; alone | Hunts whoever it sees in the dark, fast on its feet but not as fast as you sprint, and bites for 3. Ten points; silent | nothing |
 | Cave troll | The ordinary caves, where it is dark and there is room for it, very seldom; alone | Wants nothing to do with you: come within ten blocks and it walks off until it is fifteen away. Hit it and it hunts you for good, through death and a restart, and hits for 10. Eighty points; growls | nothing |
 | Swamp hag | The fens and the mangroves only, very, very seldom; alone | Hunts whoever she sees in the dark; her staff strikes for 3 and poisons. Twenty points; silent | nothing |
@@ -463,7 +466,7 @@ it is long; the goat at `--length 4.0 --rename eating=sneak`; the bunny at `--le
 mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the spider at
 `--length 3.5 --axis z --rename eating=sneak`, its legs wider than it is long; the
 scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
-wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 3.5 --axis z --rename eating=sneak`; the mortal at `--length 1.05 --axis z --rename eating=sneak`, sized along its depth; the ghost
+wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 3.5 --axis z --rename eating=sneak`; the mortal at `--length 1.05 --axis z --rename eating=sneak`, sized along its depth; the crab at `--length 1.6 --axis z`, the sea turtle at `--length 4.2 --axis z` and the dolphin at `--length 6.0`, each with `--rename eating=sneak`; the ghost
 at `--length 2.6 --axis z --rename eating=sneak`, its arms out; the cave troll at `--length 5.5
 --axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`.
 A channel that holds its bone at rest for a whole clip is dropped, since the engine starts every

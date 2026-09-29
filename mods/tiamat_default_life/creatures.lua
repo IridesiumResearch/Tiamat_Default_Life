@@ -35,6 +35,8 @@
 --                     within `gift_reach` (config.lua), once per player per `gift_ticks`
 --   patience          blows it takes before it strikes back; then `smite` = { damage, range,
 --                     cause }: it walks to whoever did it and strikes ONCE, and forgets
+--   swims             lives in the water: steered through it as a flyer is through the air,
+--                     held up only while in it; appears only at water (`spawn.water`)
 --   keeps_off         blocks: never met. A player nearer than this, or the day, and it
 --                     is gone in a breath of mist (the ghost)
 --   eats, eat_ticks, eat_every   blocks it eats when it touches them; how long; how often
@@ -62,6 +64,7 @@
 --                       group = { min, max }, weight, cap, chance (in a hundred: a rare kind),
 --                       swarm = { chance, group }: sometimes a swarm, over the cap (bats),
 --                       headroom = blocks clear over the ground it needs (default 2),
+--                       water = true: at the sea rather than on land (a swimmer),
 --                       distance = { min, max } blocks from the player, if not the usual }
 --
 -- WHERE a creature appears is its biomes: the world's own answer for the
@@ -394,6 +397,60 @@ tdl.register_mob{
     -- Twice a bat's draw, and never two together.
     spawn = { biomes = C.cave_biomes, sun_max = 8,
               time = "any", group = { 1, 1 }, weight = 6, cap = 4 },
+}
+
+-- The crab: models/crab.glb, from an export that was already skinned,
+-- wider than it is long (`--length 1.6 --axis z`), two thirds of a block
+-- across the claws; its feeding clip under `sneak` and a pinch under
+-- `swing`. On the beaches and the mangrove mud, any hour, in ones to
+-- threes; it scuttles off from you, and pinches back if you hit it.
+tdl.register_mob{
+    id = "crab", name = "Crab", health = 4,
+    collider = { width = 1.8, height = 1.0 },
+    model = "models/crab.glb", texture = "models/crab.png", grazes = true, jumps = "stuck",
+    walk_speed = 0.8, run_speed = 3.2,
+    shy = 3, sight = 8, wander_radius = 6, pause_min = 20, pause_max = 140,
+    provoked = true, hunt_ticks = 60,
+    bite = { damage = 1, range = 1.4, cooldown = 20, cause = "were pinched to death by a crab" },
+    drops = { { "raw_meat", 0, 1 } },
+    spawn = { biomes = {
+                  sandy_shores = COMMON, mangrove_coast = COMMON, coastal_cliffs = UNCOMMON,
+                  cinder_coast = SCARCE, frostpine_coast = SCARCE, dunes = RARE,
+              },
+              ground = { G .. "sand", G .. "white_sand", G .. "dark_sand", G .. "mud" },
+              time = "any", group = { 1, 3 }, weight = 4, cap = 6 },
+}
+
+-- The sea turtle: models/sea_turtle.glb, from an export that was already
+-- skinned, a block and a half across the flippers (`--length 4.2 --axis
+-- z`); its grazing clip under `sneak`. Ashore on the warm beaches, by day,
+-- in ones and twos, slow on the sand and in no hurry about anything.
+tdl.register_mob{
+    id = "sea_turtle", name = "Sea turtle", health = 12,
+    collider = { width = 3.0, height = 1.7 },
+    model = "models/sea_turtle.glb", texture = "models/sea_turtle.png", grazes = true, jumps = "stuck",
+    walk_speed = 0.4, run_speed = 1.0,
+    shy = 2, sight = 8, wander_radius = 8, pause_min = 80, pause_max = 320,
+    drops = { { "raw_meat", 1, 2 } },
+    spawn = { biomes = { sandy_shores = UNCOMMON, mangrove_coast = SCARCE, coastal_cliffs = RARE },
+              ground = { G .. "sand", G .. "white_sand", G .. "mud" },
+              time = "day", sun_min = 10, group = { 1, 2 }, weight = 2, cap = 3 },
+}
+
+-- The dolphin: models/dolphin.glb, from an export that was already
+-- skinned, two blocks nose to tail; it swims on its `walk` clip and races
+-- on `run`. The first creature of the sea (`swims`): pods of two to four in
+-- the open ocean, the shallows and the kelp, cruising round where they
+-- appeared and never leaving the water. Harmless, and not shy.
+tdl.register_mob{
+    id = "dolphin", name = "Dolphin", health = 10,
+    collider = { width = 2.4, height = 2.4 },
+    model = "models/dolphin.glb", texture = "models/dolphin.png",
+    swims = true, speed = 0.35, speed_fast = 0.6,
+    sight = 12, wander_radius = 14, pause_min = 10, pause_max = 60,
+    drops = {},
+    spawn = { biomes = { deep_ocean = COMMON, coral_fringed_shallows = COMMON, kelp_forest = UNCOMMON },
+              water = true, time = "any", group = { 2, 4 }, weight = 3, cap = 6 },
 }
 
 -- The scurrier: models/scurrier.glb, from an export that was already skinned,
