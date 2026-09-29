@@ -5,9 +5,9 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-09-26)
+## Where these stand (2026-09-29)
 
-**One is open: 18.** Everything else landed, and the mod uses every answer: 17 landed 2026-09-26
+**Two are open: 18 and 19.** Everything else landed, and the mod uses every answer: 17 landed 2026-09-26
 (engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
 One thing landed that was never numbered: the place control at nothing (open sky, or a
 block past reach) reaches a mod that asks, engine a6d34e1 (protocol 76), so food is eaten
@@ -19,6 +19,7 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
+| 19 a creature is lit where it stands | **Open.** | every creature is lit as if in the open: a cave's bats and rats glow. |
 | 18 riding | **Open.** | the horse is in the world and cannot be ridden. |
 | 17 using an entity | Landed, engine 50462b7. | feeding, milking, shearing and leading, in husbandry.lua. |
 | (unnumbered) a use at nothing | Landed, engine a6d34e1, protocol 76. | `hooks.lua` registers `on_use` with `{ anywhere = true }`; right mouse eats what is held at open sky too. |
@@ -39,6 +40,33 @@ included.
 | 7 `submerged` and `fell` | Landed, engine a3db9fa. | the head-block probe and the peak tracker are gone. |
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
+
+## 19. A creature is lit as if it stood in the open, wherever it is (2026-09-29): OPEN
+
+**Seen.** In play, every creature is lit the same everywhere: a bat hanging
+in a pitch-dark cave, a scurrier in a tunnel and a cow in noon sun are
+equally bright, so a cave's animals seem to glow against the dark rock round
+them, and a mob under a canopy or in a torchlit room is no darker or warmer
+than one in a field.
+
+**Why the mod cannot fix it.** How a model is shaded is the client's alone.
+`crates/client/src/render/skinned.rs` says it outright: figures are "lit by
+the sun, the ambient and the fog and nothing else", and `skinned.wgsl`
+shades `albedo * (sun + sky)` from the frame's globals. The light the world
+has PROPAGATED to the block the figure stands in (the sky light that is 0
+at the bottom of a cave, and the block light a lamp or lava gives), which
+every voxel face beside it is lit by, never reaches the figure. A mod has
+no hand in the shader, and no knob on an entity for brightness.
+
+**Smallest change.** Light each figure by the light where it stands: when
+the client builds a `Figure`, sample the propagated light at the block its
+body's centre is in (the same sky and block channels the mesher lights a
+face with there), put it on the instance, and in `skinned.wgsl` scale the
+sun and sky terms by the sky channel and add the block channel's colour in
+place of the flat ambient, the way a voxel face is lit. A figure in the
+open looks exactly as it does now; one in a cave goes dark, and one by lava
+glows orange. The same would serve the engine's own humanoid (other
+players), which has the same flat lighting.
 
 ## 18. Riding: a player seated on an entity, driving it (2026-09-23): OPEN
 
