@@ -36,15 +36,40 @@ id = "my_mod"           # letters, digits, underscore. Your namespace.
 name = "My Mod"
 version = "0.1.0"       # semver
 depends = ["core >=0.1"]
+conflicts = ["core_ui"] # mods this one replaces: the engine refuses to load both
 description = "One line."
 license = "MIT"
 ```
+
+`conflicts` is for a mod that replaces another outright — an inventory screen
+beside the reference one is two hotbars, not two features. Between two
+ordinary mods the set is refused: the server does not start and `--check-mods`
+fails, naming both and the way out (`enabled_mods` in the server's config, or
+the mod list when a world is made). **Against one of the engine's own reference
+mods it is different**: the fixture stands aside and yours loads in its place,
+with nothing to disable by hand. It reaches a mod through an alias it
+`provides` as well, and a mod that `provides` a reference mod's id puts it aside
+the same way.
+
+The mods under `game/core_*` carry `reference = true`. It means "a fixture,
+not content": they load before every other mod, lose a tie the lowest id
+would otherwise win (the sky, the cloud deck), step aside for a mod that
+replaces them, and the start screen folds them away. A mod of yours must not
+set it.
 
 Validate without launching the game — this is the fast loop, and it catches
 typos, namespace errors and load-order problems in seconds:
 
 ```console
 cargo run -p server -- --check-mods <mods-dir>
+```
+
+A mod to start from is one command away: the engine's template, written out
+with your id, name and licence, the stubs and this file beside it, and checked
+the same way before it is handed over.
+
+```console
+cargo run -p server -- --create-mod my_mod --into <mods-dir>
 ```
 
 It prints the mods that loaded, in dependency order, and every block that
@@ -107,6 +132,40 @@ partial ones. `game.inventory` reports each stack as
 are different numbers and confusing them is the commonest arithmetic bug here,
 and `blocks`/`nodes` are already worked out for you, so do not divide again.
 
+**A cut of several materials** — one carved shape, each of its 27 cells its own
+material — is a stack too, and it carries `cells`: 27 numeric ids, entry `i`
+being cell `i - 1` (`x + 3*y + 9*z`), `0` for empty. Its `material` is the
+LOWEST id in the cells and its `shape` their occupancy (the full mask
+`0x7FFFFFF` when it fills the block, never nil). Give one with
+`game.give(uuid, { cells = cells, count = n })` — no `material`, no `shape`;
+the engine derives both. **The engine does not craft it for you**: one item
+costs one unit of each cell's own material, so take `n * cells_of(m)` units of
+every material `m` first, then give the cut. Take it back with the same
+`cells`: a take naming only a material never touches a cut of several, and one
+moves in whole items. A `shape_editor` given `cells` edits one, and its
+`"chiselled"` event reports `cells` — pass them straight to `game.give`.
+`game/core_ui/init.lua` is the worked example: its shape crafter's "Several
+materials" box, with the material list as the brush.
+
+```lua
+local need = {}                                  -- cells of each material, per item
+for _, id in ipairs(event.cells) do
+    if id ~= 0 then need[id] = (need[id] or 0) + 1 end
+end
+local taken, short = {}, false
+for id, per in pairs(need) do
+    taken[id] = game.take(uuid, { material = id, units = per * n })
+    short = short or taken[id] < per * n
+end
+if short then                                    -- put back exactly what was taken
+    for id, units in pairs(taken) do
+        if units > 0 then game.give(uuid, { material = id, units = units }) end
+    end
+else
+    game.give(uuid, { cells = event.cells, count = n })
+end
+```
+
 ### 3. String IDs are canonical; numbers are per-session
 
 `"core:white"` is the identity. The numeric ids `game.get_block_id` hands back
@@ -124,15 +183,39 @@ calling one is a hard error. Anything conditional on the world, the player or
 the time of day belongs in a hook, not in registration.
 
 Hooks (`register_on_tick`, `register_on_chat`, `register_on_place`,
-`register_on_dig_complete`, `register_on_use`, `register_on_generate`, …) are
-registered in the window and called for ever after.
+`register_on_dig_start`, `register_on_dig_complete`, `register_on_use`,
+`register_on_generate`, …) are registered in the window and called for ever
+after.
+
+**A tool gate goes on `register_on_dig_start`**, which is asked the tick a dig
+begins: "that needs a pick" reaches the player as they start, not after they
+have waited out the dig. `register_on_dig_complete` is asked at the first chip,
+for a mod that wants the block's state then. And a tools mod's `default` hand
+wins over the engine's reference `core_tools:hand` whatever the ids, so it need
+not `conflicts` the fixture out of the set to be the hand.
 
 **Right-clicking a block with nothing to place is `register_on_use`**, not a
 cancelled dig. Picking fruit, opening a door, pulling a lever: the event has the
 cell, what it is made of and what is in the hand, `game.get_block` works inside
 it, and returning `""` says you handled it. Return `nil` for blocks that are not
 yours, so the next mod — and in the end the engine's own "nothing selected"
-warning — gets its turn.
+warning — gets its turn. **A callback registered with `materials = { "campfire_lit",
+... }` is asked first, and only, at those blocks**, ahead of every callback with
+no list — a fire's own mod hears the use before a mod that eats whatever is
+held. `register_on_use` may be called twice per mod, once with `materials` and
+once without: each is its own slot, so a mod can both claim its own blocks and
+still be heard, in its ordinary load-order place, at every block it cannot
+name. **Right-clicking at nothing** (open sky, or past reach) is a use too,
+heard only by a callback registered with `{ anywhere = true }` — the UNLISTED
+one; a listed callback can never be asked about a use with no block, so
+`anywhere` on one is refused at load: it comes with no cell — `e.x` and
+`e.material` nil — and `e.held` as ever, which is how a meal is eaten wherever
+the player looks. A callback that did not ask never sees a use without a
+cell.
+**Right-clicking an entity is `register_on_use_entity`**: the server casts
+the ray, a creature nearer than any block is the target, the event carries it
+with its owner and the hand, and a use nobody handles falls through to the
+block. `game.looking_at` answers `{ entity = id }` in the same case.
 
 **Between events, `game.looking_at(uuid)` says what a player's crosshair is
 on** — the same `{ x, y, z, domain, material }` a use event carries, plus the
@@ -493,21 +576,37 @@ under. The client draws it by marching a ray through a **field**, not by
 building cubes — which is why a deck can reach the horizon, drift and change
 shape without anything being rebuilt, and why you can fly up through one.
 
+**The sky has four genera, a share each.** `cover` is cumulus, the heaps over
+the floor. `stratocumulus` is a low sheet of rounded cells with grooves of sky
+between them, `altocumulus` a mid-level mackerel sky of small cloudlets in wave
+bands, and `cumulonimbus` towers under spreading anvils, supercells at 1. They
+are numbers rather than a kind so that a front arriving blends one sky into the
+next, and a genus you leave out is none of it — a mod that only ever sent
+`cover` sends exactly the sky it always did.
+
 Two things follow that are worth knowing before you design around them. A
-column of the deck is up to **two** intervals, which gives stepped undersides
-and a tower that mushrooms over its waist, but not a third lobe. And `darkness`
-hangs a dark haze under the deck as well as greying it: that, rather than
-`set_precipitation`, is what makes a storm read from outside it, because
+column of the deck is up to **three** intervals — the low cloud, an anvil over
+it, and a mid-level layer between — which is what lets a mackerel sky sit under
+a storm's anvil and over a heap in one column, and is also the limit: a fourth
+lobe cannot be drawn. And `darkness` hangs a dark haze under the deck as well
+as greying it, darkest at a cloud's base and least on its tops: that, rather
+than `set_precipitation`, is what makes a storm read from outside it, because
 precipitation spawns around the player's own camera and cannot draw a curtain
 of rain over the next valley.
 
 **A storm over the next valley is `map` on `set_clouds`** — a coarse grid of
 cover and darkness laid over the world rather than over the player, sampled
 where each ray of the deck passes, with the plain `cover` still answering
-outside the grid. Up to 16 cells a side; at the 256-block squares a weather mod
+outside the grid — and the three genera per cell beside them, each optional,
+so a storm over the next valley has its sheet and its anvil from the clear
+valley beside it. Up to 16 cells a side; at the 256-block squares a weather mod
 tends to evaluate that is four kilometres, which is further than the deck is
 drawn. Values are shares of one and travel as bytes. Without it, a front cannot
 be watched coming: the sky a player sees is overcast everywhere or nowhere.
+
+The deck shades the ground under it along the sun, in the Classic and
+Beautiful lighting modes, so a drifting sky reads as drifting from the ground.
+Figures are not shaded by it yet.
 
 The player owns the quality: a cloud setting in their own graphics options
 scales the deck's resolution and draw distance, down to off. The server is
@@ -838,6 +937,10 @@ What to design around:
   value, or as an argument to your callback — you get the very table you gave,
   mutable and iterable, not a view of a view. A third mod that receives it
   gets a read-only view of YOUR table, however many hands it passed through.
+- **Views go straight into a dialog.** A widget another mod's exported
+  builder returned is a read-only view, and `game.show_dialog` /
+  `update_dialog` read views wherever they sit in the tree. Do not copy them
+  into plain tables first.
 - **A disabled mod's functions stop answering, even ones you are holding.** A
   function you took from `exports` yesterday answers `nil` the moment its owner
   is disabled, and its code does not run. If it matters whether the other mod
@@ -877,11 +980,17 @@ end)
 - **Both answer in UNITS, not true or false.** A container is a fixed size, so a
   partial fit is ordinary: what did not fit was never taken from you. 27 units
   to a block (charter rule 5).
+- **Ask `game.container_holder(name)` before breaking one.** `break_container`
+  answers an empty list for an empty box and for one it refused because somebody
+  has it open, so the holder is how a chest tells "empty" from "in use" and says
+  so instead of vanishing under them. `game/core_chest` is the worked example.
 - **They work while a player has it open.** An open container lives in that
   player's own inventory, and the engine writes into the slots they are looking
   at, so a machine does not stop while its owner watches it.
-- **One callback per hook per mod.** Two `register_on_tick` calls is an error,
-  not a merge — put your machines in one tick function.
+- **One callback per hook per mod — `on_use` is the exception.** Two
+  `register_on_tick` calls is an error, not a merge — put your machines in
+  one tick function. `register_on_use` alone takes two: once with
+  `materials`, once without (see "Right-clicking a block", above).
 
 ---
 
@@ -1342,6 +1451,24 @@ rubber-bands. Do not try this with `game.set_entity` on a player's body: the
 body is stepped from the player's own inputs and your write is overwritten the
 next tick.
 
+**A player can ride an entity: `game.mount(uuid, entity, { seat, sneak_dismounts })`.**
+From the next tick their walk, jump and sprint drive the ENTITY — at its own
+`speed`, with its own `collider` — and their client predicts it, so nobody
+rubber-bands; their body and camera sit at the `seat` (blocks above the
+mount's feet, turned with it; no seat is on top of its box), and the mount
+faces where they look. Sneak gets them off unless `sneak_dismounts = false`,
+and so do `game.dismount(uuid)`, the mount being despawned (which is how you
+kill one), either of them changing domain, and the player leaving; every one
+of them is heard by `register_on_dismount` with a `reason` and where the engine
+put them — the mount's feet — so `game.move_player` from there lands them
+anywhere else. `game.mounted(uuid)` says what they are on. Refusals are
+`nil, reason`, never an error, because a race can cause each: one rider to a
+mount (`"ridden"`), one mount to a rider (`"already riding"`), and no players,
+markers, boxes past 16 blocks or other domains. The rider's own abilities stay
+theirs, a push on a rider pushes the mount, a `move_player` on one ends the
+ride, and nothing about a ride is saved. Do not build this with `move_player`
+every tick: that is the rubber-banding version.
+
 **Your sea is drawn at the horizon.** A chunk past the detail radius arrives as
 a summary — one material a cell — and until 2026-09-19 a summary held no fluid,
 so a generated ocean read as its floor with a hole over it until you walked into
@@ -1367,7 +1494,9 @@ naming the other fluid, so what it MEANS — steam, obsidian, a hiss — is your
 write from there.
 
 **Ground drinks any fluid unless it names one.** `absorbs = { rate, becomes }`
-drinks whatever touches it; `absorbs = { rate, becomes, fluid = "weather:rain" }`
+drinks whatever touches it, and `becomes` may be another mod's block —
+`"tiamat_weather:damp_dirt"` — resolved once every mod has registered, so the
+soil is the world's and the dampness the weather's; `absorbs = { rate, becomes, fluid = "weather:rain" }`
 drinks that fluid alone, so the bed that soaks a puddle of rain does not drain
 the river it is the bed of. A named fluid nobody registered is one nothing
 drinks.
@@ -1390,7 +1519,23 @@ greys the grade, eased on that player's client — and `nil` puts the plain sky
 back. It multiplies and mixes rather than replacing, so it is right at every
 hour. `game.flash{ pos, radius, intensity, colour, attack_ticks, decay_ticks }`
 is lightning: a moment's light on the sun and sky of everyone in reach, with no
-relight. The sun's direction and the keyframes themselves cannot be moved.
+relight. `game.lightning{ from, to, seed, colour, width, branches, ticks,
+radius, player }` draws the bolt itself — a forked line every client builds
+from `seed`, so everyone watching sees the same one; its `radius` is measured
+from `from`, the top, so a tall bolt needs a radius taller than it. The sun's
+direction and the keyframes themselves cannot be moved.
+
+**Stars are places, and the sky is per domain.** A keyframe's `stars` (0 to 1)
+says how much of the catalog shows at that hour — omit it and none do; the
+engine never decides that night means stars. The catalog is `game.stars()`,
+two thousand positions derived from the seed on both ends of the wire, so the
+star a player sees is the star `game.star_in_view(uuid)` names. A domain
+registered with a `position`, or an instance made with
+`game.create_domain(template, key, { position = ... })`, sees the sky from
+there; `register_sky{ domain = ... }` gives it colours of its own, sent to the
+client when a player arrives. Travel is yours: which star has a surface, what
+takes you there and what brings you back is a mod's rule, and `game/core_space`
+is the smallest one that works.
 
 **A place's fog and tint are asked when a chunk is SERVED, and never again.**
 Change what your callback returns and only chunks a player has not loaded yet

@@ -515,7 +515,7 @@ function Stream:next_bool() end
 ---@field name string? Display name.
 ---@field brush string? What shape it removes: `"block"` (default) or `"subnode"`.
 ---@field speed_multiplier number? How much faster than a bare hand. Default 1.0, must be positive.
----@field speeds table<string, number>? Its speed on particular blocks, by id, where it is not `speed_multiplier`: `{ ["tiamat_default_world:stone"] = 4.5, dirt = 0.5 }` — a bare name is your own. Each must be positive. A block nobody registered is dropped, and digs at the general speed.
+---@field speeds table<string, number>? Its speed on particular blocks, by id, where it is not `speed_multiplier`: `{ ["tiamat_default_world:stone"] = 4.5, dirt = 0.5 }` — a bare name is your own. Each must be positive. A block nobody registered is dropped, and digs at the general speed. A key of the form `["#<name>"]` — `{ ["#soil"] = 2.0 }` — names every block carrying that tag (see `game.tags` and `game.tagged`) instead of one material, and is resolved once every mod has registered, so a block registered by a mod that loaded after yours still gets the speed. The leading `#` (not, say, a `"tag:"` prefix) is deliberate: mod ids can never contain it, so it can never collide with a bare or namespaced material key. Precedence, at that same resolution: a speed named for the material itself always beats one reached through a tag; where two tags both reach one block, the higher speed wins. A tag nothing carries is a load-time warning naming the tool and the tag, not an error — the tool simply gets no speed from it, like a material name nobody registered.
 ---@field default boolean? Whether this is what a player digs with holding nothing. The engine has no bare hand of its own, so a world whose mods register no default is one nobody can dig in. Lowest id wins if several mods mark one.
 
 ---Fields accepted by `game.register_sky`.
@@ -528,6 +528,7 @@ function Stream:next_bool() end
 ---@field domain string? Which domain this sky is for — a domain id, or a template's, which every instance made from it inherits. Omit it and this is the sky for every domain not named, which is every domain a mod written before this existed has. A space between worlds has no dawn, and a body a player lands on has a sky of its own; the client is sent the right one when a player arrives.
 ---@field keyframes Tiamat.SkyKeyframe[]
 ---@field start_time number? Where a fresh world's clock starts, 0..1. Defaults to mid-morning: a counter left at zero opens every world at midnight, which is the one hour with no sun in it. Required, and not empty. Need not be sorted — the engine sorts them, because an out-of-order list would make the sky walk backwards partway through the day.
+---@field cave_fog number[]? `{r, g, b}` (or `{ r =, g =, b = }`), each 0 to 1: the colour distance fog takes where no sky reaches. Defaults to a dark neutral, `{0.05, 0.05, 0.06}`. **One colour for every hour**, not a keyframe's: each fragment's fog is blended by the sky light at it, from the keyframe's `sky` at full sky light to this at none, so the fog down a tunnel is the cave's at noon and at midnight while the daylit ground seen out of its mouth is fogged in the day's colour, in the same frame. Whatever leans the sky's colour — the clock, `set_sky_modifier`, a `flash` — leans only the sky-lit share, so none of them reaches a cave. The last stretch before the fog is total is the sky's whatever the sky light, so the edge of the loaded world is still hidden. Per sky, so a domain's sky has caves of its own colour. A missing channel or one that is not a number is an error; a number out of range is clamped.
 
 ---One moment in your day.
 ---
@@ -536,7 +537,7 @@ function Stream:next_bool() end
 ---at the moment the clock wraps.
 ---@class Tiamat.SkyKeyframe
 ---@field time number Required. When in the day, 0 to 1, where 0 is midnight and 0.5 is noon.
----@field sky number[] Required. `{r, g, b}` for the sky itself. Distance fog fades towards this, so it is also the horizon.
+---@field sky number[] Required. `{r, g, b}` for the sky itself. Distance fog fades towards this wherever the sky reaches, so it is also the horizon; where it does not, fog fades towards the sky's `cave_fog` instead.
 ---@field sun number[] Required. `{r, g, b}` tinting the sunlight stored in the world.
 ---@field intensity number Required, 0 to 1. Scales stored sunlight at DRAW time — which is why a day/night cycle costs nothing: the world's sunlight is always full daylight and never needs relighting.
 ---@field grade Tiamat.SkyGrade? Optional. How the finished picture is graded at this moment. Omit it and nothing is graded.
@@ -668,6 +669,50 @@ function game.set_sky_modifier(player, modifier) end
 ---@param spec { pos: Tiamat.BlockPos, radius?: number, intensity?: number, colour?: number[]|{ r: number, g: number, b: number }, attack_ticks?: integer, decay_ticks?: integer, player?: string }
 ---@return integer told
 function game.flash(spec) end
+
+---Lightning, drawn: a jagged, forked bolt from `from` to `to`, shown to every
+---player within `radius` of `from` in its domain. Returns how many were told.
+---
+---**Why this and not particles.** A particle is lit by the world, so a bolt at
+---night comes out grey; a burst fills an axis-aligned box, so a jagged line is
+---dozens of bursts of dozens of particles; and bursts are dropped first under
+---load, which is exactly when a storm is on. This sends two ends and a seed.
+---Each client builds the path from `seed` — a trunk from `from` to `to` bent by
+---midpoint displacement, `branches` forks that leave it partway down and fade
+---out before the ground — and draws it unlit and additive, a narrow core in a
+---wider glow, hidden by the terrain in front of it. Full at once, then two or
+---three dips and returns, then gone after `ticks`. The same seed is the same
+---bolt for everyone watching; nothing collides with it or is lit by it, so
+---send a `game.flash` beside it for the light on the sky.
+---
+---```lua
+---game.lightning{ from = { x = x, y = cloud_base, z = z }, to = ground,
+---                seed = game.world_seed + strikes, radius = 1024 }
+---game.flash{ pos = ground, radius = 1024, colour = { 0.9, 0.92, 1.0 } }
+---```
+---
+---Defaults: violet-white `{ 0.85, 0.8, 1.0 }`, `width` 0.4 blocks, three
+---`branches`, eight `ticks`, `radius` 256, and a seed the engine picks — a
+---different one every call, so two unseeded bolts between the same two points
+---are two bolts. Wrong numbers are clamped (colour channels 0 to 2, width up to
+---8, branches up to 8, ticks 1 to 200, radius up to 1024, and a `to` more than
+---4096 blocks from `from` is moved along the bolt towards it); wrong types are
+---errors, and so is a `to` that names a different domain from `from`'s.
+---
+---`seed` is read by its bits: an integer from `game.world_seed` or a mod's own
+---generator crosses exactly, including one past 2^63 that Lua shows as
+---negative. A float that is not a whole number is an error, not a seed.
+---
+---**`radius` is measured from `from`, the top.** A bolt whose top is 300 blocks
+---above the players under it reaches none of them at the default 256 — give a
+---tall bolt the radius you give its flash.
+---
+---`player` sends the bolt to that one player and nobody else, provided they are
+---in the domain and within `radius` — it narrows, never widens, as a flash's
+---does, so a player in a cave under the storm is not shown the sky's bolts.
+---@param spec { from: Tiamat.BlockPos, to: Tiamat.BlockPos, seed?: integer, colour?: number[]|{ r: number, g: number, b: number }, width?: number, branches?: integer, ticks?: integer, radius?: number, player?: string }
+---@return integer told
+function game.lightning(spec) end
 
 ---Sets the rain around one player: an emitter their client runs. Returns
 ---whether the player is here.
@@ -1453,6 +1498,50 @@ function game.register_on_player_move(callback) end
 ---@field domain string The space they are in.
 ---@field from { x: integer, y: integer, z: integer }? The block they were in, or nil the first time.
 
+---Called when a rider comes off their mount — Life ask 18.
+---
+---**Registration window only.**
+---
+---An observation, like `on_player_move`: they are already off, every mod that
+---registered hears it whatever any returns, and an error disables your mod.
+---Once per ride, on the tick it ended, after the entities have moved — so the
+---mount is where it came to rest. `reason` says how:
+---
+---- `"sneak"` — they pressed sneak, on a seat that lets it get them off;
+---- `"dismount"` — a mod ended it: `game.dismount`, or `game.move_player`
+---  moving the rider (which would otherwise do nothing: a rider is put back at
+---  the seat every tick);
+---- `"gone"` — the mount was despawned (which is how a mod kills one), or it
+---  or the rider was moved into another domain;
+---- `"leave"` — the player left the server while riding. They are gone, so
+---  there is nobody to move; the mount is free.
+---
+---`x`, `y`, `z` are where the engine put them, in world blocks: the mount's
+---feet, or where they were when the ride ended somewhere else. **To land them
+---anywhere else, move them from here** — `game.move_player` reaches their client
+---in the same tick's state:
+---
+---```lua
+---game.register_on_dismount(function(e)
+---    if e.reason ~= "leave" then
+---        game.move_player(e.player, { x = e.x + 1.5, y = e.y, z = e.z })  -- beside the horse
+---    end
+---    riders[e.entity] = nil
+---end)
+---```
+---@param callback fun(event: Tiamat.DismountEvent)
+function game.register_on_dismount(callback) end
+
+---A rider coming off their mount.
+---@class Tiamat.DismountEvent
+---@field player string The rider's UUID in hex.
+---@field entity integer What they were riding. It may already be gone.
+---@field reason "sneak"|"dismount"|"gone"|"leave" How the ride ended.
+---@field domain string The space they are in.
+---@field x number Where the engine put them, in world blocks.
+---@field y number
+---@field z number
+
 ---Called when a player presses or releases one of YOUR registered actions.
 ---
 ---Charter rule 11: you are told WHAT was done, never which key did it. There is
@@ -1514,12 +1603,20 @@ function game.set_tool(player, tool) end
 ---of a cut and is nil for loose material, so `if entry.shape then` is the test
 ---for "is this a shaped stack".
 ---
+---**A cut of several materials** also reports `cells`: 27 numeric ids, entry
+---`i` being cell `i - 1` (`x + 3*y + 9*z`), `0` for an empty cell. Its
+---`material` is the LOWEST id among them and its `shape` their occupancy —
+---and a cut of several that fills the block reports `shape = 0x7FFFFFF`, never
+---nil, so `if entry.shape then` still means "not loose material". `if
+---entry.cells then` is the test for "made of several materials".
+---
 ---Answers an empty list during worldgen, when nobody is carrying anything yet.
 ---@param player string A player UUID in hex, as a hook event reports one.
 ---@param view string? Which view. Defaults to "player:main".
----Each stack reports `{ material, units, blocks, nodes, count, shape, detail }`.
----`detail` is your own word for which item it is, absent when nothing said one —
----see `game.give`.
+---Each stack reports `{ material, units, blocks, nodes, count, shape, detail,
+---cells }`. `detail` is your own word for which item it is, absent when nothing
+---said one — see `game.give`. `cells` is absent except for a cut of several
+---materials.
 ---@return table[] stacks
 function game.inventory(player, view) end
 
@@ -1537,6 +1634,26 @@ function game.inventory(player, view) end
 ---cells in `shape` for a cut. `shape` is a 27-bit occupancy mask over the
 ---block's sub-nodes, indexed `x + 3*y + 9*z`; leave it out for loose material.
 ---
+---**A cut of several materials** is given by its `cells` instead: an array of
+---exactly 27 entries, entry `i` being cell `i - 1` (`x + 3*y + 9*z`), each a
+---block id, a numeric id, or `0` for an empty cell. The stack is built from
+---the cells — its `material` is the lowest id among them and its `shape` their
+---occupancy — so leave those two out; given and disagreeing, they are an error.
+---Cells of one material are the plain cut (or, filling the block, the loose
+---material) they are. `count` is items as before, and `units` must be a whole
+---number of them: a cut of several moves in whole items, because a unit of
+---it is no material at all. **The engine does not craft**: taking each
+---material's units and giving the cut is yours, and one item costs one unit of
+---each cell's own material.
+---
+---```lua
+---local cells = {}
+---for i = 1, 27 do cells[i] = 0 end
+---for i = 1, 9 do cells[i] = "core:stone" end      -- the bottom layer
+---for i = 10, 12 do cells[i] = "core:oak" end       -- a step at the back
+---game.give(uuid, { cells = cells, count = 4 })
+---```
+---
 ---`detail` is YOUR OWN word for which item this is, and the engine never looks
 ---inside it. **Without it, two swords are one sword**: stacks merge on being the
 ---same thing, and being the same thing was material and cut — so one sword worn
@@ -1553,8 +1670,10 @@ function game.inventory(player, view) end
 ---```
 ---
 ---Two stacks stack only if they are the same material AND the same shape AND the
----same detail, so giving somebody a cut never merges it into the rubble they were
----carrying, and giving them a named block never merges it into their plain ones.
+---same cells AND the same detail, so giving somebody a cut never merges it into
+---the rubble they were carrying, giving them a named block never merges it into
+---their plain ones, and a stair of stone and oak never merges into one of stone
+---and brick.
 ---
 ---Returns false for a player who is not connected, or for a quantity of zero.
 ---An inventory never refuses for lack of room — it grows.
@@ -1563,9 +1682,37 @@ function game.inventory(player, view) end
 ---or not at all — an empty slot takes it, one holding the same thing with room
 ---merges, anything else is refused. What rewriting a tool's `detail` needs, so
 ---the pick lands back in the hand rather than wherever the pack has room.
----@param spec { material: string|integer, units: integer?, count: integer?, shape: integer?, detail: string?, view: string?, slot: integer? }
+---**Two answers.** `gave` is true only when ALL of it went in. `left` is
+---how many units did not: zero on success; everything for a player who is
+---not connected or a view that does not exist; and, once a mod has fixed the
+---size of `player:main` with `game.set_main_slots`, whatever was left when
+---the view filled — the view no longer grows past its size. A pickup that
+---leaves something is a pickup to leave on the ground: give back `left`
+---units to the entity rather than despawning it.
+---@param spec { material: string|integer?, units: integer?, count: integer?, shape: integer?, cells: (string|integer)[]?, detail: string?, view: string?, slot: integer? }
 ---@return boolean gave
+---@return integer left
 function game.give(player, spec) end
+
+---Fixes the size of `player:main` for this server.
+---
+---**Registration window only.** One size for the server: a second mod
+---naming a different one is an error at load.
+---
+---Without this the main view GROWS: `game.give` never refuses, a dig always
+---credits, and a pickup into a full twenty-eight lands in a twenty-ninth slot
+---no screen shows and no key selects. A mod that draws a fixed number of
+---slots says so here, and then: the view never grows past it, `game.give`
+---answers with what did not fit (its second return), and a dig whose yield
+---would not fit is refused before the block comes apart, with the player
+---told "you cannot carry any more". The first 28 keep the engine's meaning
+---(1–9 the hotbar, 28 the off-hand).
+---
+---```lua
+---game.set_main_slots(28)
+---```
+---@param slots integer 1 to 256.
+function game.set_main_slots(slots) end
 
 ---What a player is holding: the stack in the hotbar slot they have selected.
 ---
@@ -1578,7 +1725,7 @@ function game.give(player, spec) end
 ---reaches the server when it changes.
 ---
 ---The table is the same shape `game.inventory` reports a stack in:
----`{ material, units, blocks, nodes, count, shape, detail }`.
+---`{ material, units, blocks, nodes, count, shape, detail, cells }`.
 ---@param player string A player UUID in hex.
 ---@return table|nil held
 function game.held(player) end
@@ -1593,7 +1740,8 @@ function game.held(player) end
 ---`game.take(player, { ..., slot = 28 })` and gives the bar back into the same
 ---slot with `game.give(player, { ..., slot = 28 })`.
 ---
----The same table `game.held` answers: `material`, `units`, `shape`, `detail`.
+---The same table `game.held` answers: `material`, `units`, `shape`, `detail`,
+---and `cells` for a cut of several materials.
 ---@param player string A player UUID in hex.
 ---@param view string A view name, such as `"player:main"`.
 ---@param n integer The slot, from 1.
@@ -1637,9 +1785,16 @@ function game.heading(dx, dz) end
 ---stack — a recipe asking for stone must not melt down the named sword somebody
 ---left in the same view. A mod that does want any of them reads `game.inventory`,
 ---which reports each stack's detail, and asks for the ones it wants by name.
+---
+---**With `cells`, exactly that cut of several materials**, and a take that
+---names a material and no cells never takes from one — not even one that fills
+---the block, whose `material` and missing mask look like loose material's. A
+---stack table `game.inventory` reported is a spec for the same stack. A cut of
+---several is taken in whole items: asking for part of one takes the whole
+---ones the request covers.
 ---@param player string A player UUID in hex.
 ---`slot` names ONE slot of the view, one-based, to take from that slot alone.
----@param spec { material: string|integer, units: integer?, count: integer?, shape: integer?, detail: string?, view: string?, slot: integer? }
+---@param spec { material: string|integer?, units: integer?, count: integer?, shape: integer?, cells: (string|integer)[]?, detail: string?, view: string?, slot: integer? }
 ---@return integer units How many units were removed.
 function game.take(player, spec) end
 
@@ -1687,6 +1842,7 @@ function game.register_on_chat(callback) end
 ---@class Tiamat.Widget
 ---@field type string Required. One of the types above.
 ---@field name string? What events from this widget carry, so you can tell two buttons apart.
+---@field tooltip string? What hovers over it, or nothing. Capped at 256 bytes — refused rather than truncated, the same rule `Stack.detail` follows. Drawn in the theme's `text_font`. On a `container`, a child's own tooltip wins: the container's only shows when the pointer is over it and over no descendant that has one.
 ---@field children Tiamat.Widget[]? Only for `container` and `scroll`.
 ---@field style Tiamat.WidgetStyle?
 ---@field grow integer? Share of the parent's leftover space. 0 takes only what it needs.
@@ -1712,8 +1868,9 @@ function game.register_on_chat(callback) end
 ---@field first integer? `item_grid`: the first slot shown, one-based.
 ---@field count integer? `item_grid`: how many slots.
 ---@field permille integer? `progress`: how full, 0 to 1000.
----@field shape integer? `shape_editor`: the 27-bit occupancy mask, indexed `x + 3*y + 9*z`. Defaults to a whole block.
----@field material integer? `shape_editor`: which material the cells are drawn as.
+---@field shape integer? `shape_editor`: the 27-bit occupancy mask, indexed `x + 3*y + 9*z`. Defaults to a whole block; with `cells`, it is theirs and may be left out.
+---@field material integer? `shape_editor`: which material the cells are drawn as — with `cells`, the BRUSH a right-click adds, defaulting to the lowest material in them.
+---@field cells integer[]? `shape_editor`: an editor of several materials — 27 numeric ids, entry `i` being cell `i - 1`, `0` for an empty cell. Leave it out for one material.
 
 ---What a widget may say about how it looks. Deliberately small.
 ---@class Tiamat.WidgetStyle
@@ -1749,6 +1906,12 @@ function game.register_on_chat(callback) end
 ---set `compact = true` when you built a prompt, and it is measured and drawn
 ---small. Pass it on `update_dialog` too: it travels with the tree, so a redraw
 ---cannot change the shape of the window a player is already reading.
+---
+---**Widgets from another mod's exports go straight in.** What a builder in
+---`game.exports(id)` returns is a read-only view, and the tree may hold such
+---views anywhere — as the root, as a child, inside a list the other mod made —
+---with no copying into plain tables first. The engine reads what each view
+---stands for and changes nothing.
 ---
 ---Returns whether the player was there to show it to, which is NOT a promise it
 ---rendered.
@@ -1787,6 +1950,20 @@ function game.close_dialog(spec) end
 ---deciding what either means is yours. `shape` counts its own cells, so an item
 ---of that cut costs that many units.
 ---
+---**An editor of several materials** is given `cells` — 27 numeric ids, entry
+---`i` being cell `i - 1`, `0` for empty — and draws each cell as its own
+---material. `material` is then the BRUSH: a right-click puts a cell of it back,
+---and a left-click takes the nearest cell off whatever it is made of. Change
+---the brush with `game.update_dialog` and the cells the player has made stay as
+---they are; the client adopts your `cells` only when they differ from the ones
+---you sent last, as it does `shape`, and never because only the brush changed.
+---Each change reports `"chiselled"` with `shape` AND `cells`, in the ids
+---`game.get_block_id` gives, and `{ cells = event.cells, count = n }` is the
+---spec that gives the cut. Without `cells` an editor is one material, exactly
+---as before. `game/core_ui`'s shape crafter is the reference: its "Several
+---materials" box turns this on, its material list becomes the brush, and Make
+---takes each material's units before giving the cut.
+---
 ---Called when a player does something in one of YOUR dialogs.
 ---
 ---Only your own: a dialog's events are private to the mod that opened it.
@@ -1797,19 +1974,28 @@ function game.close_dialog(spec) end
 ---
 ---`event.kind` says what the player did, and which other fields are set:
 ---
----  - `"pressed"` — `name`
+---  - `"pressed"` — `name`, `click` ("left", "right", "double")
 ---  - `"submitted"` — `name`, `text`
 ---  - `"toggled"` — `name`, `checked`
 ---  - `"slid"` — `name`, `value`
 ---  - `"chose"` — `name`, `index` (one-based)
 ---  - `"clicked"` — `view`, `index` (one-based), `click` ("left", "right", "shift_left")
----  - `"chiselled"` — `name`, `shape` (the whole 27-bit mask)
+---  - `"chiselled"` — `name`, `shape` (the whole 27-bit mask), and `cells` (27
+---    numeric ids, `0` for empty) from an editor of several materials
 ---  - `"closed"` — nothing else
 ---
 ---**Every one is a REQUEST, never a result.** A slot click says what the player
 ---did with the mouse; whether any item moves is the server's decision, taken
 ---against its own inventory. A client saying "I moved this" does not make it so.
----@param callback fun(event: { player: string, form: string, kind: string, name: string?, text: string?, checked: boolean?, value: integer?, index: integer?, view: string?, click: string?, shape: integer? })
+---
+---**A button's `click` is which press it had**, and what each means is yours:
+---ten for a click, one for a right-click, a stackful for a double. It is always
+---set. A double-click arrives as TWO events, `"left"` and then `"double"`: the
+---first half is a click like any other, and nothing can know a second is
+---coming without making every button wait to answer. So on `"double"`, do what
+---is left of the larger thing rather than the whole of it again. A right-click
+---presses a button; a mod that never reads `click` treats it as a press.
+---@param callback fun(event: { player: string, form: string, kind: string, name: string?, text: string?, checked: boolean?, value: integer?, index: integer?, view: string?, click: string?, shape: integer?, cells: integer[]? })
 function game.register_on_dialog_event(callback) end
 
 ---Registers a sound. Registration window only.
@@ -2244,7 +2430,7 @@ function game.chat_to(player, text) end
 ---    hud.hide_builtin("crosshair")
 ---    for index, slot in ipairs(state.carried) do
 ---        hud.icon{ anchor = "bottom", x = (index - 1) * 56 - 224, y = 72, size = 48,
----                  material = slot.material, shape = slot.shape }
+---                  material = slot.material, shape = slot.shape, cells = slot.cells }
 ---        hud.text{ anchor = "bottom", x = (index - 1) * 56 - 224, y = 26,
 ---                  text = slot.count or (slot.blocks .. "+" .. slot.nodes), size = 18 }
 ---    end
@@ -2274,6 +2460,14 @@ function game.chat_to(player, text) end
 ---`slot.count` is how many of that cut it is, and is nil for loose material —
 ---where `slot.blocks` and `slot.nodes` are the display instead. Labelling a
 ---thirteen-cell stair `+13` tells a player they have thirteen of something.
+---
+---**A cut of several materials carries `slot.cells`** too: 27 ids, `0` for an
+---empty cell. Pass it to `hud.icon` as `cells` and each cell is drawn as its
+---own material; leave it out and every cell is drawn as `material`, which is
+---only the lowest of them. Such a cut that fills the block has `slot.shape =
+---0x7FFFFFF` rather than nil, so a test for loose material still works.
+---`hud.icon`'s `cells` must be 27 entries or absent; any other length is a
+---fault in the frame.
 ---
 ---`state.offhand` is the twenty-eighth slot of the same view, or nil. It is
 ---handed over separately because a HUD draws it somewhere else entirely; the
@@ -2720,7 +2914,7 @@ function game.find_path(from, to, options) end
 ---like hurting you or making a sound, is yours and needs no engine support
 ---beyond the hooks that already exist.
 ---
-Fluid is BLOCK resolution, not sub-node: one volume per block, never a
+---Fluid is BLOCK resolution, not sub-node: one volume per block, never a
 ---per-cell mask (Sub-Node Contract §4). What the lattice IS consulted for is how
 ---much fits — a block one third full of stone holds one third less — so you
 ---never have to think about a partially flooded chiselled block, only about how
@@ -3083,6 +3277,7 @@ function game.set_block(position, block, occupancy, options) end
 ---@field material integer What it would be made of.
 ---@field occupancy integer Bitmask of which of the block's 27 cells would be filled.
 ---@field units integer How many units it would cost, which is the number of set bits in `occupancy`.
+---@field cells integer[]|nil For a cut of several materials, each cell's material as it would land — turned to face the player as the placement turns it — 27 numeric ids with `0` for empty; `material` is then the lowest of them. Absent for anything else.
 
 ---The place control landing on a block with nothing to place.
 ---@class Tiamat.UseEvent
@@ -3092,7 +3287,7 @@ function game.set_block(position, block, occupancy, options) end
 ---@field z integer|nil
 ---@field domain string The space the player is in, so `game.get_block{ x, y, z, domain = e.domain }` reads the right world.
 ---@field material integer|nil What that cell is made of; absent for a use at nothing.
----@field held { material: integer, units: integer, blocks: integer, nodes: integer, count: integer, shape: integer|nil, detail: string|nil }|nil What is in the main hand — the shape `game.held` answers with — or `nil` for an empty one. An item, when not nil: a placeable stack is a placement, not a use.
+---@field held { material: integer, units: integer, blocks: integer, nodes: integer, count: integer, shape: integer|nil, detail: string|nil, cells: integer[]|nil }|nil What is in the main hand — the shape `game.held` answers with — or `nil` for an empty one. An item, when not nil: a placeable stack is a placement, not a use.
 
 ---Registers a veto on completed digs.
 ---
@@ -3271,8 +3466,34 @@ function game.register_on_place(callback) end
 ---    if e.held and raw[e.held.material] then cook(e) return "" end
 ---end, { materials = { "campfire_lit", "kiln_lit" } })
 ---```
+---
+---**`register_on_use` may be called twice, and no more:** once with
+---`materials`, once without. Each is checked as its own slot, so nothing
+---about the ladder above changes — the listed callback still answers first,
+---and only, at its blocks; the unlisted one still answers in its ordinary
+---load-order place at every OTHER block, exactly as a mod with no listed
+---callback at all would. This is for a mod that both names its own blocks
+---(its own fires) and must still be heard at blocks it cannot name (a
+---station another mod registers after it loads):
+---
+---```lua
+---game.register_on_use(function(e)
+---    if e.held and raw[e.held.material] then cook(e) return "" end
+---end, { materials = { "campfire_lit" } })      -- Craft's own fire: listed
+---
+---game.register_on_use(function(e)
+---    if is_a_station(e) then open_station(e) return "" end
+---end)                                          -- everybody else's: unlisted
+---```
+---
+---A third call, or a second with the same one of `materials`/no-`materials`,
+---is refused at load — "one callback per hook per mod" still holds, it is
+---only `on_use` that has two hooks' worth of slot. `anywhere` is the
+---unlisted callback's: it hears a use with no block, and a listed callback
+---asking for one is refused, since it can never be asked about a block that
+---is not on its own list.
 ---@param callback fun(event: Tiamat.UseEvent): boolean|string|nil
----@param options { anywhere?: boolean, materials?: string[] }? `anywhere = true` to hear a use at nothing as well; `materials` to be asked first, and only, about uses at those blocks. Any other key is an error at load.
+---@param options { anywhere?: boolean, materials?: string[] }? `anywhere = true` to hear a use at nothing as well; `materials` to be asked first, and only, about uses at those blocks. Any other key is an error at load. `anywhere` and `materials` may not both be set.
 function game.register_on_use(callback, options) end
 
 ---Somebody hitting something.
@@ -3310,7 +3531,7 @@ function game.register_on_punch(callback) end
 ---@field player string Who is using, as 64 hex characters.
 ---@field target integer The entity under the crosshair, as `game.entity` names one.
 ---@field owner string|nil The player that entity belongs to, if it is somebody's body — the same field `game.entity` reports.
----@field held { material: integer, units: integer, blocks: integer, nodes: integer, count: integer, shape: integer|nil, detail: string|nil }|nil What is in the main hand, as `on_use` has it, or `nil` for an empty one.
+---@field held { material: integer, units: integer, blocks: integer, nodes: integer, count: integer, shape: integer|nil, detail: string|nil, cells: integer[]|nil }|nil What is in the main hand, as `on_use` has it, or `nil` for an empty one.
 
 ---Registers a handler for USING an entity: the place control with an entity
 ---nearer than any block along the player's own reach ray — getting on a
@@ -3407,7 +3628,9 @@ function game.register_on_fluid_flow(callback) end
 ---Registers a named input action.
 ---
 ---Mods register actions; the engine owns key bindings and mods never read keys.
----Stored now, inert until Task 13.
+---A press and a release of whatever key the player bound reach
+---`game.register_on_action` as `pressed = true` and `false`; `default_key`
+---is only the suggestion the settings screen starts from.
 ---
 ---**Registration window only.**
 ---@param spec Tiamat.ActionSpec
@@ -3505,6 +3728,24 @@ function game.hardness(material) end
 ---@param material integer
 ---@return string[]|nil tags
 function game.tags(material) end
+
+---The qualified ids of every block registered so far that carries a tag, in
+---the order they were registered — the other direction from `game.tags`: not
+---what a block is tagged, but which blocks a tag names.
+---
+---Callable in the registration window as well as after freeze. In the
+---window it answers only what has registered before this call: a mod sees
+---the blocks the mods it `depends` on have already registered, and nothing a
+---mod loading after it adds yet — arranging that is what `depends` is for.
+---Called again once every mod has registered, the answer is complete.
+---
+---An unknown tag answers an empty table, not an error or `nil` — a mod
+---classing "every hard block" should not have to guess which tags anything
+---actually uses first. Only blocks can carry a tag (`register_item` has no
+---`tags` field), so nothing here ever names an item.
+---@param tag string
+---@return string[] blocks
+function game.tagged(tag) end
 
 ---Generates a heightmap for a chunk from fractal noise.
 ---
@@ -3674,6 +3915,15 @@ function Density:at(x, y, z, seed) end
 ---  features four times as tall here, as if sampled at `y / 4` — for rock that
 ---  flutes vertically or strata that run level; an axis left out is 1. Every
 ---  value must be above zero. Bounds follow it, so pruning still works.
+---- `{ op = "noise2", stream = "name", octaves = 4, frequency = 0.02,
+---  amplitude = 1.0 }` — the same noise sampled on the GROUND PLANE, `y`
+---  held at zero, so the field never reads height: one value per column,
+---  the same at every y. **Flat by construction**, which is what a terraced
+---  fill's `within` needs (`fill_fluid_terraced` reads it on one plane for
+---  the whole world and refuses a field that answers differently at two
+---  heights) and what any mask meant as a map of the ground wants. Same
+---  options as `noise` but no `stretch`. A `contour` of the same stream
+---  draws its line through this field.
 ---- `{ op = "map", map = <a Tiamat.Map> }` — the map's value under this
 ---  sample, ignoring y. **The way an eroded field becomes terrain.** A map is
 ---  a surface, so subtract `y` to get a density from it. The node takes a COPY
@@ -4102,6 +4352,11 @@ function game.set_entity(id, spec) end
 ---`false` means the player is not connected, or the position is outside the
 ---world.
 ---
+---**Moving a rider gets them off** where the move put them — their body is
+---otherwise put back at the seat every tick — and `on_dismount` hears it with
+---the reason `"dismount"`. Inside `on_dismount` they are already off, which is
+---how a mod lands a rider somewhere other than the mount's feet.
+---
 ---```lua
 ----- A respawn point, remembered per player and keyed on the UUID.
 ---local home = game.storage.get("home:" .. event.player)
@@ -4156,6 +4411,9 @@ function game.select_slot(player, slot) end
 ---An upward push also takes them off the ground, or the next step's friction
 ---eats a shove meant to move somebody standing still.
 ---
+---**A rider's push lands on their mount**, which carries them: their own body
+---is put at the seat every tick. They stay on.
+---
 ---```lua
 ---game.push_player(event.player, { x = 0, y = 0.9, z = 0 })   -- a jump pad
 ---```
@@ -4163,6 +4421,79 @@ function game.select_slot(player, slot) end
 ---@param impulse { x: number, y: number, z: number }
 ---@return boolean pushed
 function game.push_player(player, impulse) end
+
+---Seats a connected player on an entity, so their keys drive it — Life ask 18.
+---
+---**The player's body is the thing that changes.** From the next tick their
+---walk, jump and sprint step the ENTITY: at its own `speed`, with its own
+---`collider`, through the same physics every entity takes, and predicted by the
+---rider's own client the way their body is — no rubber-banding. Their body sits
+---at the seat and turns with the mount, and their camera is at the seat plus
+---their eye height. **While ridden, the mount faces where its rider looks**; its
+---`drive` is ignored (set it again when they get off) and your `on_step` still
+---runs for it. The rider's own abilities stay theirs: a flying rider's horse
+---does not fly, and a hungry rider's horse still gallops.
+---
+---`seat` is in BLOCKS from the mount's feet, measured as if the mount faced
+---north (`+z` ahead of it), and turns with it; an axis left out is 0, and no
+---`seat` at all is on top of the mount's box. `sneak_dismounts` (default
+---`true`) makes the sneak key get the rider off; with it `false`, sneak drives
+---the mount at a crawl that will not walk off an edge, and getting off is
+---yours to arrange with `game.dismount`.
+---
+---**Answers `true`, or `nil` and a reason** — never an error for any of these,
+---because each can happen to a mod doing nothing wrong (two players using one
+---horse on the same tick):
+---
+---- `"not connected"` — no such player here;
+---- `"no such entity"` — the id names nothing live;
+---- `"a player"` — it is somebody's body, their own included;
+---- `"no collider"` — it has no box to drive, or one wider or taller than 16
+---  blocks;
+---- `"another domain"` — it is not in the player's simulation space;
+---- `"ridden"` — somebody else is on it: one rider to a mount;
+---- `"already riding"` — they are on something else; `game.dismount` first.
+---
+---**Asking again for the entity they already ride keeps the ride and moves the
+---seat.** A mistake in the call itself — a seat that is not numbers or is more
+---than 16 blocks from the feet, an option that does not exist — is an error.
+---
+---Riding is never saved: a player who leaves is off (heard as `"leave"`), a
+---server shutting down is everybody leaving, and the mount is saved where it
+---stands like any entity. See `game.register_on_dismount` for every way off.
+---
+---```lua
+---game.register_on_use_entity(function(e)
+---    if not horses[e.target] then return end          -- not ours: let it pass
+---    local ok, why = game.mount(e.player, e.target, { seat = { y = 1.6, z = -0.3 } })
+---    if not ok then game.chat_to(e.player, "You cannot ride that: " .. why) end
+---    return ""
+---end)
+---```
+---@param player string The player's UUID, in hex.
+---@param entity integer The entity to ride, as `game.spawn_entity` returned it.
+---@param options { seat?: { x?: number, y?: number, z?: number }, sneak_dismounts?: boolean }?
+---@return true|nil ok
+---@return string? reason Why not, when `ok` is nil.
+function game.mount(player, entity, options) end
+
+---Gets a player off whatever they are riding. Returns whether they were riding.
+---
+---They land at the mount's feet — inside its box, which the crowd pass eases
+---them out of over the next second — and `on_dismount` hears it with the
+---reason `"dismount"` later in the same tick, never from inside this call.
+---
+---```lua
+---game.dismount(event.player)
+---```
+---@param player string The player's UUID, in hex.
+---@return boolean was_riding
+function game.dismount(player) end
+
+---The entity a connected player is riding, or `nil`.
+---@param player string The player's UUID, in hex.
+---@return integer|nil entity
+function game.mounted(player) end
 
 ---Every entity within `radius` blocks of a position, nearest first.
 ---
