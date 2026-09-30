@@ -355,7 +355,10 @@ remembered with the world; that an animal was fed a moment ago is not.
 Wild hives hang under the trees of the flower forest, never more than one
 to a chunk; dig one up and hang it by your own flowers. A **lead**
 right-clicked at an animal makes it follow you, three blocks behind, until
-you right-click it again or get twelve blocks ahead. A **fence** keeps in
+you right-click it again or get twelve blocks ahead. One person may lead
+several. A lead right-clicked at a **fence** post ties everything you are
+leading to it, free to graze a lead's length from the post; a lead at a
+tied animal takes it off again. A **fence** keeps in
 the animals that only hop when stuck — cows, sheep, pigs, hens — and not a
 goat or a horse; a **gate** in it opens and shuts with a right-click. Dead,
 the animals leave hide, bone, sinew, wool and feathers beside their meat

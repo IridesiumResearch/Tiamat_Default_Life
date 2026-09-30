@@ -580,6 +580,94 @@ tdl.on_punch(function(event)
     tdl.hurt_mob(event.target, damage, event.attacker)
 end)
 
+-- What another mod does to one of ours (exports.lua) ------------------------------------------
+--
+-- A push or a freeze takes the creature's own AI off it for the time, since
+-- a velocity written from outside is overwritten by the next tick of the
+-- AI. Effects on a creature are the few that mean something to one: poison
+-- and wither (a point now and then, poison never the last), regeneration
+-- (a point back now and then), and burning (`set_alight`).
+
+local PUSH_TICKS = 10
+local CREATURE_FX = {
+    poison = { period = 25, hurt = 1, floor = 1 },
+    wither = { period = 40, hurt = 1 },
+    regeneration = { period = 25, heal = 1 },
+}
+
+--- One of ours, adopted, or nil.
+local function ours(id)
+    local entity = math.type(id) == "integer" and game.entity(id)
+    if not entity or entity.item or entity.source ~= game.mod_id then return nil end
+    return M.live[id] or adopt(id, entity), entity
+end
+
+function M.push(id, velocity)
+    local m = ours(id)
+    if m == nil then return false end
+    m.pushed = PUSH_TICKS
+    game.set_entity(id, { velocity = velocity })
+    return true
+end
+
+function M.freeze(id, ticks)
+    local m = ours(id)
+    if m == nil then return false end
+    m.frozen = math.max(m.frozen or 0, ticks)
+    return true
+end
+
+function M.add_effect(id, fx, ticks)
+    local m = ours(id)
+    if m == nil then return false end
+    if fx == "burning" then return tdl.set_alight(id, ticks) end
+    if not CREATURE_FX[fx] then return false end
+    m.fx = m.fx or {}
+    m.fx[fx] = { left = math.max((m.fx[fx] or {}).left or 0, ticks), acc = 0 }
+    return true
+end
+
+function M.cure(id, fx)
+    local m = ours(id)
+    if m == nil then return false end
+    if fx == "burning" then
+        m.burning, m.in_fire = 0, nil
+    elseif m.fx then
+        m.fx[fx] = nil
+    end
+    return true
+end
+
+function M.heal(id, n)
+    local m, entity = ours(id)
+    if m == nil or entity.health == nil then return 0 end
+    local max = entity.max_health or m.kind.health
+    local healed = math.min(n, max - entity.health)
+    if healed > 0 then game.set_entity(id, { health = entity.health + healed }) end
+    return math.max(healed, 0)
+end
+
+--- The creature's effects, a tick on.
+local function tick_fx(id, m, entity, dt)
+    for fx, state in pairs(m.fx) do
+        local def = CREATURE_FX[fx]
+        state.left = state.left - dt
+        state.acc = state.acc + dt
+        while state.acc >= def.period do
+            state.acc = state.acc - def.period
+            if def.hurt and (entity.health or 0) > (def.floor or 0) then
+                m.hurt_cd = 0
+                tdl.hurt_mob(id, def.hurt, nil)
+                if M.live[id] == nil then return false end
+            elseif def.heal then
+                M.heal(id, def.heal)
+            end
+        end
+        if state.left <= 0 then m.fx[fx] = nil end
+    end
+    return true
+end
+
 -- Behaviour ------------------------------------------------------------------------------------
 
 --- The nearest player within a kind's sight, refreshed every tenth tick.
@@ -1291,6 +1379,21 @@ local function step(id, dt)
     if m.bite_cd > 0 then m.bite_cd = m.bite_cd - dt end
     if (now + m.perceive_at) % PERCEIVE_EVERY == 0 then perceive(m, entity) end
     if not tick_fire(id, m, entity, dt) then return end
+    if m.fx and next(m.fx) and not tick_fx(id, m, entity, dt) then return end
+
+    -- Held by another mod: pushed (the AI lets the push play out), or frozen
+    -- (held where it is, a flyer or a swimmer held up).
+    if (m.pushed or 0) > 0 then
+        m.pushed = m.pushed - dt
+        return
+    end
+    if (m.frozen or 0) > 0 then
+        m.frozen = m.frozen - dt
+        local lift = (kind.flyer and not m.landed) or (kind.swims and (entity.submerged or 0) > 0)
+        game.set_entity(id, { velocity = { x = 0, y = lift and C.fly_lift or 0, z = 0 },
+            drive = { walk = { x = 0, z = 0 } }, anim = ANIM_IDLE })
+        return
+    end
 
     -- Landing on tilled ground tramples it, as a player's does.
     if (entity.fell or 0) > 0 and tdl.farming then tdl.farming.trample(entity.pos) end

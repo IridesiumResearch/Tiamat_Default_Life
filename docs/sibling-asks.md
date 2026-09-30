@@ -50,6 +50,30 @@ as players come near, one to a chunk at most, remembered with the world.
 It is a spawn pass, not worldgen, so a hive is never in a chunk nobody has
 walked to — which nobody can tell.
 
+## Tiamat Default Magic and Tiamat Default Science
+
+Their asks of this mod (each repo's `docs/sibling-asks.md`), all answered
+2026-09-30 (docs/exports.md has the shapes):
+
+- **L-M1**, a per-player stat ceiling: `set_stat_max(uuid, id, max)`; at 0
+  the bar is not drawn for that player.
+- **L-M2**, effects and health on others: `add_effect`, `cure`, `heal`,
+  `hurt`, for players and this mod's creatures.
+- **L-M3 / L-S3**, composed abilities: `set_ability(uuid, source, {
+  speed_mul, fly })`, combined with this mod's cold and hunger.
+- **L-M4 / L-S5**, the worn view: a promise, in docs/exports.md.
+- **L-M5**, steering a creature: `follow(entity, uuid, ticks)`.
+- **L-M6**, air: `set_air(uuid, n)` and the `water_breathing` effect.
+- **L-M7**, the phoenix: `on_death(fn(uuid, pos, drops))` and
+  `keep_inventory(uuid)`.
+- **L-S2**, acting on creatures: `push(entity, velocity)` and
+  `freeze(entity, ticks)`.
+- **L-S4**, moving drops: yes, and `pull_drops(pos, radius, strength)`.
+- **L-S6**, a tether: a lead right-clicked at a fence post ties everything
+  you lead to it, a lead's length from the post, remembered with the
+  world; a lead at the animal unties it. One player leading two was
+  already so: every animal holds its own lead.
+
 ## Tiamat Default Progress
 
 Its asks of this mod (its `docs/sibling-asks.md`), all three answered

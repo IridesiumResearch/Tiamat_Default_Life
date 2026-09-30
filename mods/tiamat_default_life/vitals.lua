@@ -76,7 +76,10 @@ local function load(uuid)
         v.temp = U.clamp(r.temp or 0, -1, 1)
         v.deaths = r.deaths or 0
         E.decode(v, r.fx)
-        if tdl.stats then tdl.stats.decode(v, r.st) end
+        if tdl.stats then
+            tdl.stats.decode_max(v, r.sm)
+            tdl.stats.decode(v, r.st)
+        end
     end
     return v
 end
@@ -85,6 +88,7 @@ local function save(uuid, v)
     game.storage.set(key(uuid), U.encode{
         hp = v.hp, food = v.food, air = v.air, temp = v.temp, deaths = v.deaths, fx = E.encode(v),
         st = tdl.stats and tdl.stats.encode(v) or nil,
+        sm = tdl.stats and tdl.stats.encode_max(v) or nil,
     })
 end
 
@@ -285,7 +289,7 @@ end
 
 local function tick_air(uuid, v, dt)
     tick_underwater(uuid, v)
-    if v.env.submerged then
+    if v.env.submerged and not E.has(v, "water_breathing") then
         if v.air > 0 then
             v.air_acc = v.air_acc + dt
             while v.air_acc >= C.air_drain_ticks and v.air > 0 do
@@ -426,13 +430,37 @@ end
 --- own night. Admins and creative worlds keep it.
 --- Said only when it changes; the engine forgets it when the player leaves,
 --- and a rejoin loads a fresh record, which says it again.
+--- Abilities other mods ask for, per player and per source (exports.lua's
+--- `set_ability`): `{ speed_mul, fly }`. Composed with this mod's own
+--- below, since the engine keeps one table a player and the last writer
+--- wins: every source's speed multiplies in, and any source's flight flies.
+--- Not saved: a mod sets them again when a player joins.
+local ability_sources = {}
+
+function tdl.set_ability(uuid, source, spec)
+    ability_sources[uuid] = ability_sources[uuid] or {}
+    ability_sources[uuid][source] = spec
+    if next(ability_sources[uuid]) == nil then ability_sources[uuid] = nil end
+end
+
 local function push_abilities(uuid, v)
     local whole = tdl.is_invulnerable(uuid) or v.dead
     local cold = not whole and v.temp <= -C.temp_uncomfortable
     local speed = cold and C.cold_speed or 1
     local sprint = whole or v.food > 0
     local fly = tdl.mode == "Creative"
-    local wind_sky = fly or tdl.is_admin(uuid)
+    local names = {}
+    for source, spec in pairs(ability_sources[uuid] or {}) do
+        names[#names + 1] = source
+    end
+    table.sort(names)
+    for _, source in ipairs(names) do
+        local spec = ability_sources[uuid][source]
+        if spec.speed_mul then speed = speed * spec.speed_mul end
+        if spec.fly then fly = true end
+    end
+    speed = U.clamp(speed, 0, 16)
+    local wind_sky = tdl.mode == "Creative" or tdl.is_admin(uuid)
     local said = string.format("%s %s %s %s", speed, sprint, fly, wind_sky)
     if said == v.abilities then return end
     v.abilities = said

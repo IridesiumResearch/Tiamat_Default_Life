@@ -57,6 +57,8 @@ effect("rested", { name = "Well rested" })
 -- hunger that walking and working bring on.
 effect("hearty", { name = "Hearty", damage_scale = C.hearty_damage_scale, damage_kinds = { physical = true } })
 effect("steady", { name = "Steady", exhaust_scale = C.steady_exhaust_scale })
+-- Breathing under water: air does not run out while it lasts (the vitals).
+effect("water_breathing", { name = "Water breathing" })
 
 --- Puts an effect on a player, or extends one already there to the longer
 --- of the two durations. `v` is the player's vitals record.

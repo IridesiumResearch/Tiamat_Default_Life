@@ -39,6 +39,25 @@ function tdl.drop(pos, stack, opts)
     return id
 end
 
+--- Draws this mod's dropped stacks within `radius` blocks toward `pos`, at
+--- `strength` cells a tick: a magnet. Answers how many it moved.
+function tdl.pull_drops(pos, radius, strength)
+    local n = 0
+    for _, id in ipairs(game.entities_in_radius(pos, radius, game.mod_id)) do
+        local item = game.entity(id)
+        if item and item.item then
+            local dx, dy, dz = pos.x - item.pos.x, pos.y - item.pos.y, pos.z - item.pos.z
+            local length = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if length > 0.3 then
+                local k = strength / length
+                game.set_entity(id, { velocity = { x = dx * k, y = dy * k + 0.1, z = dz * k } })
+                n = n + 1
+            end
+        end
+    end
+    return n
+end
+
 tdl.on_tick(function(dt)
     -- Anything of ours lying near a player that this session does not
     -- remember (the world was closed and reopened) is adopted as settled.

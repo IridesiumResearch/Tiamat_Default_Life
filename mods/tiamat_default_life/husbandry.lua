@@ -80,8 +80,14 @@ tdl.on_use_entity(function(event)
     local held = event.held
     local def = held and I.by_material[held.material]
 
-    -- A lead: on, or off again.
+    -- A lead: on, or off again; or back off the post it was tied to.
     if def and def.lead then
+        if m.tied then
+            M.untie(id, m)
+            m.led = uuid
+            tell(uuid, "You untie the " .. string.lower(kind.name) .. ".")
+            return ""
+        end
         if m.led == uuid then
             m.led = nil
             tell(uuid, "You let the " .. string.lower(kind.name) .. " go.")
@@ -213,6 +219,30 @@ function M.step(id, m, entity, dt)
         end
     end
 
+    -- Tied to a post: it may wander, but a lead's length from the post; the
+    -- rope comes off if the post is gone.
+    if m.tied then
+        if (now + m.perceive_at) % 20 == 0 then
+            local post = game.get_block(m.tied)
+            if post and post.material ~= I.fence then
+                M.untie(id, m)
+                return false
+            end
+        end
+        local at = { x = m.tied.x + 0.5, y = m.tied.y, z = m.tied.z + 0.5 }
+        m.home = at
+        if U.dist2(at, entity.pos) > U.square(C.lead_reach) then
+            MOBS.move_to(id, m, entity, at, false)
+            return true
+        end
+        return false
+    end
+
+    -- Charmed (another mod's `follow`) for a while.
+    if m.led_until and now >= m.led_until then
+        m.led, m.led_until = nil, nil
+    end
+
     -- On a lead: it follows whoever holds the rope, and the rope comes off
     -- if they get too far ahead or leave.
     if m.led then
@@ -239,18 +269,64 @@ function M.adopt(id, m, entity)
     if m.young then m.grow_left = C.grow_up_ticks end
     local expecting = game.storage.get("breed:" .. id)
     if math.type(expecting) == "integer" and expecting > 0 then m.breed_in = expecting end
+    local tied = game.storage.get("tie:" .. id)
+    if type(tied) == "string" then
+        local x, y, z = string.match(tied, "^(%-?%d+),(%-?%d+),(%-?%d+)$")
+        if x then m.tied = { x = tonumber(x), y = tonumber(y), z = tonumber(z) } end
+    end
 end
 
 --- The animal is gone: what was kept for it goes too.
 function M.forget(id, m)
     if m.breed_in then game.storage.set("breed:" .. id, nil) end
+    if m.tied then game.storage.set("tie:" .. id, nil) end
 end
 
--- Gates -------------------------------------------------------------------------------
+--- Ties an animal to a fence post, remembered with the world.
+function M.tie(id, m, post)
+    m.led, m.led_until = nil, nil
+    m.tied = { x = post.x, y = post.y, z = post.z }
+    game.storage.set("tie:" .. id, U.key(post))
+end
+
+function M.untie(id, m)
+    m.tied = nil
+    game.storage.set("tie:" .. id, nil)
+end
+
+--- Another mod's charm: the creature follows `uuid` for `ticks`, as on a
+--- lead, whatever it was doing. Not a thing that stands still, flies or
+--- swims.
+function M.follow(id, uuid, ticks)
+    local entity = math.type(id) == "integer" and game.entity(id)
+    if not entity or entity.item or entity.source ~= game.mod_id then return false end
+    local m = MOBS.live[id] or MOBS.adopt(id, entity)
+    if m == nil or m.kind.still or m.kind.flyer or m.kind.swims then return false end
+    if m.tied then M.untie(id, m) end
+    m.led, m.led_until = uuid, now + ticks
+    m.state, m.threat, m.target, m.angry = "idle", nil, nil, false
+    return true
+end
+
+-- Gates, and tying up -------------------------------------------------------------------
 
 tdl.on_use(function(event)
     if event.x == nil then return end
     local at = U.cell_block(event.x, event.y, event.z)
+    -- A lead at a fence post: everything you are leading is tied to it.
+    local held = event.held and I.by_material[event.held.material]
+    if event.material == I.fence and held and held.lead then
+        local n = 0
+        for id, m in pairs(MOBS.live) do
+            if m.led == event.player and not m.led_until then
+                M.tie(id, m, at)
+                n = n + 1
+            end
+        end
+        if n == 0 then return "You are leading nothing." end
+        tell(event.player, n == 1 and "Tied to the post." or ("All " .. n .. " tied to the post."))
+        return ""
+    end
     if event.material == I.gate then
         game.set_block(at, game.mod_id .. ":gate_open")
         return ""

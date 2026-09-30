@@ -65,7 +65,13 @@ end
 
 --- Scatters one stack in `fraction` of a view where the body was; a
 --- fraction of one is everything.
-local function scatter(uuid, v, pos, fraction, view)
+--- Keep everything, the next death: another mod's gift (exports.lua's
+--- `keep_inventory`), remembered with the world until it is spent.
+function tdl.keep_inventory(uuid)
+    game.storage.set("keep:" .. uuid, true)
+end
+
+local function scatter(uuid, v, pos, fraction, view, dropped)
     local n = 0
     for _, stack in ipairs(game.inventory(uuid, view)) do
         local units
@@ -88,9 +94,10 @@ local function scatter(uuid, v, pos, fraction, view)
                 local dz = ((n * 3) % 5 - 2) * 0.15
                 -- Owned by the one who died, so a respawn on the spot does
                 -- not scoop everything back up before it has landed.
-                tdl.drop({ x = pos.x, y = pos.y + 1.0, z = pos.z }, {
+                local id = tdl.drop({ x = pos.x, y = pos.y + 1.0, z = pos.z }, {
                     material = stack.material, units = took, shape = stack.shape, detail = stack.detail,
                 }, { owner = uuid, velocity = { x = dx, y = 0.35, z = dz } })
+                if id and dropped then dropped[#dropped + 1] = id end
             end
         end
     end
@@ -102,11 +109,14 @@ function tdl.die(uuid, kind, cause)
     if v == nil or v.dead then return end
     v.dead = true
     v.deaths = v.deaths + 1
-    tdl.emit("death", uuid)
 
     local body = U.body(uuid)
     local pos = body and body.pos or v.pos
     tdl.cue(uuid, "death")
+    -- A kept inventory: nothing falls, this once.
+    local keep = game.storage.get("keep:" .. uuid) == true
+    if keep then game.storage.set("keep:" .. uuid, nil) end
+    local dropped = {}
 
     local line = "You " .. (cause or CAUSES[kind] or "died") .. "."
     game.log(string.format("tiamat_default_life: %s %s (%s)", tdl.name(uuid), cause or CAUSES[kind] or kind, kind))
@@ -114,10 +124,11 @@ function tdl.die(uuid, kind, cause)
     -- One life: everything falls, worn and carried, and the player stays
     -- where they fell as a ghost. There is no waking up.
     if tdl.mode == "Adventure" then
-        if pos then
-            scatter(uuid, v, pos, 1)
-            scatter(uuid, v, pos, 1, I.worn_view)
+        if pos and not keep then
+            scatter(uuid, v, pos, 1, nil, dropped)
+            scatter(uuid, v, pos, 1, I.worn_view, dropped)
         end
+        tdl.emit("death", uuid, pos, dropped)
         tdl.set_ghost(uuid, true)
         v.hp, v.fx, v.dead = 0, {}, false
         v.env.fire = nil
@@ -127,9 +138,10 @@ function tdl.die(uuid, kind, cause)
         return
     end
 
-    if pos then
-        scatter(uuid, v, pos, C.drop_fraction)
+    if pos and not keep then
+        scatter(uuid, v, pos, C.drop_fraction, nil, dropped)
     end
+    tdl.emit("death", uuid, pos, dropped)
 
     -- Where to wake up.
     local target = bed_spawn(uuid) or v.safe_old or v.safe_recent

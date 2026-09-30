@@ -23,6 +23,10 @@
 local I = tdl.items
 local U = tdl.util
 
+-- The kinds of damage a player takes, for `hurt`.
+local DAMAGE_KINDS = { physical = true, fall = true, fire = true, lava = true, poison = true, wither = true,
+    starvation = true, drowning = true, freezing = true, overheating = true, explosion = true, radiation = true }
+
 local function block_name(name)
     return type(name) == "string" and #name <= 128 and string.match(name, "^[%w_]+:[%w_]+$") ~= nil
 end
@@ -116,7 +120,9 @@ return {
 
     --- Survival events. Each takes a function of yours, called when it
     --- happens: `on_kill(fn(uuid, kind))` when a player's blow kills one of
-    --- this mod's creatures (`kind` its short id, "cow"); `on_death(fn(uuid))`;
+    --- this mod's creatures (`kind` its short id, "cow"); `on_death(fn(uuid,
+    --- pos, drops))`, `pos` where they fell and `drops` the entity ids of
+    --- the stacks that fell, empty for a kept inventory;
     --- `on_eat(fn(uuid, material))` with the food's qualified id;
     --- `on_sleep(fn(uuid))` for a night slept through. Your function runs in
     --- your sandbox. Answers whether it was taken.
@@ -176,6 +182,143 @@ return {
     spend_stat = function(uuid, id, amount)
         if type(uuid) ~= "string" or type(id) ~= "string" or real(amount, 0, 1e6) == nil then return false end
         return tdl.stats.spend(uuid, id, amount)
+    end,
+
+    -- Magic's and Science's asks (their docs/sibling-asks.md) ----------------
+
+    --- A player's own ceiling for one of your stats (L-M1): a quintessence
+    --- only some players have. `max` 0 hides the bar for them; nil puts the
+    --- stat's own ceiling back. Saved with the vitals.
+    set_stat_max = function(uuid, id, max)
+        if type(uuid) ~= "string" or type(id) ~= "string" then return false end
+        if max ~= nil and real(max, 0, 1e6) == nil then return false end
+        return tdl.stats.set_max(uuid, id, max)
+    end,
+
+    --- Effects and health on a player (a UUID) or one of this mod's
+    --- creatures (an entity id) (L-M2). `add_effect(target, id, ticks)`: a
+    --- player takes any of this mod's effects; a creature `burning`,
+    --- `poison`, `wither` and `regeneration`. `cure(target, id)`,
+    --- `heal(target, n)` (answers points healed), `hurt(target, n, kind,
+    --- source)`: `kind` one of this mod's damage kinds for a player
+    --- (default physical), `source` the UUID the blow is blamed on, whom a
+    --- creature turns on or flees from. Answers what landed.
+    add_effect = function(target, id, ticks)
+        local t = whole(ticks, 1, 20 * 60 * 30)
+        if type(id) ~= "string" or not t then return false end
+        if type(target) == "string" then
+            local v = tdl.get(target)
+            if v == nil or v.dead or not tdl.effects.defs[id] then return false end
+            tdl.effects.apply(v, id, t)
+            return true
+        end
+        return tdl.mobs.add_effect(target, id, t)
+    end,
+    cure = function(target, id)
+        if type(id) ~= "string" then return false end
+        if type(target) == "string" then
+            local v = tdl.get(target)
+            if v == nil then return false end
+            tdl.effects.remove(v, id)
+            return true
+        end
+        return tdl.mobs.cure(target, id)
+    end,
+    heal = function(target, n)
+        local amount = whole(n, 1, 1000)
+        if not amount then return 0 end
+        if type(target) == "string" then return tdl.heal(target, amount) or 0 end
+        return tdl.mobs.heal(target, amount)
+    end,
+    hurt = function(target, n, kind, source)
+        local amount = whole(n, 1, 1000)
+        if not amount then return 0 end
+        local by = type(source) == "string" and string.match(source, "^%x+$") and source or nil
+        if type(target) == "string" then
+            local k = DAMAGE_KINDS[kind] and kind or "physical"
+            return tdl.damage(target, amount, k) or 0
+        end
+        local entity = math.type(target) == "integer" and game.entity(target)
+        if not entity or entity.item or entity.source ~= game.mod_id then return 0 end
+        local before = entity.health or 0
+        tdl.hurt_mob(target, amount, by)
+        local after = game.entity(target)
+        return before - (after and after.health or 0)
+    end,
+
+    --- Abilities of yours on a player, composed with this mod's own (L-M3,
+    --- L-S3): `spec = { speed_mul, fly }` under `source` (your name for it),
+    --- or nil to take it off. Every source's speed multiplies in, any
+    --- source's flight flies; cold and hunger still slow and stop a sprint.
+    --- Do not call `game.set_player_abilities` yourself: the last writer
+    --- wins, and this mod writes it. Not saved: set it again on a join.
+    set_ability = function(uuid, source, spec)
+        if type(uuid) ~= "string" or type(source) ~= "string" or #source > 64 then return false end
+        if spec == nil then
+            tdl.set_ability(uuid, source, nil)
+            return true
+        end
+        if type(spec) ~= "table" then return false end
+        local mul = spec.speed_mul == nil and 1 or real(spec.speed_mul, 0, 4)
+        if mul == nil or (spec.fly ~= nil and type(spec.fly) ~= "boolean") then return false end
+        tdl.set_ability(uuid, source, { speed_mul = mul, fly = spec.fly == true })
+        return true
+    end,
+
+    --- One of this mod's creatures follows `uuid` for `ticks`, as on a
+    --- lead, whatever it was doing (L-M5): a charm. Not a creature that
+    --- stands still, flies or swims.
+    follow = function(entity, uuid, ticks)
+        local t = whole(ticks, 1, 20 * 60 * 30)
+        if type(uuid) ~= "string" or not t then return false end
+        return tdl.husbandry.follow(entity, uuid, t)
+    end,
+
+    --- A player's air, 0..27 (L-M6); and the `water_breathing` effect,
+    --- through `add_effect`, keeps it from running out under water.
+    set_air = function(uuid, n)
+        local v = type(uuid) == "string" and tdl.get(uuid)
+        if not v or real(n, 0, 27) == nil then return false end
+        v.air = n
+        return true
+    end,
+
+    --- The player's next death drops nothing (L-M7): a phoenix feather.
+    --- Remembered with the world until it is spent. `on_death` says where
+    --- a death was and what fell.
+    keep_inventory = function(uuid)
+        if type(uuid) ~= "string" or not string.match(uuid, "^%x+$") then return false end
+        tdl.keep_inventory(uuid)
+        return true
+    end,
+
+    --- Pushes one of this mod's creatures (L-S2): `velocity` in cells a
+    --- tick, played out for half a second before its own AI takes it back.
+    --- `freeze(entity, ticks)` holds it where it is, AI and all.
+    push = function(entity, velocity)
+        if type(velocity) ~= "table" then return false end
+        local x, y, z = real(velocity.x, -8, 8), real(velocity.y, -8, 8), real(velocity.z, -8, 8)
+        if not (x and y and z) then return false end
+        return tdl.mobs.push(entity, { x = x, y = y, z = z })
+    end,
+    freeze = function(entity, ticks)
+        local t = whole(ticks, 1, 20 * 60 * 5)
+        if not t then return false end
+        return tdl.mobs.freeze(entity, t)
+    end,
+
+    --- Draws this mod's dropped stacks within `radius` blocks (at most 16)
+    --- toward `pos` at `strength` cells a tick (default 0.3, at most 2)
+    --- (L-S4): a magnet. Answers how many it moved. Setting the velocity of
+    --- this mod's drops yourself is fine too; they are picked up where they
+    --- come to rest.
+    pull_drops = function(pos, radius, strength)
+        if type(pos) ~= "table" then return 0 end
+        local x, y, z = real(pos.x, -1e7, 1e7), real(pos.y, -1e7, 1e7), real(pos.z, -1e7, 1e7)
+        local r = real(radius, 0, 16)
+        local s = strength == nil and 0.3 or real(strength, 0, 2)
+        if not (x and y and z and r and s) then return 0 end
+        return tdl.pull_drops({ x = x, y = y, z = z }, r, s)
     end,
 
     --- Your item `material` is food: `spec = { food, saturation, heal,

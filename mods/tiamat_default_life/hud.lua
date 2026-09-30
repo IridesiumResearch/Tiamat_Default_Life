@@ -62,6 +62,7 @@ local EFFECT_NAMES = {
     rested = { "Well rested", { 190, 230, 190, 255 } },
     hearty = { "Hearty", { 220, 160, 120, 255 } },
     steady = { "Steady", { 210, 190, 140, 255 } },
+    water_breathing = { "Water breathing", { 120, 200, 230, 255 } },
 }
 
 local function icon(name, x, y, size, anchor)

@@ -33,9 +33,18 @@ in `depends` or `optional_depends`. Source: `mods/tiamat_default_life/exports.lu
 | `add_tilling_tool(material)` | `material` your item's name | Grass or earth right-clicked with it is tilled ground. |
 | `mode()` | | The world's mode: `"Default"`, `"Creative"` or `"Adventure"`. |
 | `is_ghost(uuid)`, `is_admin(uuid)` | `uuid` a player's hex UUID | Whether the player is a ghost (died in an Adventure world; a ghost may touch nothing), or an admin. |
-| `on_kill(fn)`, `on_death(fn)`, `on_eat(fn)`, `on_sleep(fn)` | `fn` a function of yours | Survival events: `fn(uuid, kind)` when a player's blow kills one of this mod's creatures (`kind` its short id); `fn(uuid)` on a death; `fn(uuid, material)` on a meal, with the food's qualified id; `fn(uuid)` on a night slept through. Your function runs in your sandbox. |
+| `on_kill(fn)`, `on_death(fn)`, `on_eat(fn)`, `on_sleep(fn)` | `fn` a function of yours | Survival events: `fn(uuid, kind)` when a player's blow kills one of this mod's creatures (`kind` its short id); `fn(uuid, pos, drops)` on a death, with where they fell and the entity ids of the stacks that fell; `fn(uuid, material)` on a meal, with the food's qualified id; `fn(uuid)` on a night slept through. Your function runs in your sandbox. |
 | `add_stat(id, spec)` | `id` qualified by you (`"tiamat_magic:mana"`); `spec = { max, regen, name, colour = { r, g, b }, start }`, `regen` points a tick, `start` defaulting to `max` | A stat on every player that this mod keeps, fills back, saves with the vitals and draws as a bar above the hearts, in your colour with your name (up to a handful; they stack). |
 | `stat(uuid, id)`, `set_stat(uuid, id, value)`, `spend_stat(uuid, id, amount)` | | Read it; set it (clamped to 0..max); take `amount` off it if there is that much (`true`), else leave it (`false`). |
+| `set_stat_max(uuid, id, max)` | `max` 0..1e6, or `nil` for the stat's own | A player's own ceiling for one of your stats, saved with the vitals; at 0 the bar is not drawn for them. |
+| `add_effect(target, id, ticks)`, `cure(target, id)` | `target` a player's UUID or the entity id of one of this mod's creatures; `id` an effect of this mod's (`effects.lua`) | Puts an effect on, or takes it off. A player takes any; a creature `burning`, `poison` (never the last point), `wither` and `regeneration`. |
+| `heal(target, n)`, `hurt(target, n, kind, source)` | `n` whole, 1..1000; `kind` one of this mod's damage kinds for a player (default `physical`); `source` a UUID | Answers the points that landed. A creature hurt turns on, or flees from, `source`. |
+| `set_ability(uuid, source, spec)` | `spec = { speed_mul (0..4), fly }` under your `source` name, or `nil` to take it off | Composed with this mod's own: every source's speed multiplies in, any source's flight flies; cold and hunger still apply. Do not call `game.set_player_abilities` yourself. Not saved. |
+| `follow(entity, uuid, ticks)` | one of this mod's creatures; ticks up to 30 minutes | It follows the player as on a lead, whatever it was doing: a charm. Not a creature that stands still, flies or swims. |
+| `set_air(uuid, n)` | `n` 0..27 | A player's air. The `water_breathing` effect keeps it from running out under water. |
+| `keep_inventory(uuid)` | | The player's next death drops nothing. Remembered with the world until spent. |
+| `push(entity, velocity)`, `freeze(entity, ticks)` | `velocity = { x, y, z }` in cells a tick, each -8..8; ticks up to five minutes | A creature pushed plays the push out for half a second before its own AI takes it back; frozen, it is held where it is, AI and all. |
+| `pull_drops(pos, radius, strength)` | `radius` up to 16 blocks; `strength` cells a tick, default 0.3, at most 2 | Draws this mod's dropped stacks toward `pos`. Answers how many moved. Writing their velocity yourself is fine too. |
 | `drop(pos, stack, opts)` | `pos = { x, y, z }`; `stack = { material, units \| count, shape, detail }`; `opts = { velocity = { x, y, z }, owner = uuid }` | Puts a stack on the ground in this mod's care: picked up by whoever walks over it, gone after five minutes. Answers the entity id, or `nil`. |
 
 None of them raise: anything malformed answers `false` (or `nil`, for
@@ -77,7 +86,10 @@ All are namespaced `tiamat_default_life:` by the engine.
   `icon_cookie_half`, `icon_cookie_empty`, `icon_bubble`, `icon_thermo_hot`,
   `icon_thermo_cold`, `icon_shield`, `icon_shield_faint`, `icon_shield_broken`.
 - **Actions:** `use`, `wardrobe`.
-- **Inventory view:** `worn` (four slots).
+- **Inventory view:** `worn` (four slots, the clothing a player wears).
+  Part of the exports: another mod may read it with
+  `game.inventory(uuid, "tiamat_default_life:worn")` and rely on its name
+  and its four slots, which will not change without a `version` bump.
 - **World option:** `mode` — `"Default"`, `"Creative"` or `"Adventure"`,
   readable by any mod as `game.world_option("tiamat_default_life:mode")`.
 

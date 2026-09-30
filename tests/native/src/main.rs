@@ -899,6 +899,52 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
         &dir,
     )
     .expect("the progress stand-in loads and Life's exports answer it");
+    // Stand-ins for Tiamat Default Magic and Science: every export they
+    // asked for, called from chat words, with what each answers said back.
+    vm.note_dependencies("tiamat_default_magic", &[MOD.to_owned()]);
+    vm.load_mod(
+        "tiamat_default_magic",
+        r#"
+        local life = game.exports("tiamat_default_life")
+        assert(life.add_stat("tiamat_default_magic:quintessence", { max = 30, regen = 0, name = "Quintessence" }) == true)
+        assert(life.set_stat_max("00", "nope", 3) == false)
+        assert(life.add_effect("00", "not_an_effect", 10) == false)
+        assert(life.set_ability("00", "x", { speed_mul = 99 }) == false)
+        assert(life.push(1, { x = "fast" }) == false)
+        local deaths = {}
+        life.on_death(function(uuid, pos, drops) deaths[#deaths + 1] = (pos and "pos" or "nopos") .. ":" .. #drops end)
+        game.register_on_chat(function(e)
+            local word, a, b = string.match(e.text, "^magic (%S+)%s*(%S*)%s*(%S*)$")
+            if word == nil then return end
+            local p = e.player
+            local out
+            if word == "hide" then out = life.set_stat_max(p, "tiamat_default_magic:quintessence", 0)
+            elseif word == "grant" then out = life.set_stat_max(p, "tiamat_default_magic:quintessence", 12)
+            elseif word == "breathe" then out = life.add_effect(p, "water_breathing", 400)
+            elseif word == "air" then out = life.set_air(p, tonumber(a))
+            elseif word == "swift" then out = life.set_ability(p, "swiftness", { speed_mul = 1.5 })
+            elseif word == "sylph" then out = life.set_ability(p, "sylph", { fly = true })
+            elseif word == "plain" then out = life.set_ability(p, "swiftness", nil) and life.set_ability(p, "sylph", nil)
+            elseif word == "hurtme" then out = life.hurt(p, 4, "fire")
+            elseif word == "healme" then out = life.heal(p, 27)
+            elseif word == "keep" then out = life.keep_inventory(p)
+            elseif word == "deaths" then out = table.concat(deaths, " ")
+            elseif word == "fx" then out = life.add_effect(math.tointeger(tonumber(a)), b, 400)
+            elseif word == "cure" then out = life.cure(math.tointeger(tonumber(a)), b)
+            elseif word == "hit" then out = life.hurt(math.tointeger(tonumber(a)), 3, "physical", p)
+            elseif word == "mend" then out = life.heal(math.tointeger(tonumber(a)), 5)
+            elseif word == "charm" then out = life.follow(math.tointeger(tonumber(a)), p, 200)
+            elseif word == "push" then out = life.push(math.tointeger(tonumber(a)), { x = 2, y = 1, z = 0 })
+            elseif word == "freeze" then out = life.freeze(math.tointeger(tonumber(a)), 60)
+            elseif word == "pull" then out = life.pull_drops({ x = 100.5, y = 64, z = 100.5 }, 12, 0.5)
+            end
+            game.chat_to(p, tostring(out))
+            return false
+        end)
+        "#,
+        &dir,
+    )
+    .expect("the magic stand-in loads and Life's exports answer it");
     vm.freeze().unwrap();
     // The server hands out fluid numbers once every mod has loaded; the
     // world's water is 1 here, the number the fake world answers with.
@@ -1333,6 +1379,7 @@ fn main() {
     mob_check(&mut r);
     farm_check(&mut r);
     progress_check(&mut r);
+    magic_check(&mut r);
     ui_check();
     climate_check();
     modes_check();
@@ -2318,6 +2365,148 @@ const BOB: [u8; 32] = [9; 32];
 
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
+/// What Magic and Science reach through the exports.
+fn magic_check(r: &mut Rig) {
+    r.say("heal");
+    r.say("feed");
+    r.tick(1);
+    let ask = |r: &mut Rig, words: &str| -> String {
+        r.say(&format!("magic {words}"));
+        r.said()
+    };
+
+    // L-M1: a stat of theirs, hidden for a player at a ceiling of 0, shown
+    // at their own ceiling, and clamped to it.
+    assert_eq!(ask(r, "hide"), "true");
+    r.tick(1);
+    assert!(!r.text("stats").contains("Quintessence"), "a ceiling of 0 draws no bar: {}", r.text("stats"));
+    assert_eq!(ask(r, "grant"), "true");
+    r.tick(1);
+    assert!(r.text("stats").contains("Quintessence"), "{}", r.text("stats"));
+    let n = r.text("stats").split(';').position(|s| s.starts_with("Quintessence")).unwrap() + 1;
+    assert_eq!(r.number(&format!("stat{n}_max")), 12.0, "their own ceiling");
+    assert!(r.number(&format!("stat{n}")) <= 12.0, "and the value under it");
+
+    // L-M6: water breathing keeps air from running out; set_air sets it.
+    r.entities.body(|b| b.submerged = 1.0);
+    assert_eq!(ask(r, "breathe"), "true");
+    r.tick(200);
+    assert_eq!(r.number("air"), 27.0, "breathing under water");
+    assert_eq!(ask(r, "air 9"), "true");
+    r.tick(1);
+    // Still breathing, so it refills from there, three a tick.
+    assert_eq!(r.number("air"), 12.0, "air set, and refilling: {}", r.number("air"));
+    r.entities.body(|b| b.submerged = 0.0);
+    r.tick(200);
+
+    // L-M3: abilities composed with Life's own.
+    assert_eq!(ask(r, "swift"), "true");
+    r.tick(2);
+    assert_eq!(r.abilities().map(|a| a.speed), Some(1.5), "swiftness multiplies in");
+    assert_eq!(ask(r, "sylph"), "true");
+    r.tick(2);
+    assert_eq!(r.abilities().map(|a| a.fly), Some(true), "a sylph flies");
+    assert_eq!(ask(r, "plain"), "true");
+    r.tick(2);
+    assert_eq!(r.abilities().map(|a| (a.speed, a.fly)), Some((1.0, false)), "and both come off");
+
+    // L-M2 on a player: hurt and heal answer what landed.
+    let hurt: f64 = ask(r, "hurtme").parse().unwrap();
+    assert!(hurt > 0.0, "hurt landed: {hurt}");
+    r.tick(20);
+    let healed: f64 = ask(r, "healme").parse().unwrap();
+    assert!(healed > 0.0, "healed: {healed}");
+
+    // L-M2, L-S2 and L-M5 on a creature.
+    r.say("cull");
+    r.say("spawn cow 1");
+    r.tick(1);
+    let cow = r.mobs()[0].0;
+    let health = |r: &Rig| r.entities.0.lock().unwrap().entities[&cow].health.map(|h| h.current).unwrap_or(0);
+    assert_eq!(ask(r, &format!("hit {cow}")), "3", "a cow hurt for three");
+    assert_eq!(health(r), 7);
+    assert_eq!(ask(r, &format!("mend {cow}")), "3", "and healed back to full, no further");
+    assert_eq!(health(r), 10);
+    assert_eq!(ask(r, &format!("fx {cow} poison")), "true");
+    for _ in 0..600 {
+        r.put_mob(cow, 104.5, 64.0, 100.5);
+        r.tick(1);
+    }
+    assert_eq!(health(r), 1, "poisoned to its last point, and no further");
+    assert_eq!(ask(r, &format!("cure {cow} poison")), "true");
+    assert_eq!(ask(r, &format!("fx {cow} regeneration")), "true");
+    r.tick(100);
+    assert!(health(r) > 1, "regenerating: {}", health(r));
+    assert_eq!(ask(r, &format!("fx {cow} resistance")), "false", "a creature takes only the few that mean something to one");
+    assert_eq!(ask(r, &format!("freeze {cow}")), "true");
+    r.put_mob(cow, 110.5, 64.0, 100.5);
+    r.entities.0.lock().unwrap().entities.get_mut(&cow).unwrap().on_ground = true;
+    r.tick(5);
+    assert_eq!(r.entities.0.lock().unwrap().entities[&cow].drive.walk, [0.0, 0.0], "frozen, it does not move");
+    r.tick(60);
+    assert_eq!(ask(r, &format!("push {cow}")), "true");
+    let v = r.entities.0.lock().unwrap().entities[&cow].velocity.0;
+    assert!(v[0] > 1.0, "pushed: {v:?}");
+    r.tick(12);
+    assert_eq!(ask(r, &format!("charm {cow}")), "true");
+    r.put_mob(cow, 108.5, 64.0, 100.5);
+    r.tick(12);
+    assert!(r.entities.0.lock().unwrap().entities[&cow].drive.walk[0] < 0.0, "charmed, it comes after you");
+
+    // L-S6: a lead at a fence post ties what you lead to it; a lead at the
+    // animal takes it back.
+    r.say("cull");
+    r.say("spawn cow 2");
+    r.tick(1);
+    let cows: Vec<u64> = r.mobs().iter().map(|(id, _)| *id).collect();
+    r.hold("tiamat_default_life:lead");
+    for id in &cows {
+        r.put_mob(*id, 102.5, 64.0, 100.5);
+        r.use_entity(*id);
+    }
+    r.world.put(101, 64, 103, r.material("tiamat_default_life:fence"));
+    r.use_at(101, 64, 103);
+    for id in &cows {
+        assert!(r.storage.get(MOD, &format!("tie:{id}")).is_some(), "both tied to the post, remembered");
+    }
+    r.put_mob(cows[0], 115.5, 64.0, 103.5);
+    r.entities.0.lock().unwrap().entities.get_mut(&cows[0]).unwrap().on_ground = true;
+    r.tick(12);
+    assert!(r.entities.0.lock().unwrap().entities[&cows[0]].drive.walk[0] < 0.0, "wandered off, it is pulled back to the post");
+    r.use_entity(cows[0]);
+    assert!(r.storage.get(MOD, &format!("tie:{}", cows[0])).is_none(), "untied");
+    r.world.clear();
+    r.say("cull");
+    r.hold_nothing();
+
+    // L-S4: a magnet draws drops.
+    r.say("craftdrop");
+    let drop = r.entities.0.lock().unwrap().entities.iter().find(|(_, e)| e.source == MOD && e.item.is_some()).map(|(id, _)| *id).unwrap();
+    r.put_mob(drop, 110.5, 64.0, 100.5);
+    assert_ne!(ask(r, "pull"), "0");
+    assert!(r.entities.0.lock().unwrap().entities[&drop].velocity.0[0] < 0.0, "the drop is drawn toward the magnet");
+    r.tick(80);
+
+    // L-M7: a kept inventory drops nothing, and the death is heard with where
+    // it was and what fell.
+    r.hold("tiamat_default_life:apple");
+    assert_eq!(ask(r, "keep"), "true");
+    r.say("die");
+    r.tick(80);
+    r.say("heal");
+    r.say("die");
+    r.tick(80);
+    let deaths = ask(r, "deaths");
+    let last_two: Vec<&str> = deaths.split(' ').rev().take(2).collect();
+    assert_eq!(last_two[1], "pos:0", "the kept death dropped nothing: {deaths}");
+    assert!(last_two[0].starts_with("pos:") && last_two[0] != "pos:0", "the next one dropped a third: {deaths}");
+    r.say("heal");
+    r.say("feed");
+    r.hold_nothing();
+    r.tick(80);
+    println!("ok  magic and science reach stats, effects, health, abilities, air, deaths, creatures, drops and tethers");
+}
+
 /// What Progress reads through the exports: the survival events, counted
 /// by its stand-in over everything above, and a stat kept, spent, filled
 /// back, drawn and saved.
@@ -2334,7 +2523,7 @@ fn progress_check(r: &mut Rig) {
     r.tick(1);
     assert_eq!(r.number("stat1"), 20.0, "mana starts full and reaches the HUD");
     assert_eq!(r.number("stat1_max"), 20.0);
-    assert_eq!(r.text("stats"), "Mana:80,120,255");
+    assert_eq!(r.text("stats").split(';').next(), Some("Mana:80,120,255"), "first, as it was added first");
     r.say("spend");
     assert_eq!(r.said(), "true");
     r.say("spend");
