@@ -1367,6 +1367,24 @@ local function stalker(id, m, entity, dt)
     return true
 end
 
+--- One tick of a creature under a rider: walking or running by the speed it
+--- is really making, and idle when it stands.
+local function ridden(id, m, entity)
+    local v = entity.velocity
+    local speed2 = v.x * v.x + v.z * v.z
+    -- The rider's walking pace on this mount, in cells a tick; a good deal
+    -- over it is a sprint.
+    local walk = C.player_walk * m.kind.ride.speed * 3 / 20
+    local anim = ANIM_IDLE
+    if speed2 >= 0.0025 then
+        anim = speed2 > walk * walk * 1.3 and ANIM_RUN or ANIM_WALK
+    end
+    if m.ridden_anim ~= anim then
+        m.ridden_anim = anim
+        game.set_entity(id, { anim = anim })
+    end
+end
+
 local function step(id, dt)
     local entity = game.entity(id)
     if entity == nil or entity.item then return end
@@ -1377,6 +1395,7 @@ local function step(id, dt)
     m.timer = m.timer - dt
     if m.hurt_cd > 0 then m.hurt_cd = m.hurt_cd - dt end
     if m.bite_cd > 0 then m.bite_cd = m.bite_cd - dt end
+    if (m.calm or 0) > 0 then m.calm = m.calm - dt end
     if (now + m.perceive_at) % PERCEIVE_EVERY == 0 then perceive(m, entity) end
     if not tick_fire(id, m, entity, dt) then return end
     if m.fx and next(m.fx) and not tick_fx(id, m, entity, dt) then return end
@@ -1399,6 +1418,19 @@ local function step(id, dt)
     if (entity.fell or 0) > 0 and tdl.farming then tdl.farming.trample(entity.pos) end
     -- Growing up, breeding, laying, being led (husbandry.lua).
     if tdl.husbandry and tdl.husbandry.step(id, m, entity, dt) then return end
+
+    -- Ridden (engine ask 18): the rider's keys step it and it faces where they
+    -- look, so its own AI stands down; only its clip is its own, from how fast
+    -- it is really going. A rider gone without a dismount (an older engine,
+    -- a reload) frees it.
+    if m.rider then
+        if game.mounted(m.rider) ~= id then
+            m.rider, m.ridden_anim = nil, nil
+        else
+            ridden(id, m, entity)
+            return
+        end
+    end
 
     -- A bird or bat on foot that finds itself in the air (off a ledge, the
     -- ground dug from under it) flies at once, rather than standing on nothing.
@@ -1448,7 +1480,7 @@ local function step(id, dt)
             m.state, m.threat, m.timer = "withdraw", m.seen.uuid, 400
         elseif kind.hostile and (m.swarm and riled(m) or not m.swarm and hunts_now(kind, entity)) then
             m.state, m.threat, m.timer = "hunt", m.seen.uuid, C.mob_hunt_ticks
-        elseif kind.shy and m.seen.d2 < U.square((m.treed or m.landed) and kind.wary or kind.shy) then
+        elseif kind.shy and (m.calm or 0) <= 0 and m.seen.d2 < U.square((m.treed or m.landed) and kind.wary or kind.shy) then
             m.state, m.threat, m.timer = "flee", m.seen.uuid, C.mob_flee_ticks // 2
         end
     end

@@ -193,6 +193,7 @@ C.mob_turn_rate = 0.6          -- radians a walker turns in a tick: half a turn 
 C.mob_turn_hold = 1.2          -- radians off its way at which it turns on the spot before it goes
 C.player_walk = 4.3            -- the engine's own gaits, blocks a second: what a kind's
 C.player_sprint = 5.6          -- speeds are a multiple of (`speed` on the entity)
+C.ride_settle_ticks = 200      -- after a ride, a mount does not shy from anyone for this long
 C.mob_spawn_every = 100        -- ticks between spawning passes, per player
 C.mob_spawn_tries = 6          -- ground spots tried per pass
 C.mob_spawn_min = 20           -- blocks from the player, at least

@@ -37,6 +37,9 @@
 --                     cause }: it walks to whoever did it and strikes ONCE, and forgets
 --   swims             lives in the water: steered through it as a flyer is through the air,
 --                     held up only while in it; appears only at water (`spawn.water`)
+--   ride              { seat = { x, y, z }, speed }: an adult may be ridden (engine ask
+--                     18). `seat` is where the rider's feet go, in blocks from its feet,
+--                     as if it faced north; `speed` multiplies the rider's own gaits
 --   keeps_off         blocks: never met. A player nearer than this, or the day, and it
 --                     is gone in a breath of mist (the ghost)
 --   eats, eat_ticks, eat_every   blocks it eats when it touches them; how long; how often
@@ -183,9 +186,10 @@ tdl.register_mob{
 -- The horse: models/horse.glb, from an export that was already skinned.
 -- Seven cells long, 2.6 wide, 6.6 tall to the tips of its ears; its grazing
 -- clip under `sneak` and a rear kick under `swing`. A herd on open grass,
--- skittish and quick to bolt. It cannot be ridden yet: the engine has no
--- event for right-clicking an entity and no way to seat a player on one
--- (docs/engine-asks.md, asks 17 and 18).
+-- skittish and quick to bolt. A grown one is ridden: right-click it with
+-- nothing it wants in your hand, and sneak to get off. The rider has no
+-- sitting clip yet, so the seat is low enough that a standing figure
+-- straddles the back rather than standing on it.
 tdl.register_mob{
     id = "horse", name = "Horse", health = 15,
     collider = { width = 2.6, height = 5.4 },
@@ -194,6 +198,7 @@ tdl.register_mob{
     shy = 3.0, sight = 12, wander_radius = 14, pause_min = 60, pause_max = 260,
     sound = "snort", sound_death = "snort", voice_min = 400, voice_max = 1600,
     breeds = true, feeds = { "wheat", "apple" },
+    ride = { seat = { y = 0.45, z = -0.15 }, speed = 1.6 },
     drops = { { "raw_meat", 1, 3 }, { "hide", 1, 2 }, { "bone", 1, 2 }, { "sinew", 0, 1 } },
     -- Wide open grass, in herds that are a sight rather than a crowd.
     spawn = { biomes = {

@@ -5,9 +5,10 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-09-29)
+## Where these stand (2026-09-30)
 
-**Two are open: 18 and 19.** Everything else landed, and the mod uses every answer: 17 landed 2026-09-26
+**None are open.** 18 and 19 landed 2026-09-30 and 2026-09-29; both await the
+designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
 (engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
 One thing landed that was never numbered: the place control at nothing (open sky, or a
 block past reach) reaches a mod that asks, engine a6d34e1 (protocol 76), so food is eaten
@@ -19,8 +20,8 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
-| 19 a creature is lit where it stands | **Open.** | every creature is lit as if in the open: a cave's bats and rats glow. |
-| 18 riding | **Open.** | the horse is in the world and cannot be ridden. |
+| 19 a creature is lit where it stands | Landed, engine 847a908. | nothing to do: a cave's bats and rats are dark as the cave is. |
+| 18 riding | Landed, engine 7974abc. | a grown horse is ridden (`ride` on a kind, husbandry.lua); set down beside it on the way off. |
 | 17 using an entity | Landed, engine 50462b7. | feeding, milking, shearing and leading, in husbandry.lua. |
 | (unnumbered) a use at nothing | Landed, engine a6d34e1, protocol 76. | `hooks.lua` registers `on_use` with `{ anywhere = true }`; right mouse eats what is held at open sky too. |
 | 16 a model's skin is not drawn | Landed, engine b5ed249. | every animal painted, first world or fifth; checked by replaying the rejoin through the engine's renderer. |
@@ -41,7 +42,12 @@ included.
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 19. A creature is lit as if it stood in the open, wherever it is (2026-09-29): OPEN
+## 19. A creature is lit as if it stood in the open, wherever it is (2026-09-29): LANDED, engine 847a908
+
+*Landed 2026-09-29, as asked and for the engine's own figures too: a
+figure is lit by the brightest of the blocks at its feet, middle and head.
+Nothing on the wire and nothing for the mod to do. To see in the game: a
+bat in a dark cave against the rock, a cow at noon, a creature by lava.*
 
 **Seen.** In play, every creature is lit the same everywhere: a bat hanging
 in a pitch-dark cave, a scurrier in a tunnel and a cow in noon sun are
@@ -68,7 +74,18 @@ open looks exactly as it does now; one in a cave goes dark, and one by lava
 glows orange. The same would serve the engine's own humanoid (other
 players), which has the same flat lighting.
 
-## 18. Riding: a player seated on an entity, driving it (2026-09-23): OPEN
+## 18. Riding: a player seated on an entity, driving it (2026-09-23): LANDED, engine 7974abc
+
+*Landed 2026-09-30 as `game.mount(player, entity, { seat, sneak_dismounts })`,
+`game.dismount`, `game.mounted` and `game.register_on_dismount`. The mod
+adopted it the same day: a kind with `ride = { seat, speed }` (the horse) is
+got on with a right-click when nothing in the hand is for it, at `speed`
+times the rider's own gaits; its AI stands down while ridden and its clip
+follows the speed it makes; sneak gets off, and `on_dismount` sets the rider
+down beside it, where there is room, and it does not shy from them for ten
+seconds. There is no sitting clip yet, so the seat is low enough that a
+standing figure straddles the back. To see in the game: the seat's height,
+the pace, and the walk and gallop clips under a rider.*
 
 **Wanted.** Right-click a horse and you are on it: sat on its back, the
 camera up where a rider's eyes are, your movement keys driving the horse at

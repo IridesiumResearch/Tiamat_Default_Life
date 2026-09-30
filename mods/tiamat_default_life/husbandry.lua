@@ -2,8 +2,8 @@
 -- SPDX-License-Identifier: GPL-3.0-only
 --
 -- Husbandry: what a player does WITH an animal rather than to it. Feeding
--- and breeding, milk, wool, eggs and honey, leading one on a rope, and the
--- gate of the pen it lives in.
+-- and breeding, milk, wool, eggs and honey, leading one on a rope, riding
+-- one, and the gate of the pen it lives in.
 --
 --   tdl.husbandry.step(id, m, entity, dt)   one tick of an animal's domestic life; true if it took the tick
 --   tdl.husbandry.add_feed(material, kinds) another mod's food, for these kinds
@@ -139,12 +139,74 @@ tdl.on_use_entity(function(event)
         return ""
     end
 
+    -- Riding: anything else in the hand, or nothing, and a kind that is
+    -- ridden (engine ask 18) is got on.
+    if kind.ride and game.mount then
+        return M.ride(uuid, id, m)
+    end
+
     -- An empty hand, or the wrong thing: say what it is, and let the click go.
     if held == nil then
         tell(uuid, "A " .. string.lower(kind.name) .. (m.young and ", young." or "."))
         return ""
     end
     return nil
+end)
+
+-- Riding ------------------------------------------------------------------------------
+
+--- Seats `uuid` on the animal `id`. Answers what the use handler returns.
+function M.ride(uuid, id, m)
+    local kind = m.kind
+    if m.young then return "It is too young to ride." end
+    if m.tied then return "It is tied up." end
+    local ok, why = game.mount(uuid, id, { seat = kind.ride.seat })
+    if not ok then
+        if why == "ridden" then return "Somebody is riding it." end
+        if why == "already riding" then return "You are riding already." end
+        return "You cannot get on it."
+    end
+    m.rider, m.led = uuid, nil
+    m.state, m.threat, m.target, m.grazing = "idle", nil, nil, false
+    m.ridden_anim = nil
+    game.set_entity(id, { speed = kind.ride.speed })
+    m.speed = kind.ride.speed
+    return ""
+end
+
+--- Whether `pos` (a body's feet) has room for a player: the block there and
+--- the one over it empty.
+local function room_at(pos)
+    for dy = 0, 1 do
+        local at = game.get_block{ x = math.floor(pos.x), y = math.floor(pos.y) + dy, z = math.floor(pos.z) }
+        if at and at.occupancy ~= 0 and at.material ~= game.AIR then return false end
+    end
+    return true
+end
+
+-- Off again: the engine puts a rider at the mount's feet, which is inside
+-- it, so they are set down beside it, on whichever side has room; with no
+-- room either side they stay where the engine put them. The mount is its
+-- own again, and does not shy from the rider it just carried.
+tdl.on_dismount(function(e)
+    local m = MOBS.live[e.entity]
+    if m and m.rider == e.player then
+        m.rider, m.ridden_anim = nil, nil
+        m.calm = C.ride_settle_ticks
+        m.state, m.timer = "idle", 40
+    end
+    if e.reason == "leave" then return end
+    local mount = game.entity(e.entity)
+    if mount == nil then return end
+    local f = mount.facing
+    local side = (m and m.kind.collider.width / 3 / 2 or 0.5) + 0.6
+    for _, s in ipairs({ 1, -1 }) do
+        local at = { x = e.x + f.z * side * s, y = e.y, z = e.z - f.x * side * s }
+        if room_at(at) then
+            game.move_player(e.player, at)
+            return
+        end
+    end
 end)
 
 -- The animal's own tick ---------------------------------------------------------------

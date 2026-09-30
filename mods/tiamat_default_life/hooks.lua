@@ -20,6 +20,7 @@ local places = {}
 local steps = {}
 local uses = {}
 local entity_uses = {}
+local dismounts = {}
 local events = {}
 
 -- Runs `fn(dt_ticks)` every tick, after everything subscribed before it.
@@ -94,6 +95,13 @@ end
 -- then not asked.
 function tdl.on_use_entity(fn)
     entity_uses[#entity_uses + 1] = fn
+end
+
+-- Runs `fn(event)` when a rider comes off their mount (engine ask 18):
+-- `event.player`, `event.entity`, `event.reason` ("sneak", "dismount",
+-- "gone", "leave") and `event.x`, `y`, `z`, where the engine put them.
+function tdl.on_dismount(fn)
+    dismounts[#dismounts + 1] = fn
 end
 
 -- Survival events, for the mods that count them (Progress): "kill",
@@ -203,6 +211,15 @@ if game.register_on_use_entity then
             if verdict ~= nil and verdict ~= true then
                 return verdict
             end
+        end
+    end)
+end
+
+-- Engine ask 18, landed 2026-09-30: an older engine seats nobody.
+if game.register_on_dismount then
+    game.register_on_dismount(function(event)
+        for _, fn in ipairs(dismounts) do
+            fn(event)
         end
     end)
 end

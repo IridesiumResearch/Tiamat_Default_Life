@@ -22,7 +22,7 @@ use tiamat_core::{
     fluid::{self, Fluid, FluidId},
     hud::{self, State, Value, Values},
     identity::PlayerUuid,
-    inventory::{self, Shape, Stack},
+    inventory::{self, Stack},
     light::{Light, LightSource},
     particle::{self, BadgeRequest, EmitRequest},
     script::{
@@ -77,6 +77,8 @@ struct EntityStore {
     moved_to: Vec<[f64; 3]>,
     shoves: Vec<[f32; 3]>,
     abilities: HashMap<[u8; 32], Option<Abilities>>,
+    /// What the player rides, and the seat they were given.
+    riding: Option<(u64, ent::mount::Seat)>,
 }
 
 #[derive(Clone)]
@@ -96,6 +98,7 @@ impl Entities {
             moved_to: Vec::new(),
             shoves: Vec::new(),
             abilities: HashMap::new(),
+            riding: None,
         })))
     }
     fn body(&self, edit: impl FnOnce(&mut Entity)) {
@@ -191,6 +194,30 @@ impl ent::Access for Entities {
         self.0.lock().unwrap().abilities.insert(uuid, abilities);
         true
     }
+    fn mount(&self, uuid: [u8; 32], id: EntityId, seat: ent::mount::Seat) -> Result<(), ent::mount::Refusal> {
+        use ent::mount::Refusal;
+        if uuid != PLAYER {
+            return Err(Refusal::NotConnected);
+        }
+        let mut store = self.0.lock().unwrap();
+        if !store.entities.contains_key(&id.0) {
+            return Err(Refusal::NoSuchEntity);
+        }
+        if store.riding.as_ref().is_some_and(|(on, _)| *on != id.0) {
+            return Err(Refusal::AlreadyRiding);
+        }
+        store.riding = Some((id.0, seat));
+        Ok(())
+    }
+    fn dismount(&self, uuid: [u8; 32]) -> bool {
+        uuid == PLAYER && self.0.lock().unwrap().riding.take().is_some()
+    }
+    fn mounted(&self, uuid: [u8; 32]) -> Option<EntityId> {
+        if uuid != PLAYER {
+            return None;
+        }
+        self.0.lock().unwrap().riding.as_ref().map(|(on, _)| EntityId(*on))
+    }
 }
 
 #[derive(Default)]
@@ -260,16 +287,14 @@ impl inventory::Access for Inventory {
         _: [u8; 32],
         view: &str,
         _: Option<usize>,
-        material: MaterialId,
-        shape: Option<Shape>,
-        detail: Option<&str>,
+        which: inventory::StackKey<'_>,
         units: u32,
     ) -> u32 {
         let mut views = self.views.lock().unwrap();
         let Some(list) = views.get_mut(view) else { return 0 };
         let mut got = 0;
         for stack in list.iter_mut() {
-            if stack.material == material && stack.shape == shape && stack.detail.as_deref() == detail {
+            if which.matches(stack) {
                 let take = units.saturating_sub(got).min(stack.units);
                 stack.units -= take;
                 got += take;
@@ -1380,6 +1405,7 @@ fn main() {
     farm_check(&mut r);
     progress_check(&mut r);
     magic_check(&mut r);
+    ride_check(&mut r);
     ui_check();
     climate_check();
     modes_check();
@@ -2365,6 +2391,78 @@ const BOB: [u8; 32] = [9; 32];
 
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
+/// A horse ridden (engine ask 18): got on with nothing it wants in the hand,
+/// at its own pace, its clip from the speed it makes, set down beside it, and
+/// not shied from by the rider it carried; a foal is not ridden.
+fn ride_check(r: &mut Rig) {
+    use tiamat_core::ent::AnimTag;
+    r.say("cull");
+    r.say("spawn horse 1");
+    r.tick(1);
+    let horse = r.mobs()[0].0;
+    r.put_mob(horse, 102.5, 64.0, 100.5);
+    let riding = |r: &Rig| r.entities.0.lock().unwrap().riding.as_ref().map(|(on, _)| *on);
+
+    // Wheat in the hand feeds it, and does not get you on.
+    r.hold("tiamat_default_life:wheat");
+    r.use_entity(horse);
+    assert_eq!(riding(r), None, "a horse held wheat eats it");
+
+    // An empty hand gets you on, at the seat, and it goes at its riding pace.
+    r.hold_nothing();
+    r.use_entity(horse);
+    assert_eq!(riding(r), Some(horse), "on the horse");
+    {
+        let store = r.entities.0.lock().unwrap();
+        let seat = store.riding.as_ref().unwrap().1.offset.expect("a seat");
+        assert!(seat[1] > 0.0 && seat[1] < 3.0, "a seat low on its back, in cells: {seat:?}");
+        assert!((store.entities[&horse].speed - 1.6).abs() < 1e-6, "at its riding pace");
+    }
+
+    // Its clip follows the speed the rider makes it go.
+    let clip_at = |r: &mut Rig, vx: f32| {
+        r.entities.0.lock().unwrap().entities.get_mut(&horse).unwrap().velocity.0 = [vx, 0.0, 0.0];
+        r.tick(1);
+        r.entities.0.lock().unwrap().entities[&horse].anim
+    };
+    assert_eq!(clip_at(r, 1.0), AnimTag::WALK, "walked");
+    assert_eq!(clip_at(r, 1.4), AnimTag::RUN, "galloped");
+    assert_eq!(clip_at(r, 0.0), AnimTag::IDLE, "stood");
+
+    // Off, with sneak: set down beside it rather than inside it.
+    assert!(ent::Access::dismount(&r.entities, PLAYER));
+    let at = r.entities.0.lock().unwrap().entities[&horse].transform.to_world();
+    r.vm.dismounted(&tiamat_core::script::DismountEvent {
+        player: PLAYER,
+        entity: EntityId(horse),
+        reason: ent::mount::Dismount::Sneak,
+        domain: String::new(),
+        at,
+    });
+    assert!(r.vm.faulted_mods().is_empty(), "faulted: {:?}", r.vm.faulted_mods());
+    let landed = *r.entities.0.lock().unwrap().moved_to.last().expect("set down");
+    let d = ((landed[0] - at[0]).powi(2) + (landed[2] - at[2]).powi(2)).sqrt();
+    assert!(d > 0.9 && d < 1.3, "beside the horse, clear of it: {d}");
+
+    // A block from its rider, and it does not bolt.
+    r.entities.0.lock().unwrap().entities.get_mut(&horse).unwrap().on_ground = true;
+    r.tick(30);
+    assert_eq!(r.entities.0.lock().unwrap().entities[&horse].drive.walk, [0.0, 0.0], "it stays by the one it carried");
+
+    // A foal will not carry anyone.
+    r.say("cull");
+    r.say("spawn horse 1 young");
+    r.tick(1);
+    let foal = r.mobs()[0].0;
+    r.put_mob(foal, 102.5, 64.0, 100.5);
+    r.use_entity(foal);
+    assert_eq!(riding(r), None, "too young to ride");
+    r.say("cull");
+    r.entities.set_position(100.5, 64.0, 100.5);
+    r.tick(20);
+    println!("ok  a horse is ridden at its own pace, walks and gallops under you, sets you down beside it, and a foal is not");
+}
+
 /// What Magic and Science reach through the exports.
 fn magic_check(r: &mut Rig) {
     r.say("heal");
