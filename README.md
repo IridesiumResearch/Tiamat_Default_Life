@@ -362,8 +362,7 @@ tied animal takes it off again. A **fence** keeps in
 the animals that only hop when stuck — cows, sheep, pigs, hens — and not a
 goat or a horse; a **gate** in it opens and shuts with a right-click. Dead,
 the animals leave hide, bone, sinew, wool and feathers beside their meat
-(the creature table). The hen has no model yet: it wears the engine's
-stand-in body with its name over it until `models/hen.glb` arrives.
+(the creature table).
 
 ## Sound
 
@@ -426,7 +425,7 @@ goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
 | Ghost | Any land, at night only, extremely seldom, and always a long way off (56 to 88 blocks); alone | Drifts about far off. Come within forty blocks of it, or let the night end, and it is gone in a breath of mist. It never harms anybody | nothing |
 | Scarecrow | Very rarely, and only in the fields: the grassland and river meadows. Any hour, alone | Stands in its field and never moves. Hit it and it follows you for good: never further than thirty-six blocks, never nearer than eighteen, keeping pace however you run, turning to watch you when it stands still. It never strikes. Only when it happens to come up against an apple tree does it stop, and eat. Twenty points; silent | nothing |
 | Bear | Seldom: scarce in the taiga and redwoods, rare in the woods, silverwood, frostpine coast and mountains, and only a fifth of those come to anything; never more than one about | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
-| Hen | Uncommon on the grassland, river meadows and in the flower forest; scarce in the woods, savanna and on the moor. By day, in twos to fours | Pecks about, shies from you; lays an egg every few minutes. Fed on grain, and bred (Husbandry). No model yet: the stand-in body, named | 1 raw meat, 1 to 2 feathers |
+| Hen | Uncommon on the grassland, river meadows and in the flower forest; scarce in the woods, savanna and on the moor. By day, in twos to fours | Pecks about, shies from you; lays an egg every few minutes. Fed on grain, and bred (Husbandry) | 1 raw meat, 1 to 2 feathers |
 | Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The ordinary caves, lit and dark, where it is dark enough; now and then a swarm of eight to fourteen | Leaves you be. Hit one and it bites back for a point, once or twice, fluttering off between. At rest it hangs upside down from a ceiling, or comes down to crawl and eat. A swarm churns round its leader and roosts where it roosts, and leaves you be until you hit one of it, when all of it comes for you | nothing |
 
@@ -471,7 +470,7 @@ mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the 
 scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
 wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 3.5 --axis z --rename eating=sneak`; the mortal at `--length 1.05 --axis z --rename eating=sneak`, sized along its depth; the crab at `--length 1.6 --axis z`, the sea turtle at `--length 4.2 --axis z` and the dolphin at `--length 6.0`, each with `--rename eating=sneak`; the ghost
 at `--length 2.6 --axis z --rename eating=sneak`, its arms out; the cave troll at `--length 5.5
---axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`.
+--axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`; the hen at `--length 1.5 --rename eating=sneak`, its texture the atlas that came with it.
 A channel that holds its bone at rest for a whole clip is dropped, since the engine starts every
 bone at rest: the ghost keys all 57 of its bones in every clip, which is over the engine's limit
 of 512 channels otherwise. So is a key the straight line between its neighbours already gives,

@@ -3000,7 +3000,8 @@ fn farm_check(r: &mut Rig) {
     r.say("spawn hen 1");
     r.tick(1);
     let (hen, body) = r.mobs()[0].clone();
-    assert!(body.nametag.is_some() && body.model.as_deref() == Some("engine:humanoid"), "a hen wears the stand-in body, named");
+    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:hen"), "a hen is its own model");
+    assert!(body.nametag.is_none(), "and needs no name over it");
     let egg = r.material("tiamat_default_life:egg");
     for _ in 0..(20 * 60 * 8) / 100 + 1 {
         r.put_mob(hen, 120.5, 64.0, 120.5);

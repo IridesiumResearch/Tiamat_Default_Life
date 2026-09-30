@@ -162,15 +162,15 @@ tdl.register_mob{
               time = "day", sun_min = 6, group = { 1, 3 }, weight = 3, cap = 6 },
 }
 
--- The hen: the farmyard's bird. It has no model yet, so it wears the
--- engine's stand-in body with its name over it, as every creature did
--- before its model arrived; drop `models/hen.glb` and `models/hen.png` in
--- and name them here and it is a hen. It lays an egg every few minutes
--- wherever it stands, is fed on grain, and breeds like the rest.
+-- The hen: the farmyard's bird. models/hen.glb, from a Blender export
+-- that was already skinned: a cell and a half long and 1.9 tall to the top
+-- of its comb, ivory with a scarlet comb, its pecking clip under `sneak`.
+-- It lays an egg every few minutes wherever it stands, is fed on grain,
+-- and breeds like the rest.
 tdl.register_mob{
     id = "hen", name = "Hen", health = 4,
-    collider = { width = 1.2, height = 1.6 },
-    grazes = true, jumps = "stuck",
+    collider = { width = 1.0, height = 1.8 },
+    model = "models/hen.glb", texture = "models/hen.png", grazes = true, jumps = "stuck",
     walk_speed = 0.9, run_speed = 2.6,
     shy = 2.5, sight = 8, wander_radius = 6, pause_min = 30, pause_max = 160,
     breeds = true, feeds = { "wheat_seeds", "wheat" }, lays = true,
