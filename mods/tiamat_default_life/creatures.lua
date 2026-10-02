@@ -163,13 +163,14 @@ tdl.register_mob{
 }
 
 -- The hen: the farmyard's bird. models/hen.glb, from a Blender export
--- that was already skinned: a cell and a half long and 1.9 tall to the top
--- of its comb, ivory with a scarlet comb, its pecking clip under `sneak`.
+-- that was already skinned: three cells long and 3.7 tall to the top of
+-- its comb, so it reads at a glance across a yard; ivory with a scarlet
+-- comb, its pecking clip under `sneak`.
 -- It lays an egg every few minutes wherever it stands, is fed on grain,
 -- and breeds like the rest.
 tdl.register_mob{
     id = "hen", name = "Hen", health = 4,
-    collider = { width = 1.0, height = 1.8 },
+    collider = { width = 2.0, height = 3.6 },
     model = "models/hen.glb", texture = "models/hen.png", grazes = true, jumps = "stuck",
     walk_speed = 0.9, run_speed = 2.6,
     shy = 2.5, sight = 8, wander_radius = 6, pause_min = 30, pause_max = 160,

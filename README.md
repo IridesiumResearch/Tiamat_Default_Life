@@ -470,7 +470,7 @@ mammoth at 12.0 and the squirrel at 1.3, each with `--rename eating=sneak`; the 
 scarecrow at `--length 1.78 --axis z --rename eating=sneak`, sized for its height, since it is
 wider than it is deep; the scurrier at `--length 3.6 --axis z --rename eating=sneak`; the cave rat at `--length 3.5 --axis z --rename eating=sneak`; the mortal at `--length 1.05 --axis z --rename eating=sneak`, sized along its depth; the crab at `--length 1.6 --axis z`, the sea turtle at `--length 4.2 --axis z` and the dolphin at `--length 6.0`, each with `--rename eating=sneak`; the ghost
 at `--length 2.6 --axis z --rename eating=sneak`, its arms out; the cave troll at `--length 5.5
---axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`; the hen at `--length 1.5 --rename eating=sneak`, its texture the atlas that came with it.
+--axis z --rename eating=sneak` and the swamp hag at `--length 3.0 --axis z --rename eating=sneak`; the hen at `--length 3.0 --rename eating=sneak`, its texture the atlas that came with it.
 A channel that holds its bone at rest for a whole clip is dropped, since the engine starts every
 bone at rest: the ghost keys all 57 of its bones in every clip, which is over the engine's limit
 of 512 channels otherwise. So is a key the straight line between its neighbours already gives,
