@@ -767,6 +767,43 @@ end
 ---
 --- `facing`, if given, is the way it looks while it goes (the scarecrow,
 --- backing off while it watches you), and it goes at once without turning.
+---
+--- A kind with `jumps = "never"` (the spider) is driven the same way and never
+--- hops at all; one that `climbs` goes up a wall it walks into instead.
+
+--- Whether the block at a point holds anything: what a climber has against it.
+local function solid_at(x, y, z)
+    local at = game.get_block{ x = math.floor(x), y = math.floor(y), z = math.floor(z) }
+    return at ~= nil and at.occupancy ~= 0 and at.material ~= game.AIR
+end
+
+--- Up a wall: a climber that is trying to go, has stopped going, and has
+--- something solid just ahead of its feet goes up it at `kind.climbs` blocks a
+--- second, the drive still pressing it to the face, until its feet are over
+--- the top and the drive walks it on. Being against the wall is what keeps it
+--- there, so the moment nothing is ahead it is walking again; tufts it walks
+--- through never stop it, so they never set it climbing. On the wall its nose
+--- is pitched up the face. Answers whether it is climbing.
+local function climb(m, entity, spec, dx, dz, speed2)
+    local length = math.sqrt(dx * dx + dz * dz)
+    local up = false
+    if length > 0.001 and (speed2 < C.mob_moving_speed2 or m.climbing) then
+        local reach = m.kind.collider.width / 3 / 2 + 0.35
+        local ax, az = entity.pos.x + dx / length * reach, entity.pos.z + dz / length * reach
+        up = solid_at(ax, entity.pos.y + 0.1, az)
+    end
+    if up then
+        local v = entity.velocity
+        spec.velocity = { x = v.x, y = C.fly_lift + m.kind.climbs * 3 / 20, z = v.z }
+        m.stuck = 0
+    end
+    if up ~= (m.climbing or false) then
+        spec.pitch = up and math.pi / 2 or 0
+    end
+    m.climbing = up
+    return up
+end
+
 local function walk_to(id, m, entity, target, gait, facing)
     local kind = m.kind
     local want = gait == "sprint" and kind.run_speed or kind.walk_speed
@@ -803,14 +840,18 @@ local function walk_to(id, m, entity, target, gait, facing)
         return true
     end
 
-    local going
-    if kind.jumps == "stuck" then
+    local going, climbing
+    if kind.jumps == "stuck" or kind.jumps == "never" then
         local dx, dz = target.x - entity.pos.x, target.z - entity.pos.z
         going = dx * dx + dz * dz > C.mob_arrive * C.mob_arrive
         -- One hop, the moment it has been stuck long enough, then walking
         -- again: a hole climbed out of, not a hare.
-        local hop = going and entity.on_ground and m.stuck == C.mob_hop_ticks
+        local hop = kind.jumps == "stuck" and going and entity.on_ground and m.stuck == C.mob_hop_ticks
         spec.drive = { walk = going and { x = dx, z = dz } or { x = 0, z = 0 }, gait = gait, jump = hop }
+        if kind.climbs then climbing = going and climb(m, entity, spec, dx, dz, speed2) end
+        if kind.climbs and not going and m.climbing then
+            m.climbing, spec.pitch = false, 0
+        end
     else
         going = game.steer_entity(id, target, gait)
     end
@@ -826,11 +867,28 @@ local function walk_to(id, m, entity, target, gait, facing)
     -- A kind that `hangs` has its roost as its idle clip, so on the ground it
     -- rests on its eating clip instead.
     local anim = kind.hangs and ANIM_SNEAK or ANIM_IDLE
-    if speed2 >= 0.0025 then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
+    if speed2 >= 0.0025 or climbing then anim = gait == "sprint" and ANIM_RUN or ANIM_WALK end
     spec.anim = anim
     spec.yaw = yaw
     game.set_entity(id, spec)
     return going ~= false
+end
+
+--- A leap at the prey (`kind.pounce`): up and across, timed to come down where
+--- they stand, the one jump a kind that `jumps = "never"` makes. Played out in
+--- the air for as long as the arc lasts before it is steered again.
+local function pounce(id, m, entity, prey)
+    local dx, dz = prey.pos.x - entity.pos.x, prey.pos.z - entity.pos.z
+    local airtime = 2 * C.pounce_lift / C.fly_lift
+    m.leap = airtime
+    m.pounce_cd = m.kind.pounce.cooldown
+    game.set_entity(id, {
+        velocity = { x = dx * 3 / airtime, y = C.pounce_lift, z = dz * 3 / airtime },
+        drive = { walk = { x = 0, z = 0 } },
+        yaw = game.heading(dx, dz),
+        anim = ANIM_SWING,
+    })
+    game.cue{ cue = "bite", pos = entity.pos, radius = 16 }
 end
 
 --- Which wing clip a flyer plays this tick: `swing` is the wingbeat and `run`
@@ -1395,6 +1453,8 @@ local function step(id, dt)
     m.timer = m.timer - dt
     if m.hurt_cd > 0 then m.hurt_cd = m.hurt_cd - dt end
     if m.bite_cd > 0 then m.bite_cd = m.bite_cd - dt end
+    if (m.leap or 0) > 0 then m.leap = m.leap - dt end
+    if (m.pounce_cd or 0) > 0 then m.pounce_cd = m.pounce_cd - dt end
     if (m.calm or 0) > 0 then m.calm = m.calm - dt end
     if (now + m.perceive_at) % PERCEIVE_EVERY == 0 then perceive(m, entity) end
     if not tick_fire(id, m, entity, dt) then return end
@@ -1566,6 +1626,12 @@ local function step(id, dt)
                     end
                 end
                 stand(id, m)
+            elseif (m.leap or 0) > 0 then
+                -- In the air: the leap plays out.
+            elseif kind.pounce and entity.on_ground and (m.pounce_cd or 0) <= 0 and not m.climbing
+                and d2 <= U.square(kind.pounce.range) and d2 >= U.square(C.pounce_min)
+                and prey.pos.y - entity.pos.y < 1.5 then
+                pounce(id, m, entity, prey)
             else
                 local at = { x = prey.pos.x, y = prey.pos.y + (kind.flyer and 1.2 or 0), z = prey.pos.z }
                 move_to(id, m, entity, at, true)

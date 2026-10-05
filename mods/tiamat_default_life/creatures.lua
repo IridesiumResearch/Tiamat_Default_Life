@@ -52,8 +52,13 @@
 --                     walk and sprint, 4.3 and 5.6, which is a player's)
 --   grazes            idles with its head down now and then (the `sneak` clip)
 --   jumps             "stuck": never jumps at a rise, only hops out of somewhere
---                     it has been stuck (a hole); left out, the engine's steering
+--                     it has been stuck (a hole); "never": never jumps at all (a
+--                     `pounce` is its only leap); left out, the engine's steering
 --                     jumps whatever the step cannot take
+--   climbs            blocks a second: walking into a wall, it goes up it and over
+--                     the top instead of stopping, its nose up the wall
+--   pounce            { range, cooldown }: hunting, it leaps at its prey from
+--                     within `range` blocks, once every `cooldown` ticks
 --
 -- A flyer with a model plays `swing` for a wingbeat and `run` for a glide
 -- with its wings out; on the ground, `walk`, `idle` and `sneak` as a walker.
@@ -348,18 +353,22 @@ tdl.register_mob{
 -- in the caves at any hour, and not often (`chance`). It hunts whoever it
 -- sees in the dark, within ten blocks, and bites for 2, and lets you go once
 -- you are fourteen off; in daylight it leaves you be. Slower than you walk,
--- so a spider is a thing you can get away from.
+-- so a spider is a thing you can get away from, except that it never stops
+-- for a wall: it climbs, up and over, and does not jump at all but to pounce
+-- at you from four blocks off. On a wall it is pitched nose up, which the
+-- engine does not draw yet (docs/engine-asks.md, ask 20).
 tdl.register_mob{
     id = "spider", name = "Spider", health = 12,
     collider = { width = 3.0, height = 1.6 },
     model = "models/spider.glb", texture = "models/spider.png", grazes = true,
+    jumps = "never", climbs = 1.2, pounce = { range = 4, cooldown = 60 },
     walk_speed = 1.05, run_speed = 3.6,
     hostile = { when = "dark", sun_max = 3 },
     bite = { damage = 2, range = 1.8, cooldown = 30, cause = "were bitten by a spider" },
     sight = 10, chase = 14, wander_radius = 12, pause_min = 40, pause_max = 200,
     sound = { "hiss", "hiss_2" }, sound_death = "hiss", voice_min = 300, voice_max = 1200,
     drops = {},
-    spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3, chance = 20,
+    spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3, chance = 25,
               time = "any", group = { 1, 2 }, weight = 3, cap = 6 },
 }
 

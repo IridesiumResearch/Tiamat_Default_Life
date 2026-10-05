@@ -5,10 +5,10 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-09-30)
+## Where these stand (2026-10-05)
 
-**None are open.** 18 and 19 landed 2026-09-30 and 2026-09-29; both await the
-designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
+**One is open: 20**, a creature drawn at its pitch (2026-10-05). 18 and 19
+landed 2026-09-30 and 2026-09-29; both await the designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
 (engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
 One thing landed that was never numbered: the place control at nothing (open sky, or a
 block past reach) reaches a mod that asks, engine a6d34e1 (protocol 76), so food is eaten
@@ -20,6 +20,7 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
+| 20 a creature drawn at its pitch | **Open.** | a spider on a wall is pitched nose up (`set_entity{ pitch }`), and drawn level, sticking out of the face. |
 | 19 a creature is lit where it stands | Landed, engine 847a908. | nothing to do: a cave's bats and rats are dark as the cave is. |
 | 18 riding | Landed, engine 7974abc. | a grown horse is ridden (`ride` on a kind, husbandry.lua); set down beside it on the way off. |
 | 17 using an entity | Landed, engine 50462b7. | feeding, milking, shearing and leading, in husbandry.lua. |
@@ -41,6 +42,33 @@ included.
 | 7 `submerged` and `fell` | Landed, engine a3db9fa. | the head-block probe and the peak tracker are gone. |
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
+
+## 20. A creature is drawn level, whatever its pitch (2026-10-05): OPEN
+
+**Seen.** A spider climbs walls now (mobs.lua, `climbs`): walking into one,
+it goes up the face and over the top. The mod pitches it nose up the wall
+with `game.set_entity(id, { pitch = math.pi / 2 })` while it climbs, and
+back to 0 over the top. It is drawn level all the same: a spider on a
+wall is a spider standing on nothing, its legs sticking out of the face,
+rising.
+
+**Why the mod cannot fix it.** A creature's figure is placed by its yaw
+alone. `crates/client/src/render/skinned.rs` hands the shader
+`placement: [figure.yaw, base, 0, 0]`, and `render/mod.rs` builds the
+figure's matrix from `Mat4::from_rotation_y(figure.yaw)`. The entity's
+`pitch` is kept (`ent::component::Transform.pitch`) and replicated as an
+`i8`, and is used for `facing`, but never reaches the figure. A mod has no
+other hand on how a model is turned.
+
+**Smallest change.** Turn a mod creature's figure by its pitch as well as
+its yaw: `from_rotation_y(yaw) * from_rotation_x(-pitch)`, about the
+middle of its collider, so a body pitched a quarter turn up lies against
+the face it climbs rather than pivoting off its feet. The pitch is already
+on the wire. A player's own figure (and a rider) would want to stay level,
+so it could be mod creatures only, or a flag on `register_model` /
+`spawn_entity` (`pitches = true`), which would also suit a bird diving or
+a fish nosing down. Collision is untouched: the box stays upright, which
+is right for a body that is only pressed against a wall.
 
 ## 19. A creature is lit as if it stood in the open, wherever it is (2026-09-29): LANDED, engine 847a908
 

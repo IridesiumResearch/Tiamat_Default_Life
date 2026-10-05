@@ -1409,6 +1409,7 @@ fn main() {
     progress_check(&mut r);
     magic_check(&mut r);
     ride_check(&mut r);
+    spider_check(&mut r);
     ui_check();
     climate_check();
     modes_check();
@@ -2394,6 +2395,69 @@ const BOB: [u8; 32] = [9; 32];
 
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
+/// A spider never jumps but to pounce: walked into a wall it climbs it, nose
+/// up, and over; hunting, it leaps at you from a few blocks off.
+fn spider_check(r: &mut Rig) {
+    use tiamat_core::ent::AnimTag;
+    r.entities.set_position(100.5, 64.0, 100.5);
+    r.say("cull");
+    r.say("spawn spider 1");
+    r.tick(1);
+    let spider = r.mobs()[0].0;
+    let mob = |r: &Rig| r.entities.0.lock().unwrap().entities[&spider].clone();
+
+    // A wall between it and where it is going (charmed after you): it goes up.
+    let wall = r.material("tiamat_default_life:fence");
+    r.world.put(104, 64, 100, wall);
+    r.world.put(104, 65, 100, wall);
+    r.put_mob(spider, 105.5, 64.0, 100.5);
+    r.entities.0.lock().unwrap().entities.get_mut(&spider).unwrap().on_ground = true;
+    r.say(&format!("magic charm {spider}"));
+    let mut climbed = false;
+    for _ in 0..12 {
+        r.tick(1);
+        let e = mob(r);
+        assert!(!e.drive.jump, "a spider never jumps at a wall");
+        if e.velocity.0[1] > 0.24 {
+            climbed = true;
+            assert!((e.transform.pitch - std::f32::consts::FRAC_PI_2).abs() < 1e-3, "nose up the wall: {}", e.transform.pitch);
+            assert!(e.drive.walk[0] < 0.0, "pressed to the face as it climbs");
+        }
+    }
+    assert!(climbed, "it climbs the wall");
+
+    // Over the top, nothing ahead: walking again, level.
+    r.world.clear();
+    r.tick(2);
+    let e = mob(r);
+    assert!(e.transform.pitch.abs() < 1e-3, "level again over the top: {}", e.transform.pitch);
+
+    // Hunting: from three blocks it pounces, the one leap it makes.
+    r.say("cull");
+    r.say("spawn spider 1");
+    r.tick(1);
+    let spider = r.mobs()[0].0;
+    r.put_mob(spider, 103.5, 64.0, 100.5);
+    r.entities.0.lock().unwrap().entities.get_mut(&spider).unwrap().on_ground = true;
+    r.say(&format!("magic hit {spider}"));
+    let mut leapt = None;
+    for _ in 0..10 {
+        r.tick(1);
+        let e = r.entities.0.lock().unwrap().entities[&spider].clone();
+        if e.velocity.0[1] > 1.0 {
+            leapt = Some(e);
+            break;
+        }
+    }
+    let e = leapt.expect("it pounced");
+    assert!(e.velocity.0[0] < 0.0, "at you: {:?}", e.velocity.0);
+    assert_eq!(e.anim, AnimTag::SWING);
+    r.say("cull");
+    r.say("heal");
+    r.tick(20);
+    println!("ok  a spider climbs a wall nose up and over it, never jumps, and pounces from three blocks");
+}
+
 /// A horse ridden (engine ask 18): got on with nothing it wants in the hand,
 /// at its own pace, its clip from the speed it makes, set down beside it, and
 /// not shied from by the rider it carried; a foal is not ridden.
