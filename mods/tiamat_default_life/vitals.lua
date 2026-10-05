@@ -449,6 +449,7 @@ local function push_abilities(uuid, v)
     local speed = cold and C.cold_speed or 1
     local sprint = whole or v.food > 0
     local fly = tdl.mode == "Creative"
+    local gravity = 1
     local names = {}
     for source, spec in pairs(ability_sources[uuid] or {}) do
         names[#names + 1] = source
@@ -457,14 +458,19 @@ local function push_abilities(uuid, v)
     for _, source in ipairs(names) do
         local spec = ability_sources[uuid][source]
         if spec.speed_mul then speed = speed * spec.speed_mul end
+        if spec.gravity then gravity = gravity * spec.gravity end
         if spec.fly then fly = true end
     end
     speed = U.clamp(speed, 0, 16)
+    -- The engine clamps over 4 itself; held here too, so a fall is judged by
+    -- the gravity the body really fell under (environment.lua).
+    gravity = U.clamp(gravity, 0, 4)
+    v.gravity = gravity
     local wind_sky = tdl.mode == "Creative" or tdl.is_admin(uuid)
-    local said = string.format("%s %s %s %s", speed, sprint, fly, wind_sky)
+    local said = string.format("%s %s %s %s %s", speed, sprint, fly, wind_sky, gravity)
     if said == v.abilities then return end
     v.abilities = said
-    game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly, wind_sky = wind_sky })
+    game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly, wind_sky = wind_sky, gravity = gravity })
 end
 
 tdl.on_join(function(event)

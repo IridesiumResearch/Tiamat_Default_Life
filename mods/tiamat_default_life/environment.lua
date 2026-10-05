@@ -134,11 +134,14 @@ end
 
 --- Falls: the engine says how far, on the tick the body lands. A flight
 --- down is not a fall to it, so nothing here has to tell them apart. Nothing
---- hurts landing in water.
+--- hurts landing in water. Under another mod's gravity (`set_ability`) a
+--- fall lands as hard as its height times that gravity, which is what the
+--- speed at the bottom goes with: twenty blocks at a sixth is three and a bit.
 local function track_fall(uuid, v, body)
     local fall = body.fell or 0
     -- Landing on tilled ground tramples it, however short the drop (farming.lua).
     if fall > 0 and tdl.farming then tdl.farming.trample(body.pos) end
+    fall = fall * (v.gravity or 1)
     if fall > C.fall_safe_blocks and not v.env.wet then
         local damage = (fall - C.fall_safe_blocks) * C.fall_damage_per_block
         tdl.cue(uuid, "thud")

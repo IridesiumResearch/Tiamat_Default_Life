@@ -950,6 +950,9 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
             elseif word == "swift" then out = life.set_ability(p, "swiftness", { speed_mul = 1.5 })
             elseif word == "sylph" then out = life.set_ability(p, "sylph", { fly = true })
             elseif word == "plain" then out = life.set_ability(p, "swiftness", nil) and life.set_ability(p, "sylph", nil)
+            elseif word == "plating" then out = life.set_ability(p, "plating", { gravity = 0.17 })
+            elseif word == "unplate" then out = life.set_ability(p, "plating", nil)
+            elseif word == "crushing" then out = life.set_ability(p, "plating", { gravity = 5 })
             elseif word == "hurtme" then out = life.hurt(p, 4, "fire")
             elseif word == "healme" then out = life.heal(p, 27)
             elseif word == "keep" then out = life.keep_inventory(p)
@@ -2507,6 +2510,25 @@ fn magic_check(r: &mut Rig) {
     assert_eq!(ask(r, "plain"), "true");
     r.tick(2);
     assert_eq!(r.abilities().map(|a| (a.speed, a.fly)), Some((1.0, false)), "and both come off");
+
+    // L-S7: gravity composed, and a fall judged by it.
+    assert_eq!(ask(r, "crushing"), "false", "gravity past four is refused");
+    assert_eq!(ask(r, "plating"), "true");
+    r.tick(2);
+    let g = r.abilities().map(|a| a.gravity).unwrap();
+    assert!((g - 0.17).abs() < 1e-6, "gravity plating: {g}");
+    let hp = r.number("hp");
+    r.entities.body(|b| {
+        b.on_ground = true;
+        b.fell = 15.0;
+    });
+    r.tick(1);
+    r.entities.body(|b| b.fell = 0.0);
+    r.tick(1);
+    assert_eq!(r.number("hp"), hp, "fifteen blocks at a sixth lands like two and a half: nothing");
+    assert_eq!(ask(r, "unplate"), "true");
+    r.tick(2);
+    assert_eq!(r.abilities().map(|a| a.gravity), Some(1.0), "and off again");
 
     // L-M2 on a player: hurt and heal answer what landed.
     let hurt: f64 = ask(r, "hurtme").parse().unwrap();

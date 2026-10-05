@@ -69,6 +69,10 @@ Their asks of this mod (each repo's `docs/sibling-asks.md`), all answered
 - **L-S2**, acting on creatures: `push(entity, velocity)` and
   `freeze(entity, ticks)`.
 - **L-S4**, moving drops: yes, and `pull_drops(pos, radius, strength)`.
+- **L-S7**, gravity (asked 2026-09-30, answered 2026-10-05): `gravity`
+  (0..4) in `set_ability`, multiplied across sources and handed to the
+  engine with this mod's speed and flight; a fall hurts by its height times
+  the gravity it fell under.
 - **L-S6**, a tether: a lead right-clicked at a fence post ties everything
   you lead to it, a lead's length from the post, remembered with the
   world; a lead at the animal unties it. One player leading two was

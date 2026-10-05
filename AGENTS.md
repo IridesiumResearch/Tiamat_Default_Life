@@ -801,7 +801,10 @@ end)
 
 `visibility` is how many blocks a player sees into it (95% hidden there), the
 colour is its colour in daylight — the engine dims it at night — and `top` makes
-it ground fog that thins over a few blocks above that height. The engine blends
+it ground fog that thins over a few blocks above that height. `bottom` is its
+mirror: the fog thins over the same few blocks below it, so a surface fog can
+stand on its biome's ground instead of filling every cave under the column
+(`bottom = ground - margin`); without one the fog goes all the way down. The engine blends
 columns, and a fog is visible from outside as well as inside, so return what the
 PLACE is and let the edges take care of themselves. It runs where the tint does,
 in the generation workers.
@@ -1299,6 +1302,56 @@ Blending a biome's COLOUR is the exception, and it is an engine feature
 (`register_chunk_tint`, above) for a reason you cannot work around: the blend
 has to happen where the pixels are, and a mod has no way to reach them.
 
+**A campfire is a `model` block, and it is `whole`.** A block whose look is a
+shape no cube is — a campfire, a brazier, an anvil, a machine — names a model
+you registered, and the client draws that in place of the block's cells. What
+the WORLD knows of it is its `shape`: which of the 27 cells it occupies, for
+collision, light, fluid and the aim. The two need not agree, as a creature's
+collider and its mesh need not: a fire whose flames reach the top of the block
+and whose shape is its bottom layer is the intended use.
+
+```lua
+game.register_model{ id = "campfire", file = "models/campfire.glb", texture = "models/campfire.png" }
+
+game.register_block{
+    id = "campfire",
+    model = "campfire",             -- your own model; another mod's as "their_mod:thing"
+    shape = {                       -- three layers, bottom first; nine cells each
+        "### ### ###",              -- z = 0, 1, 2 rows, x left to right
+        ".#. .#. .#.",
+        "... ... ...",
+    },
+    light_emit = { r = 15, g = 10, b = 4 },
+    hardness = 0.5,
+    textures = { all = "textures/campfire_icon.png" },   -- what the inventory shows
+}
+```
+
+A model block is **whole** without saying so: any tool digs the block, not the
+cell — a chisel included — in the block's own `hardness`, it comes off in one
+piece and pays a whole block's units (27, or your `drops` table in full) however
+many cells its shape has; placing it writes the shape into an EMPTY block and
+costs 27 units whatever brush is held; and nothing is ever written into its
+block — a chisel cannot fill in a campfire, and a `set_block` with a mask or a
+merge naming one is refused and logged. `whole = true` alone, with no model,
+gives a cube-looking block the same one-piece behaviour. `shape` needs one or
+the other: a registered shape a chisel could take apart would be a cut, and a
+cut is carried, not registered.
+
+The model is in cells, like a creature's: **three units to the block**, origin
+at the bottom centre, +Z forward, and `register_model`'s `scale` applies. It is
+lit as a creature is — one light for the model, the brightest at the block and
+its six neighbours — and it draws nothing until the model table has arrived,
+never a placeholder cube. `transparent`, `cutout`, `sway` and `billboard` are
+refused on it: it has no faces for them to apply to. The shape is written as
+declared, not turned to face the player; a block that should face four ways is
+four registered blocks for now.
+
+`game.set_block(x, y, z, "my_mod:campfire")` writes the shape; so do a stamped
+plan and a generator's `buf:set_block` / `buf:set_world`. A generator's area
+fills (`fill_density`, cover, palette, a scattered schematic) take a material as
+named — a full cube — so a schematic that wants the shape carries the cells.
+
 ---
 
 ## The sandbox
@@ -1331,6 +1384,10 @@ game.register_domain{ id = "quarry", generator = function(buf, pos)
     local heights = game.noise_heightmap(pos, { octaves = 4, frequency = 0.01, amplitude = 60.0 })
     buf:fill_below_heightmap(heights, stone)
 end }
+
+-- `pos.domain` is the domain being filled: "overworld", "my_mod:quarry", or
+-- "my_mod:ship/17" for an instance of a template. A template's generator is
+-- shared by all its instances, so this is how they come out different.
 
 game.register_on_chat(function(event)
     if event.text ~= "quarry" then
@@ -1441,10 +1498,13 @@ slower one; this is the multiplier that makes a cow amble rather than march at
 a player's walk. The same number, and the same code, that slows a player.
 
 **A player's movement is yours to limit, and flight yours to grant.**
-`game.set_player_abilities(uuid, { fly, speed, sprint, wind_sky })` — a Creative
+`game.set_player_abilities(uuid, { fly, speed, sprint, wind_sky, gravity })` — a Creative
 world where everybody flies, cold that slows, hunger that stops a sprint, and
 `wind_sky = false` for a world that means its nights (the engine's sky keys
-scrub the client's own clock, which lights a player's night for free). Replaced
+scrub the client's own clock, which lights a player's night for free), and
+`gravity` (a multiplier, `0.17` for a moon, `0` floats, over 4 is clamped; the
+jump impulse is unchanged so a light player jumps higher; a rider is governed
+by the mount's physics instead). Replaced
 whole each call (a field left out is the default again), `fly` is OR-ed with the
 operator list, and the client predicts with the same numbers so nobody
 rubber-bands. Do not try this with `game.set_entity` on a player's body: the
@@ -1513,11 +1573,13 @@ again for them from `register_on_player_join`.
 **The sky's keyframes are registration-only; the weather over them is not.**
 `register_sky` takes its keyframes in the registration window and the client
 interpolates them from the clock. `game.set_sky_modifier(uuid, { intensity,
-sky, sky_mix, fog_distance, saturation, ease_ticks })` lays a per-player change
-over them at any time — a storm darkens the sun, closes the horizon in and
-greys the grade, eased on that player's client — and `nil` puts the plain sky
-back. It multiplies and mixes rather than replacing, so it is right at every
-hour. `game.flash{ pos, radius, intensity, colour, attack_ticks, decay_ticks }`
+sky, sky_mix, fog_distance, saturation, stars, ease_ticks })` lays a per-player
+change over them at any time — a storm darkens the sun, closes the horizon in
+and greys the grade, eased on that player's client — and `nil` puts the plain
+sky back. It multiplies and mixes rather than replacing, so it is right at every
+hour; the one field that replaces is `stars` (0 to 1), which stands in for the
+keyframes' star brightness while the modifier is set, so a black sky with
+`stars = 1` is darkness and stars by day as by night. `game.flash{ pos, radius, intensity, colour, attack_ticks, decay_ticks }`
 is lightning: a moment's light on the sun and sky of everyone in reach, with no
 relight. `game.lightning{ from, to, seed, colour, width, branches, ticks,
 radius, player }` draws the bolt itself — a forked line every client builds
@@ -1533,7 +1595,11 @@ star a player sees is the star `game.star_in_view(uuid)` names. A domain
 registered with a `position`, or an instance made with
 `game.create_domain(template, key, { position = ... })`, sees the sky from
 there; `register_sky{ domain = ... }` gives it colours of its own, sent to the
-client when a player arrives. Travel is yours: which star has a surface, what
+client when a player arrives. `game.set_domain_sky(id, spec)` (or
+`create_domain`'s `options.sky`) sets one at run time, for an instance or any live
+domain: everyone in it has it now, a later arrival on arrival, it is kept across
+restarts and leaves with `destroy_domain`, and `nil` gives the registered sky
+back. The day's length is still the world's one clock. Travel is yours: which star has a surface, what
 takes you there and what brings you back is a mod's rule, and `game/core_space`
 is the smallest one that works.
 
@@ -1559,6 +1625,12 @@ be seen every tick is something to make smaller — and rain is not a burst at
 all: `game.set_precipitation(uuid, { rate, size, colour, velocity, area, above,
 ease_ticks })` sends the shape once and the player's client spawns it around
 its own camera until you send `nil`.
+
+**A rainbow is a strength, not a place.** `game.set_rainbow(uuid, { intensity,
+ease_ticks? })` (or `nil`) says whether and how strongly; the client draws the
+bow 42 degrees round the point opposite the sun, at the sky's depth, fading out
+as the sun climbs and hidden at night. Deciding when one is owed, after rain, by
+day, under open sky, is yours.
 
 **A mod reaches another mod only through what it exports.** Each mod gets a
 fresh sandbox and `game.storage` is private; `game.export` / `game.exports`

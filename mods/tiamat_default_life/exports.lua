@@ -247,9 +247,11 @@ return {
     end,
 
     --- Abilities of yours on a player, composed with this mod's own (L-M3,
-    --- L-S3): `spec = { speed_mul, fly }` under `source` (your name for it),
-    --- or nil to take it off. Every source's speed multiplies in, any
-    --- source's flight flies; cold and hunger still slow and stop a sprint.
+    --- L-S3, L-S7): `spec = { speed_mul, fly, gravity }` under `source` (your
+    --- name for it), or nil to take it off. Every source's speed and gravity
+    --- multiply in, any source's flight flies; cold and hunger still slow and
+    --- stop a sprint. A fall is hurt by its height times the gravity it fell
+    --- under, so a light body lands soft.
     --- Do not call `game.set_player_abilities` yourself: the last writer
     --- wins, and this mod writes it. Not saved: set it again on a join.
     set_ability = function(uuid, source, spec)
@@ -260,8 +262,9 @@ return {
         end
         if type(spec) ~= "table" then return false end
         local mul = spec.speed_mul == nil and 1 or real(spec.speed_mul, 0, 4)
-        if mul == nil or (spec.fly ~= nil and type(spec.fly) ~= "boolean") then return false end
-        tdl.set_ability(uuid, source, { speed_mul = mul, fly = spec.fly == true })
+        local gravity = spec.gravity == nil and 1 or real(spec.gravity, 0, 4)
+        if mul == nil or gravity == nil or (spec.fly ~= nil and type(spec.fly) ~= "boolean") then return false end
+        tdl.set_ability(uuid, source, { speed_mul = mul, fly = spec.fly == true, gravity = gravity })
         return true
     end,
 
