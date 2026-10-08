@@ -14,6 +14,51 @@ does — and `scripts/check-stubs.sh` fails the engine's build if a `game.*`
 function exists that it does not document. **It cannot fall behind the engine.**
 If something is not in there, it does not exist; do not invent it.
 
+## What changed since engine 0.3.0
+
+If the copy of this file in your mod is older than this list, re-vendor
+`api/` from the engine's `main` and read the sections named here. Each item
+is a mechanism a mod may now use; none of them changes a mod that ignores it.
+
+- **A whole block swapped where one stands** (2026-10-08). `set_block` of a
+  `whole` block on the block another stands in — a campfire lit, a torch burnt
+  out — replaces the thing and keeps the ground cells it was set into. Nothing
+  to do. Sub-Node Contract §7.5.
+- **A part-full block digs in part of the time** (2026-10-08). A block
+  brush's dig takes `hardness` scaled by how full the block was when the dig
+  began: a block a third full, a third of the time. A chisel's cell and a
+  `whole` block are priced as before. Nothing to do. Sub-Node Contract §7.7.
+- **Blocks drawn as models, and blocks dug whole** (2026-10-02).
+  `register_block{ model = "<your model id>", shape = {...} }` draws a
+  registered glTF in place of the block's cells; `whole = true` makes any
+  block one piece: dug whole by any tool, placed as its shape, paid 27 either
+  way. A campfire, a brazier, an anvil, a station. See "A campfire is a
+  `model` block, and it is `whole`" below.
+- **Ground that is not a full block** (2026-10-07). A thing placed against
+  the top of a block under three quarters full goes into that block and
+  stands on the first full block beneath — a whole material's model clips
+  through the ground cells, loose material fills the gaps. Nothing to do: it
+  is how placement works now. Sub-Node Contract §7.6.
+- **`[[setting]]` in `mod.toml`** (2026-10-07). A player setting declared in
+  the manifest shows under your mod on the start screen's Mods tab, before any
+  world is open; `register_setting` stays for the rest. Never both for one id.
+  See "Your mod's own options".
+- **`domain` on the place and dig events** (2026-10-05). `e.domain` says which
+  space a block was placed or dug in; key placed things on it with the
+  coordinates. See the hooks paragraph.
+- **`light_floor` on `set_sky_modifier`** (2026-10-05). The least the frame is
+  lit at, in the open and underground: night-sight. A mod composing overlays
+  sends the highest floor.
+- **A creature turns by its pitch** (2026-10-05). `set_entity(id, { pitch })`
+  on a mod's own model tips it about the middle of its collider; a climbing
+  spider lies on its wall. Players and mounts stay level.
+- **`stars` on `set_sky_modifier`, `bottom` on a chunk's fog** (2026-10-02).
+  A modifier may name how much of the star catalog shows; a surface fog may
+  stop above a cave.
+- **The moon** (2026-10-05). The night is lit from opposite the sun, in the
+  keyframe's night `sun` colour, with shadows; a sky's night keyframes are
+  the moonlight, and no longer need a lifted grade to be legible.
+
 ---
 
 ## What a mod is
@@ -193,6 +238,14 @@ have waited out the dig. `register_on_dig_complete` is asked at the first chip,
 for a mod that wants the block's state then. And a tools mod's `default` hand
 wins over the engine's reference `core_tools:hand` whatever the ids, so it need
 not `conflicts` the fixture out of the set to be the hand.
+
+**Every place, dig and use event says which space it is in** (`e.domain`:
+`"overworld"`, or a domain's id). A block placed on a body at a star is not
+the block at the same coordinates in the overworld, so a mod that records
+placed things — a station, a frame, a box — keys them on the domain and the
+coordinates together, and reads the block back with `game.get_block{ x, y,
+z, domain = e.domain }`. Keeping each player's domain from the move hook and
+trusting the order was the workaround; the field is the fix.
 
 **Right-clicking a block with nothing to place is `register_on_use`**, not a
 cancelled dig. Picking fruit, opening a door, pulling a lever: the event has the
@@ -522,6 +575,27 @@ No `options` is a checkbox; with them it is a dropdown. `game.setting` answers
 a boolean or the chosen STRING — never the raw index — so comparing against
 `"unfair"` keeps working when you insert an option above it, and it answers your
 declared default for a player who has never touched it.
+
+**Declare it in `mod.toml` if the start screen should show it.** The start
+screen runs no Lua, so a setting only `register_setting` knows about appears on
+the in-game settings page but not under your mod on the Mods tab. The same
+setting as a `[[setting]]` shows in both, with the same fields as
+`[[world_option]]` (`id`, `name`, `description`, `options`, `default`):
+
+```toml
+[[setting]]
+id = "difficulty"
+name = "How hard the mimics hit"
+options = ["gentle", "ordinary", "unfair"]
+default = 2        # ONE-BASED here, like [[world_option]]: "ordinary"
+```
+
+One declaration per id: a `register_setting` for an id `mod.toml` already
+declares fails your mod's load ("`my_mod:difficulty` is declared in mod.toml;
+declare a setting once"). `game.setting(uuid, "my_mod:difficulty")` answers the
+same either way. Note the one difference of convention: `register_setting`'s
+`default` is a zero-based index, a manifest's is one-based (a toggle is 0 or 1
+in both).
 
 **Answers belong to the world, not to the machine.** A player's choices are
 remembered per world and per server, so they are still there when they come
@@ -1330,10 +1404,19 @@ game.register_block{
 A model block is **whole** without saying so: any tool digs the block, not the
 cell — a chisel included — in the block's own `hardness`, it comes off in one
 piece and pays a whole block's units (27, or your `drops` table in full) however
-many cells its shape has; placing it writes the shape into an EMPTY block and
-costs 27 units whatever brush is held; and nothing is ever written into its
-block — a chisel cannot fill in a campfire, and a `set_block` with a mask or a
-merge naming one is refused and logged. `whole = true` alone, with no model,
+many cells its shape has; placing it writes the air cells of its shape and
+costs 27 units whatever brush is held — on a chiselled slope it stands among
+the slope's cells, the model clipping through them, because **a block under
+three quarters full is not ground**: placing against its top puts the thing
+INTO that block, standing on the first full block beneath, rather than
+floating a block above (Contract §7.6; the same rule fills a thin floor's gaps
+with loose material instead of starting a block over it); and nothing is
+written into its block afterwards — a chisel cannot fill in a campfire, and a
+`set_block` with a mask or a merge naming one is refused and logged — except a
+`set_block` of another whole block, which swaps it in place and keeps the
+ground it was set into (a campfire lit, a torch burnt out). Dug, it
+comes up alone and the ground it stood among stays; a block brush on that
+ground takes the ground and leaves it. `whole = true` alone, with no model,
 gives a cube-looking block the same one-piece behaviour. `shape` needs one or
 the other: a registered shape a chisel could take apart would be a cut, and a
 cut is carried, not registered.
@@ -1573,13 +1656,19 @@ again for them from `register_on_player_join`.
 **The sky's keyframes are registration-only; the weather over them is not.**
 `register_sky` takes its keyframes in the registration window and the client
 interpolates them from the clock. `game.set_sky_modifier(uuid, { intensity,
-sky, sky_mix, fog_distance, saturation, stars, ease_ticks })` lays a per-player
+sky, sky_mix, fog_distance, saturation, stars, light_floor, ease_ticks })` lays a per-player
 change over them at any time — a storm darkens the sun, closes the horizon in
 and greys the grade, eased on that player's client — and `nil` puts the plain
 sky back. It multiplies and mixes rather than replacing, so it is right at every
 hour; the one field that replaces is `stars` (0 to 1), which stands in for the
 keyframes' star brightness while the modifier is set, so a black sky with
-`stars = 1` is darkness and stars by day as by night. `game.flash{ pos, radius, intensity, colour, attack_ticks, decay_ticks }`
+`stars = 1` is darkness and stars by day as by night. The other field that
+does not multiply is `light_floor` (0 to 1), the least the frame is lit at:
+the sun term is raised to it where the sky reaches and the ambient floor where
+it does not, so a cave is lit too, colours kept (`intensity` cannot — it
+multiplies midnight's 0.08, and a cave has no sun). `0` or nil changes nothing,
+and out of range is an error. A mod composing overlays sends the HIGHEST floor
+any overlay asks: a floor is a floor, not a product. `game.flash{ pos, radius, intensity, colour, attack_ticks, decay_ticks }`
 is lightning: a moment's light on the sun and sky of everyone in reach, with no
 relight. `game.lightning{ from, to, seed, colour, width, branches, ticks,
 radius, player }` draws the bolt itself — a forked line every client builds
