@@ -574,10 +574,8 @@ tdl.on_punch(function(event)
     if event.owner ~= nil then return end
     local entity = game.entity(event.target)
     if entity == nil or entity.source ~= game.mod_id or entity.item then return end
-    local damage = C.fist_damage
-    local held = game.held(event.attacker)
-    if held and I.weapons[held.material] then damage = I.weapons[held.material] end
-    tdl.hurt_mob(event.target, damage, event.attacker)
+    -- The fist's point or the weapon's, and half again from a jump (vitals.lua).
+    tdl.hurt_mob(event.target, tdl.punch_damage(event.attacker), event.attacker)
 end)
 
 -- What another mod does to one of ours (exports.lua) ------------------------------------------

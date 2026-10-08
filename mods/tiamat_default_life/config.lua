@@ -152,6 +152,10 @@ C.hurt_cooldown_ticks = 10     -- within it, only the excess over the last hit l
 C.respawn_invulnerable_ticks = 60
 C.knockback = 0.9              -- cells per tick, a punch
 C.knockback_up = 0.5
+-- A blow struck in the air, coming down — a jump's hit — lands this much
+-- harder (the designer, 2026-10-08). Points are whole: a fist's 1 lands 2,
+-- the reference sword's 6 lands 9.
+C.crit_multiplier = 1.5
 
 -- Death -------------------------------------------------------------------
 

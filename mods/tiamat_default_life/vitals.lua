@@ -523,6 +523,24 @@ tdl.on_tick(function(dt)
     end
 end)
 
+--- What a punch from `attacker` does before armour: the fist's point or the
+--- held weapon's, and half again (`C.crit_multiplier`) when the attacker is
+--- in the air and coming down — a jump's blow, which the designer wanted to
+--- land harder (2026-10-08). Both punch handlers, on a player here and on a
+--- creature in mobs.lua, take their number from this.
+function tdl.punch_damage(attacker)
+    local damage = C.fist_damage
+    local held = game.held(attacker)
+    if held and I.weapons[held.material] then
+        damage = I.weapons[held.material]
+    end
+    local body = U.body(attacker)
+    if body and not body.on_ground and body.velocity.y < 0 then
+        damage = damage * C.crit_multiplier
+    end
+    return damage
+end
+
 -- A punch on a player is damage; the engine only reports it (charter rule 1).
 tdl.on_punch(function(event)
     if event.owner == nil or not C.pvp then return end
@@ -530,11 +548,7 @@ tdl.on_punch(function(event)
     local victim = players[event.owner]
     if victim == nil then return end
 
-    local damage = C.fist_damage
-    local held = game.held(event.attacker)
-    if held and I.weapons[held.material] then
-        damage = I.weapons[held.material]
-    end
+    local damage = tdl.punch_damage(event.attacker)
 
     -- Away from whoever swung, sideways and a little up.
     local push
