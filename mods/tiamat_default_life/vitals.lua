@@ -527,7 +527,8 @@ end)
 --- held weapon's, and half again (`C.crit_multiplier`) when the attacker is
 --- in the air and coming down — a jump's blow, which the designer wanted to
 --- land harder (2026-10-08). Both punch handlers, on a player here and on a
---- creature in mobs.lua, take their number from this.
+--- creature in mobs.lua, take their number from this. The second answer is
+--- whether it was that blow, which knocks back further (`C.crit_knockback`).
 function tdl.punch_damage(attacker)
     local damage = C.fist_damage
     local held = game.held(attacker)
@@ -535,10 +536,11 @@ function tdl.punch_damage(attacker)
         damage = I.weapons[held.material]
     end
     local body = U.body(attacker)
-    if body and not body.on_ground and body.velocity.y < 0 then
+    local crit = body ~= nil and not body.on_ground and body.velocity.y < 0
+    if crit then
         damage = damage * C.crit_multiplier
     end
-    return damage
+    return damage, crit
 end
 
 -- A punch on a player is damage; the engine only reports it (charter rule 1).
@@ -548,16 +550,17 @@ tdl.on_punch(function(event)
     local victim = players[event.owner]
     if victim == nil then return end
 
-    local damage = tdl.punch_damage(event.attacker)
+    local damage, crit = tdl.punch_damage(event.attacker)
 
-    -- Away from whoever swung, sideways and a little up.
+    -- Away from whoever swung, sideways and a little up; further from a jump.
     local push
     local attacker = U.body(event.attacker)
     if attacker and victim.pos then
         local dx, dz = victim.pos.x - attacker.pos.x, victim.pos.z - attacker.pos.z
         local length = math.sqrt(dx * dx + dz * dz)
         if length > 0.001 then
-            push = { x = dx / length * C.knockback, y = C.knockback_up, z = dz / length * C.knockback }
+            local k = crit and C.crit_knockback or 1
+            push = { x = dx / length * C.knockback * k, y = C.knockback_up * k, z = dz / length * C.knockback * k }
         end
     end
     tdl.damage(event.owner, damage, "physical", {

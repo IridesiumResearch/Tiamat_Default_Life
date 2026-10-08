@@ -156,6 +156,7 @@ C.knockback_up = 0.5
 -- harder (the designer, 2026-10-08). Points are whole: a fist's 1 lands 2,
 -- the reference sword's 6 lands 9.
 C.crit_multiplier = 1.5
+C.crit_knockback = 1.8         -- and knocks whatever it hits this much further back
 
 -- Death -------------------------------------------------------------------
 

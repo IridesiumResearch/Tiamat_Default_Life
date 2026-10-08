@@ -478,7 +478,7 @@ local function show_hearts(id, kind, after, viewer)
     })
 end
 
-function tdl.hurt_mob(id, amount, by)
+function tdl.hurt_mob(id, amount, by, knock)
     local entity = game.entity(id)
     if entity == nil or entity.health == nil then return false end
     local m = M.live[id] or adopt(id, entity)
@@ -526,8 +526,9 @@ function tdl.hurt_mob(id, amount, by)
             local dx, dz = entity.pos.x - attacker.pos.x, entity.pos.z - attacker.pos.z
             local length = math.sqrt(dx * dx + dz * dz)
             if length > 0.001 then
+                local k = knock or 1
                 game.set_entity(id, { velocity = {
-                    x = dx / length * C.knockback, y = C.knockback_up, z = dz / length * C.knockback } })
+                    x = dx / length * C.knockback * k, y = C.knockback_up * k, z = dz / length * C.knockback * k } })
             end
         end
         if m.kind.stalks then
@@ -574,8 +575,10 @@ tdl.on_punch(function(event)
     if event.owner ~= nil then return end
     local entity = game.entity(event.target)
     if entity == nil or entity.source ~= game.mod_id or entity.item then return end
-    -- The fist's point or the weapon's, and half again from a jump (vitals.lua).
-    tdl.hurt_mob(event.target, tdl.punch_damage(event.attacker), event.attacker)
+    -- The fist's point or the weapon's, and half again from a jump, which
+    -- knocks it further back too (vitals.lua).
+    local damage, crit = tdl.punch_damage(event.attacker)
+    tdl.hurt_mob(event.target, damage, event.attacker, crit and C.crit_knockback or 1)
 end)
 
 -- What another mod does to one of ours (exports.lua) ------------------------------------------

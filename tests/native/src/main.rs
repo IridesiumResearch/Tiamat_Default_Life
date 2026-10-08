@@ -669,6 +669,7 @@ impl Rig {
         let allowed = self
             .vm
             .dig_complete(&tiamat_core::script::DigEvent {
+                domain: "overworld".into(),
                 player: PLAYER,
                 target: tiamat_core::SubNodePos { x: x * 3 + 1, y: y * 3 + 1, z: z * 3 + 1 },
                 material,
@@ -1370,6 +1371,7 @@ fn main() {
     let berries = r.material("tiamat_default_life:berries");
     let before = r.inventory.units_of("player:main", berries);
     r.vm.dig_complete(&tiamat_core::script::DigEvent {
+        domain: "overworld".into(),
         player: PLAYER,
         target: tiamat_core::SubNodePos { x: 300, y: 190, z: 300 },
         material: r.material("tiamat_default_world:bramble"),
@@ -1410,6 +1412,7 @@ fn main() {
     magic_check(&mut r);
     ride_check(&mut r);
     spider_check(&mut r);
+    crit_check(&mut r);
     ui_check();
     climate_check();
     modes_check();
@@ -2395,6 +2398,47 @@ const BOB: [u8; 32] = [9; 32];
 
 
 /// A mob's kind: its model, if it has one of its own, else its nametag.
+/// A blow struck coming down from a jump lands half again as hard and knocks
+/// the creature further back than one struck standing.
+fn crit_check(r: &mut Rig) {
+    r.entities.set_position(100.5, 64.0, 100.5);
+    r.entities.body(|b| b.on_ground = true);
+    r.say("cull");
+    r.say("spawn cow 1");
+    r.tick(1);
+    let cow = r.mobs()[0].0;
+    r.hold_nothing();
+    let hit = |r: &mut Rig| {
+        r.put_mob(cow, 103.5, 64.0, 100.5);
+        r.vm.punch(&tiamat_core::script::PunchEvent { attacker: PLAYER, target: EntityId(cow), owner: None });
+        let e = r.entities.0.lock().unwrap().entities[&cow].clone();
+        (e.health.unwrap().current, e.velocity.0)
+    };
+
+    // Standing: a point, and the ordinary shove.
+    let (health, v) = hit(r);
+    assert_eq!(health, 9, "a fist is one point");
+    let plain = v[0];
+    assert!((plain - 0.9).abs() < 1e-4 && (v[1] - 0.5).abs() < 1e-4, "the ordinary knockback: {v:?}");
+
+    // In the air and coming down: two points, and further back.
+    r.tick(12);
+    r.entities.body(|b| {
+        b.on_ground = false;
+        b.velocity.0[1] = -0.6;
+    });
+    let (health, v) = hit(r);
+    r.entities.body(|b| {
+        b.on_ground = true;
+        b.velocity.0[1] = 0.0;
+    });
+    assert_eq!(health, 7, "a jump's blow is half again, a fist's 1 rounded to 2");
+    assert!((v[0] - plain * 1.8).abs() < 1e-4 && (v[1] - 0.9).abs() < 1e-4, "knocked further back: {v:?}");
+    r.say("cull");
+    r.tick(20);
+    println!("ok  a jump's blow lands half again as hard and knocks a cow 1.8 times as far");
+}
+
 /// A spider never jumps but to pounce: walked into a wall it climbs it, nose
 /// up, and over; hunting, it leaps at you from a few blocks off.
 fn spider_check(r: &mut Rig) {
@@ -3177,6 +3221,7 @@ fn kind_of(e: &Entity) -> Option<String> {
 fn dig(r: &mut Rig) -> bool {
     r.vm
         .dig_complete(&tiamat_core::script::DigEvent {
+            domain: "overworld".into(),
             player: PLAYER,
             target: tiamat_core::SubNodePos { x: 300, y: 190, z: 300 },
             material: r.material("tiamat_default_world:grass"),
