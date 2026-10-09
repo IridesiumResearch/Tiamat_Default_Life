@@ -48,6 +48,7 @@
 --   wander_radius, pause_min, pause_max, fly_low, fly_high
 --   sound, sound_death, voice_min, voice_max   a cue, or a list of cues (takes of one voice)
 --   model, texture    files in this mod: a .glb, and the PNG skin it wears
+--   model_scale       how big the model is drawn, if not as it was sized (the white stag)
 --   walk_speed, run_speed  a walker's own speeds, blocks a second (default: the engine's
 --                     walk and sprint, 4.3 and 5.6, which is a player's)
 --   grazes            idles with its head down now and then (the `sneak` clip)
@@ -280,7 +281,8 @@ tdl.register_mob{
                   taiga = SCARCE, frostpine_coast = SCARCE, rime_tundra = RARE, dunes = RARE,
               },
               ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "snow" },
-              time = "any", sun_min = 6, group = { 1, 2 }, weight = 2, cap = 3 },
+              -- A quarter of the draws that land on it (the designer, 2026-10-09).
+              chance = 25, time = "any", sun_min = 6, group = { 1, 2 }, weight = 2, cap = 3 },
 }
 
 -- The squirrel: models/squirrel.glb, from an export that was already
@@ -299,7 +301,8 @@ tdl.register_mob{
                   redwood_stands = UNCOMMON, taiga = UNCOMMON, frostpine_coast = SCARCE, jungle = SCARCE,
               },
               ground = { G .. "loam", G .. "leaf_litter", G .. "grass" },
-              time = "day", sun_min = 4, group = { 1, 2 }, weight = 3, cap = 6 },
+              -- A quarter of the draws that land on it (the designer, 2026-10-09).
+              chance = 25, time = "day", sun_min = 4, group = { 1, 2 }, weight = 3, cap = 6 },
 }
 
 -- The wolf: models/wolf.glb, from an export that was already skinned, a
@@ -617,13 +620,38 @@ tdl.register_mob{
     shy = 8, sight = 16, wander_radius = 16, pause_min = 60, pause_max = 240,
     sound = "bell", sound_death = "bell", voice_min = 600, voice_max = 2400,
     drops = { { "raw_meat", 2, 3 }, { "hide", 1, 2 }, { "sinew", 1, 2 }, { "bone", 1, 2 } },
-    -- A deer is a thing you are lucky to see: scarce at best.
+    -- A deer is a thing you are lucky to see: scarce at best, and only a
+    -- tenth of the draws that land on it come to anything (the designer,
+    -- 2026-10-09), so about as often as a bear.
     spawn = { biomes = {
                   temperate_woodlands = SCARCE, silverwood = SCARCE, redwood_stands = SCARCE, taiga = SCARCE,
                   flower_forest = RARE, heather_moor = RARE, river_valleys = RARE, alpine_highlands = RARE,
               },
               ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "snow" },
-              time = "any", sun_min = 6, group = { 1, 4 }, weight = 2, cap = 5 },
+              chance = 10, time = "any", sun_min = 6, group = { 1, 4 }, weight = 2, cap = 5 },
+}
+
+-- The white stag: a stag of legend, the stag's own model half as big again
+-- (`model_scale`) in a white coat (models/white_stag.png, from the stag's
+-- by tools/make_white_stag.py). Very rare: rare wherever stags live, and
+-- one draw in fifty that lands on it comes to anything, about a tenth as
+-- often as a stag. Always alone, and only ever one. Warier than any stag,
+-- seeing you from further off and bolting sooner; more of it to take.
+tdl.register_mob{
+    id = "white_stag", name = "White Stag", health = 30,
+    collider = { width = 3.3, height = 7.5 },
+    model = "models/stag.glb", texture = "models/white_stag.png", model_scale = 1.5,
+    grazes = true, jumps = "stuck",
+    walk_speed = 1.6, run_speed = 6.2,
+    shy = 12, sight = 24, wander_radius = 24, pause_min = 80, pause_max = 300,
+    sound = "bell", sound_death = "bell", voice_min = 900, voice_max = 3600,
+    drops = { { "raw_meat", 3, 5 }, { "hide", 2, 3 }, { "sinew", 2, 3 }, { "bone", 2, 3 } },
+    spawn = { biomes = {
+                  temperate_woodlands = RARE, silverwood = RARE, redwood_stands = RARE, taiga = RARE,
+                  flower_forest = RARE, heather_moor = RARE, river_valleys = RARE, alpine_highlands = RARE,
+              },
+              ground = { G .. "grass", G .. "loam", G .. "leaf_litter", G .. "snow" },
+              chance = 2, time = "any", sun_min = 6, group = { 1, 1 }, weight = 1, cap = 1 },
 }
 
 -- Crows: a flock passing over. They come in from far off already flying,

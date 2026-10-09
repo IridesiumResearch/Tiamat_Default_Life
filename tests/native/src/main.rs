@@ -1413,6 +1413,7 @@ fn main() {
     ride_check(&mut r);
     spider_check(&mut r);
     crit_check(&mut r);
+    white_stag_check(&mut r);
     ui_check();
     climate_check();
     modes_check();
@@ -2365,7 +2366,7 @@ fn climate_check() {
     let cave = kinds_in(&mut r, "mossy_limestone");
     assert!(cave.is_empty(), "a lit cave by day holds none of the surface animals: {cave:?}");
     // How often, by biome: `odds` says each kind's weight where you stand.
-    let odds = |r: &mut Rig, biome: &str| -> std::collections::HashMap<String, u32> {
+    let odds = |r: &mut Rig, biome: &str| -> std::collections::HashMap<String, f64> {
         r.say(&format!("biome {biome}"));
         r.say("odds");
         let said = r.said();
@@ -2375,21 +2376,23 @@ fn climate_check() {
             .filter_map(|(k, w)| w.parse().ok().map(|w| (k.to_owned(), w)))
             .collect()
     };
-    let w = |m: &std::collections::HashMap<String, u32>, k: &str| m.get(k).copied().unwrap_or(0);
+    let w = |m: &std::collections::HashMap<String, f64>, k: &str| m.get(k).copied().unwrap_or(0.0);
     let mountains = odds(&mut r, "alpine_highlands");
-    assert!(w(&mountains, "sheep") > w(&mountains, "cow") && w(&mountains, "cow") > 0,
+    assert!(w(&mountains, "sheep") > w(&mountains, "cow") && w(&mountains, "cow") > 0.0,
         "up in the mountains, sheep over cattle, and cattle rare but there: {mountains:?}");
     let jungle = odds(&mut r, "jungle");
-    assert!(w(&jungle, "pig") > 0 && w(&jungle, "sheep") == 0, "pigs in the jungle, and no sheep: {jungle:?}");
+    assert!(w(&jungle, "pig") > 0.0 && w(&jungle, "sheep") == 0.0, "pigs in the jungle, and no sheep: {jungle:?}");
     let fen = odds(&mut r, "peat_fen");
-    assert!(w(&fen, "pig") > w(&fen, "cow") && w(&fen, "sheep") == 0, "the swamp is the pigs': {fen:?}");
+    assert!(w(&fen, "pig") > w(&fen, "cow") && w(&fen, "sheep") == 0.0, "the swamp is the pigs': {fen:?}");
     let pasture = odds(&mut r, "rolling_grasslands");
     for k in ["cow", "sheep"] {
-        assert!(w(&pasture, k) > w(&pasture, "horse") && w(&pasture, "horse") > 0, "{k} commoner than horses on the pasture: {pasture:?}");
+        assert!(w(&pasture, k) > w(&pasture, "horse") && w(&pasture, "horse") > 0.0, "{k} commoner than horses on the pasture: {pasture:?}");
     }
     let woods = odds(&mut r, "temperate_woodlands");
-    assert!(w(&woods, "stag") < w(&woods, "pig") && w(&woods, "bear") < w(&woods, "stag"),
-        "in the woods, pigs over deer over bears: {woods:?}");
+    assert!(w(&woods, "stag") < w(&woods, "pig") && w(&woods, "bear") <= w(&woods, "stag"),
+        "in the woods, pigs over deer, and deer as rare as bears: {woods:?}");
+    assert!(w(&woods, "white_stag") > 0.0 && w(&woods, "white_stag") * 5.0 < w(&woods, "stag"),
+        "a white stag, a small share of the deer: {woods:?}");
     r.say("biome rolling_grasslands");
     println!("ok  climate: temperate comfortable, Glass Waste hot, Crown cold; creatures keep to their own biomes, crows anywhere on land");
 }
@@ -2437,6 +2440,20 @@ fn crit_check(r: &mut Rig) {
     r.say("cull");
     r.tick(20);
     println!("ok  a jump's blow lands half again as hard and knocks a cow 1.8 times as far");
+}
+
+/// The white stag: the stag's model, its own skin, alone and hard to bring down.
+fn white_stag_check(r: &mut Rig) {
+    r.say("cull");
+    r.say("spawn white_stag 1");
+    r.tick(1);
+    let mobs = r.mobs();
+    assert_eq!(mobs.len(), 1);
+    let body = &mobs[0].1;
+    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:white_stag"), "its own body, not a stag's");
+    assert_eq!(body.health.unwrap().current, 30, "thirty points");
+    r.say("cull");
+    println!("ok  a white stag is its own body, with thirty points");
 }
 
 /// A spider never jumps but to pounce: walked into a wall it climbs it, nose

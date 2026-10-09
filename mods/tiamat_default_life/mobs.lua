@@ -86,7 +86,8 @@ function tdl.register_mob(def)
     -- fails to load.
     def.has_model = false
     if def.model and game.register_model then
-        local ok, why = pcall(game.register_model, { id = def.id, file = def.model, texture = def.texture })
+        local ok, why = pcall(game.register_model, { id = def.id, file = def.model, texture = def.texture,
+            scale = def.model_scale })
         def.has_model = ok
         if not ok then
             game.log("tiamat_default_life: " .. def.id .. " keeps its stand-in body: " .. tostring(why))
@@ -96,7 +97,7 @@ function tdl.register_mob(def)
         -- model is kept with the entity (husbandry.lua).
         if ok and def.breeds then
             pcall(game.register_model, { id = def.id .. "_young", file = def.model, texture = def.texture,
-                scale = C.young_scale })
+                scale = C.young_scale * (def.model_scale or 1) })
         end
     end
     M.kinds[def.id] = def
@@ -1855,7 +1856,7 @@ if C.dev_commands then
         local swarm = kind == "swarm"
         if swarm then kind = "bat" end
         if kind == nil or body == nil or M.kinds[kind] == nil then
-            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_rat|cave_troll|swamp_hag|scarecrow|mortal|ghost|crow|bat|hen|crab|sea_turtle|dolphin|swarm> [count] [young]")
+            tdl.say(uuid, "spawn <cow|sheep|pig|horse|stag|white_stag|goat|bunny|fox|squirrel|wolf|mammoth|bear|spider|scurrier|cave_rat|cave_troll|swamp_hag|scarecrow|mortal|ghost|crow|bat|hen|crab|sea_turtle|dolphin|swarm> [count] [young]")
             return
         end
         local at = { x = body.pos.x + body.facing.x * 4, y = body.pos.y + (M.kinds[kind].flyer and 3 or 0),
@@ -1940,13 +1941,16 @@ if C.dev_commands then
         if body == nil then return end
         local biome = biome_at(body.pos)
         local list = {}
+        -- Its weight there, times the share of draws that come to anything
+        -- (`spawn.chance`): how likely it really is, against the rest.
         for _, kid in ipairs(M.order) do
-            local w = weight_in(M.kinds[kid], biome)
+            local kind = M.kinds[kid]
+            local w = weight_in(kind, biome) * (kind.spawn.chance or 100) / 100
             if w > 0 then list[#list + 1] = { kid, w } end
         end
         table.sort(list, function(a, b) return a[2] > b[2] or (a[2] == b[2] and a[1] < b[1]) end)
         local parts = {}
-        for _, e in ipairs(list) do parts[#parts + 1] = e[1] .. " " .. e[2] end
+        for _, e in ipairs(list) do parts[#parts + 1] = e[1] .. " " .. string.format("%g", e[2]) end
         tdl.say(uuid, (biome or "no biome") .. ": " .. (#parts > 0 and table.concat(parts, ", ") or "nothing lives here"))
     end)
     tdl.command("ignite", "admin", function(uuid, rest)

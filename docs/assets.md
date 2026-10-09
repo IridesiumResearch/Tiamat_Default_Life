@@ -29,7 +29,7 @@ with its texture beside it as a `.png`.
 |---|---|---|---|---|
 | `assets/source/Tiamat Life AI <Creature>.glb` (25: Bat, Bear, Bunny, Cave Rat, Cave Troll, Cow, Crab, Crow, Dolphin, Fox, Ghost, Goat, Horse, Mammoth, Pig, Scarecrow, Scurrier, Sea Turtle, Sheep, Spider, Squirrel, Stag, Swamp Hag, The Mortal, Wolf) and `assets/source/Tiamat Life AI Pig.jpg` | AI-generated; generator to be confirmed | to be confirmed | to be confirmed (generator's terms) | none yet |
 | `assets/source/voxel_hen.glb` and `assets/source/hen_pixel_atlas.png` | a Blender export (Khronos glTF Blender I/O v5.2), not the generator above; whether it was modelled by hand or generated is to be confirmed | to be confirmed | to be confirmed | none yet |
-| `mods/tiamat_default_life/models/<creature>.glb` and `.png` (26 of each) | derived from the files above by `tools/skin_glb.py`; `hen.png` is `hen_pixel_atlas.png` as it came | as above | as above | none yet |
+| `mods/tiamat_default_life/models/<creature>.glb` and `.png` (26 of each) | derived from the files above by `tools/skin_glb.py`; `hen.png` is `hen_pixel_atlas.png` as it came; `white_stag.png` is `stag.png` whitened by `tools/make_white_stag.py` | as above | as above | none yet |
 
 ## Creature voices and the underwater loop
 
