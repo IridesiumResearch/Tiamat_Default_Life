@@ -5,10 +5,10 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-10-05)
+## Where these stand (2026-10-09)
 
-**One is open: 20**, a creature drawn at its pitch (2026-10-05). 18 and 19
-landed 2026-09-30 and 2026-09-29; both await the designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
+**None are open.** 20 landed 2026-10-05, and 18 and 19 on 2026-09-30 and
+2026-09-29; all three await the designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
 (engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
 One thing landed that was never numbered: the place control at nothing (open sky, or a
 block past reach) reaches a mod that asks, engine a6d34e1 (protocol 76), so food is eaten
@@ -20,7 +20,7 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
-| 20 a creature drawn at its pitch | **Open.** | a spider on a wall is pitched nose up (`set_entity{ pitch }`), and drawn level, sticking out of the face. |
+| 20 a creature drawn at its pitch | Landed, engine ed5826d2. | a climbing spider is pitched nose up (`set_entity{ pitch }`) and lies on its wall. |
 | 19 a creature is lit where it stands | Landed, engine 847a908. | nothing to do: a cave's bats and rats are dark as the cave is. |
 | 18 riding | Landed, engine 7974abc. | a grown horse is ridden (`ride` on a kind, husbandry.lua); set down beside it on the way off. |
 | 17 using an entity | Landed, engine 50462b7. | feeding, milking, shearing and leading, in husbandry.lua. |
@@ -43,7 +43,12 @@ included.
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 20. A creature is drawn level, whatever its pitch (2026-10-05): OPEN
+## 20. A creature is drawn level, whatever its pitch (2026-10-05): LANDED, engine ed5826d2
+
+*Landed 2026-10-05 as asked: a mod's creature is turned by its pitch about
+the middle of its collider; players and mounts stay level. Nothing for the
+mod to do, since it already pitched the spider. To see in the game: a spider
+climbing a wall lies flat on it, and comes level over the top.*
 
 **Seen.** A spider climbs walls now (mobs.lua, `climbs`): walking into one,
 it goes up the face and over the top. The mod pitches it nose up the wall

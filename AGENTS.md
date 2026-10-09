@@ -20,6 +20,29 @@ If the copy of this file in your mod is older than this list, re-vendor
 `api/` from the engine's `main` and read the sections named here. Each item
 is a mechanism a mod may now use; none of them changes a mod that ignores it.
 
+- **`sweeps = false` on a whole block** (2026-10-08). A `whole` block set
+  down on thin ground sweeps it by default; `sweeps = false` makes it stand
+  among the ground's cells instead, its model clipping through — a torch.
+  Sub-Node Contract §7.6.
+- **`e.swept` on the place event** (2026-10-08). `true` when the placement
+  destroys what the block holds — a `whole` block laid on a partial block
+  with no top node, or grass cards. A mod gating what a bare hand may clear
+  refuses here with its own words; the remains stay. See "Your hooks".
+- **Nothing is built on grass** (2026-10-08). A `billboard` block — a grass
+  card — is neither ground nor in the way: a placement against it lands
+  where the card is and the card is gone. Nothing to do. Sub-Node Contract
+  §7.6.
+- **A whole block set on a thin floor sweeps the floor** (2026-10-08). On a
+  partial block with no node in its top layer, a `whole` block's placement
+  destroys that block's remains and lays the thing whole at its bottom; with
+  any top node present it goes in the block above, intact. A side-face
+  placement with no air for the shape says "this is not flat ground".
+  Nothing to do. Sub-Node Contract §7.6.
+- **A model block's slot shows the model, a grass card shows the card**
+  (2026-10-08). A `model` block is drawn in a slot as its model in its own
+  skin, from the same angle as a cube, once both have arrived; a `billboard`
+  block is drawn flat, like an item. Nothing to do; `textures` is still what
+  shows until the model lands.
 - **A whole block swapped where one stands** (2026-10-08). `set_block` of a
   `whole` block on the block another stands in — a campfire lit, a torch burnt
   out — replaces the thing and keeps the ground cells it was set into. Nothing
@@ -1407,10 +1430,11 @@ piece and pays a whole block's units (27, or your `drops` table in full) however
 many cells its shape has; placing it writes the air cells of its shape and
 costs 27 units whatever brush is held — on a chiselled slope it stands among
 the slope's cells, the model clipping through them, because **a block under
-three quarters full is not ground**: placing against its top puts the thing
-INTO that block, standing on the first full block beneath, rather than
-floating a block above (Contract §7.6; the same rule fills a thin floor's gaps
-with loose material instead of starting a block over it); and nothing is
+with no node in its top layer is not ground**: placing against its top sweeps
+that block's remains away and lays the thing whole at its bottom, standing on
+the block beneath; a block with any top node is ground and the thing goes in
+the block above, intact (Contract §7.6; loose material keeps the
+three-quarters rule and fills a thin floor's gaps instead); and nothing is
 written into its block afterwards — a chisel cannot fill in a campfire, and a
 `set_block` with a mask or a merge naming one is refused and logged — except a
 `set_block` of another whole block, which swaps it in place and keeps the

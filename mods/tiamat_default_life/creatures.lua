@@ -355,8 +355,8 @@ tdl.register_mob{
 -- you are fourteen off; in daylight it leaves you be. Slower than you walk,
 -- so a spider is a thing you can get away from, except that it never stops
 -- for a wall: it climbs, up and over, and does not jump at all but to pounce
--- at you from four blocks off. On a wall it is pitched nose up, which the
--- engine does not draw yet (docs/engine-asks.md, ask 20).
+-- at you from four blocks off. On a wall it is pitched nose up, and the
+-- engine turns it by that so it lies on the wall (engine ask 20).
 tdl.register_mob{
     id = "spider", name = "Spider", health = 12,
     collider = { width = 3.0, height = 1.6 },
