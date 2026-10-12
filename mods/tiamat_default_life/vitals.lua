@@ -472,7 +472,10 @@ local function push_abilities(uuid, v)
     local said = string.format("%s %s %s %s %s", speed, sprint, fly, wind_sky, gravity)
     if said == v.abilities then return end
     v.abilities = said
-    game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly, wind_sky = wind_sky, gravity = gravity })
+    -- In a survival world the grant is the whole answer: being an operator
+    -- is not a licence to fly (engine ask 22).
+    game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly, wind_sky = wind_sky,
+        gravity = gravity, operator_fly = tdl.mode == "Creative" })
 end
 
 tdl.on_join(function(event)

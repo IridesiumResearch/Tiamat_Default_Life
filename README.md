@@ -194,8 +194,7 @@ are **powers**. In a creative world everybody flies and every admin may
 `tp`. In a survival world (Default or Adventure) nobody has them but the
 world's **owner**, the first admin it ever saw, and only after saying
 `powers on`, which tells the whole server; `powers off` puts them down,
-and they end when the owner leaves. The engine still lets every operator
-fly with N whatever this mod says, until engine ask 22 is answered. Say `mode`
+and they end when the owner leaves; no other admin flies there. Say `mode`
 to hear what kind of world you are in. Answers to chat words come back in
 chat.
 

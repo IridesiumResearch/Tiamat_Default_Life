@@ -5,10 +5,11 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-10-12)
+## Where these stand (2026-10-13)
 
-**One is open: 22**, an operator's flight a mod cannot withhold
-(2026-10-12). 21, a tint on a creature, landed 2026-10-09 (engine
+**None is open.** 22, an operator's flight a mod could not withhold,
+landed 2026-10-13 (engine 3e5a019d): a survival world sends
+`operator_fly = false`, so only the owner with their powers taken flies. 21, a tint on a creature, landed 2026-10-09 (engine
 f2ff9f71) and a hit flashes it faintly red. 20 landed 2026-10-05, and 18 and 19 on 2026-09-30 and
 2026-09-29; all three await the designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
 (engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
@@ -22,7 +23,7 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
-| 22 an operator's flight is not the mod's to withhold | **Open.** | in a survival world only the owner, having taken their powers, should fly; every operator still flies with N. |
+| 22 an operator's flight is not the mod's to withhold | Landed, engine 3e5a019d. | `operator_fly = false` in a survival world (vitals.lua): only the owner, having taken their powers, flies. |
 | 21 a tint on a creature | Landed, engine f2ff9f71, protocol 88. | a creature hit flashes faintly red for six ticks (`set_entity{ tint, tint_ticks }`, `C.hurt_tint`). |
 | 20 a creature drawn at its pitch | Landed, engine ed5826d2. | a climbing spider is pitched nose up (`set_entity{ pitch }`) and lies on its wall. |
 | 19 a creature is lit where it stands | Landed, engine 847a908. | nothing to do: a cave's bats and rats are dark as the cave is. |
@@ -47,7 +48,13 @@ included.
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 22. An operator flies whatever the mod says (2026-10-12): OPEN
+## 22. An operator flies whatever the mod says (2026-10-12): LANDED, engine 3e5a019d
+
+*Landed 2026-10-13 as asked: `operator_fly = false` on
+`set_player_abilities` makes the grant the whole answer. `push_abilities`
+(vitals.lua) sends it in every survival world. To see in the game: an admin
+who is not the owner, or the owner without `powers on`, presses N in a
+Default world and does not fly.*
 
 **Wanted.** In a survival world (Default, Adventure) nobody flies, not even
 an admin, unless they are the world's owner and have taken their powers

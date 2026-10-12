@@ -408,6 +408,9 @@ impl uihost::Access for Dialogs {
     fn close(&self, _: &str, _: &str) -> bool {
         true
     }
+    fn set_hover(&self, _: &str, _: Vec<(MaterialId, String)>) -> bool {
+        true
+    }
 }
 
 #[derive(Default)]
@@ -1161,6 +1164,7 @@ fn main() {
     r.tick(1);
     assert_eq!(r.abilities().map(|a| a.sprint), Some(true));
     assert_eq!(r.abilities().map(|a| a.fly), Some(false), "nobody flies by this mod in a default world");
+    assert_eq!(r.abilities().map(|a| a.operator_fly), Some(false), "and being an operator is no licence to");
     assert_eq!(r.abilities().map(|a| a.wind_sky), Some(true), "an admin may wind the sky");
     r.huds.deop(PLAYER);
     r.tick(1);
@@ -1400,6 +1404,7 @@ fn main() {
         mod_id: MOD.into(),
         form: format!("{MOD}:wardrobe"),
         event: tiamat_core::proto::DialogEvent::Closed,
+        dropped: None,
     });
     for request in r.dialogs.0.lock().unwrap().iter() {
         tiamat_core::ui::check(&request.tree, tiamat_core::ui::Limits::default()).expect("a valid tree");
@@ -3341,6 +3346,7 @@ fn modes_check() {
     assert_eq!(c.number("air"), 27.0, "nobody drowns in a creative world");
     assert!(c.flag("creative"));
     assert_eq!(c.abilities().map(|a| a.fly), Some(true), "everybody flies in a creative world");
+    assert_eq!(c.abilities().map(|a| a.operator_fly), Some(true), "and operators as ever");
     c.say_as(BOB, "kit");
     assert!(c.inventory.units_of("player:main", c.material("tiamat_default_life:apple")) > 0, "anyone may take the kit");
     c.say_as(BOB, "boom");

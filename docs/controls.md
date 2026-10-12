@@ -90,7 +90,7 @@ Both halves landed in engine 990bf8a (ask 10).
 
 | Key | Action | A cheat? | Now |
 |---|---|---|---|
-| **N** | Fly | A power. | Everybody in a creative world. In a survival world only the owner, having taken their powers aloud (`powers on`); until engine ask 22, every operator still flies. |
+| **N** | Fly | A power. | Everybody in a creative world. In a survival world only the owner, having taken their powers aloud (`powers on`); no other admin. |
 | **[ ] \\** and PageDown, PageUp, Home | Wind your own sky back, on, and resync | **Yes.** Client-side only, but it turns your night into day on your own screen: seeing in the dark for free. | A server permission, `wind_sky`. This mod grants it to admins and in creative worlds, and refuses it to everybody else. Resync is never refused. |
 | **F8** / **F7** | "Teleport" far and home | No. It shifts the render origin for the floating-point test; your body does not move. | Function keys only; the Y and H twins are unbound. |
 | **F9** | Lay out one of every block | No. Singleplayer only. | Moved off G. |
