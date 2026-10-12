@@ -71,8 +71,9 @@
 --                       time = "day" | "night" | "any", sun_min, sun_max,
 --                       dark = true: at night, or by day where sun <= sun_max (a monster),
 --                       group = { min, max }, weight, cap, chance (in a hundred: a rare kind),
---                       groups = { { min, max }, ... }: one of these ranges at random
---                       instead of `group`, for a kind seen in few or many but not between,
+--                       groups = { { min, max, weight }, ... }: one of these ranges, drawn by
+--                       weight (1 if left out), instead of `group`, for a kind seen in few or
+--                       many but not between,
 --                       swarm = { chance, group }: sometimes a swarm, over the cap (bats),
 --                       headroom = blocks clear over the ground it needs (default 2),
 --                       water = true: at the sea rather than on land (a swimmer),
@@ -673,7 +674,7 @@ tdl.register_mob{
     id = "crow", name = "Crow", health = 3,
     collider = { width = 1.6, height = 1.6 },
     model = "models/crow.glb", texture = "models/crow.png", model_scale = 1.3, grazes = true,
-    flyer = true, lands = true, flock = true, navigates = true, speed = 0.35, speed_fast = 0.6,
+    flyer = true, lands = true, flock = true, navigates = true, speed = 0.55, speed_fast = 0.9,
     walk_speed = 0.8,
     shy = 5, wary = 10, sight = 20,
     sound = { "caw", "caw_2" }, voice_min = 100, voice_max = 500,
@@ -681,9 +682,9 @@ tdl.register_mob{
     -- Anywhere on dry land.
     spawn = { land = true,
               ground = { G .. "grass", G .. "packed_dirt", G .. "leaf_litter", G .. "dead_wood", G .. "dirt" },
-              -- A few birds or a great many, never the middling flock (the
-              -- designer, 2026-10-12).
-              time = "any", sun_min = 8, groups = { { 1, 3 }, { 10, 16 } }, weight = 3, cap = 20,
+              -- A few birds or a great many, never the middling flock, and
+              -- the great many one time in twenty (the designer, 2026-10-12).
+              time = "any", sun_min = 8, groups = { { 1, 3, 19 }, { 10, 16, 1 } }, weight = 3, cap = 20,
               distance = { 56, 88 } },
 }
 

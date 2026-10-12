@@ -2064,8 +2064,9 @@ fn mob_check(r: &mut Rig) {
     *r.world.floor.lock().unwrap() = Some((63, grass));
     r.say("spawn crow 1");
     r.tick(1);
-    let (crow, body) = r.mobs()[0].clone();
-    assert_eq!(body.model.as_deref(), Some("tiamat_default_life:crow"), "a crow is its own model");
+    let (crow, _) = r.mobs().into_iter()
+        .find(|(_, e)| e.model.as_deref() == Some("tiamat_default_life:crow"))
+        .expect("a crow is its own model");
     let hold = |r: &Rig, y: f64, ground: bool| {
         r.put_mob(crow, 85.5, y, 85.5);
         r.entities.0.lock().unwrap().entities.get_mut(&crow).unwrap().on_ground = ground;
