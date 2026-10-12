@@ -13,14 +13,24 @@
 --               fell, and you stay in the world as a ghost: you may walk
 --               it and watch it, and touch nothing in it again.
 --
--- And in any mode there are ADMINS, who may be indestructible (`god`), go
--- anywhere (`tp`), raise the dead (`revive`) and use the testing words.
--- Admins ARE the server's operators (`game.is_operator`): whoever first
--- joins a world, which in a world you host is you, and whoever the engine's
--- own `/op` names after. This mod keeps no list of its own.
+-- And in any mode there are ADMINS, who may be indestructible (`god`), raise
+-- the dead (`revive`) and use the testing words. Admins ARE the server's
+-- operators (`game.is_operator`): whoever first joins a world, which in a
+-- world you host is you, and whoever the engine's own `/op` names after.
+--
+-- Flying and going anywhere (`tp`) are POWERS. In a creative world every
+-- admin has them. In a survival world (Default, Adventure) nobody does but
+-- the world's OWNER — the first admin it ever saw, remembered with the world
+-- — and only once they take them with `powers on`, which the whole server
+-- is told. They last the session, or until `powers off`. The engine lets an
+-- operator fly whatever a mod says (docs/engine-asks.md, ask 21), so until
+-- that is answered an admin can still fly with N; `tp` is this mod's, and
+-- is shut.
 --
 --   tdl.mode                          "Default" | "Creative" | "Adventure"
 --   tdl.is_admin(uuid)
+--   tdl.is_owner(uuid)                the world's first admin
+--   tdl.has_powers(uuid)              may fly and `tp`
 --   tdl.is_ghost(uuid), tdl.set_ghost(uuid, on)
 --   tdl.is_invulnerable(uuid)         creative, god, or a ghost
 --   tdl.command(word, level, fn)      a chat word for "anyone", "creative" or "admin"
@@ -31,6 +41,7 @@ local U = tdl.util
 tdl.mode = C.mode
 
 local gods = {}         -- uuid -> true, for the session
+local powers = {}       -- uuid -> true, for the session: the owner, having taken them
 local ghosts = {}       -- uuid -> true, loaded from storage per player
 local by_name = {}      -- lowercased display name -> uuid, for who is here
 
@@ -40,6 +51,24 @@ local GHOST_LINE = "You died in this world. You can walk it and watch it, and no
 
 function tdl.is_admin(uuid)
     return game.is_operator(uuid)
+end
+
+--- The world's owner: the first admin it ever saw, remembered with the world.
+function tdl.is_owner(uuid)
+    return game.storage.get("owner") == uuid and tdl.is_admin(uuid)
+end
+
+--- May fly and go anywhere: any admin in a creative world; in a survival
+--- world, the owner, having taken their powers.
+function tdl.has_powers(uuid)
+    if not tdl.is_admin(uuid) then return false end
+    if tdl.mode == "Creative" then return true end
+    return powers[uuid] == true and tdl.is_owner(uuid)
+end
+
+--- Says one line to everybody here.
+local function tell_all(text)
+    for who in pairs(tdl.online()) do tdl.say(who, text) end
 end
 
 function tdl.is_ghost(uuid)
@@ -93,6 +122,10 @@ end
 
 tdl.on_join(function(event)
     by_name[string.lower(event.name)] = event.player
+    -- The first admin this world ever sees is its owner, for good.
+    if game.storage.get("owner") == nil and tdl.is_admin(event.player) then
+        game.storage.set("owner", event.player)
+    end
     if game.storage.get("ghost:" .. event.player) == true then
         ghosts[event.player] = true
     end
@@ -101,6 +134,7 @@ end)
 tdl.on_leave(function(event)
     by_name[string.lower(event.name)] = nil
     gods[event.player] = nil
+    powers[event.player] = nil
     ghosts[event.player] = nil
 end)
 
@@ -138,8 +172,38 @@ tdl.command("god", "admin", function(uuid)
     tdl.say(uuid, gods[uuid] and "Nothing can hurt you." or "You can be hurt again.")
 end)
 
---- tp <x> <y> <z>, tp <name>, tp home.
+--- powers on | off: the owner of a survival world takes flight and `tp`,
+--- and everybody is told.
+tdl.command("powers", "admin", function(uuid, rest)
+    if tdl.mode == "Creative" then
+        tdl.say(uuid, "In a creative world every admin flies and goes anywhere already.")
+        return
+    end
+    -- A world made before owners were remembered takes the first admin to ask.
+    if game.storage.get("owner") == nil then game.storage.set("owner", uuid) end
+    if not tdl.is_owner(uuid) then
+        tdl.say(uuid, "Only the owner of this world can take powers in it.")
+        return
+    end
+    if rest == "on" then
+        if powers[uuid] then tdl.say(uuid, "You have them already.") return end
+        powers[uuid] = true
+        tell_all(tdl.name(uuid) .. ", the owner of this world, has given themselves the power to fly and to teleport.")
+    elseif rest == "off" then
+        if not powers[uuid] then tdl.say(uuid, "You have none to put down.") return end
+        powers[uuid] = nil
+        tell_all(tdl.name(uuid) .. " has put their powers down.")
+    else
+        tdl.say(uuid, "powers on, or powers off. " .. (powers[uuid] and "You have them." or "You have none."))
+    end
+end)
+
+--- tp <x> <y> <z>, tp <name>, tp home: a power (see the top of this file).
 tdl.command("tp", "admin", function(uuid, rest)
+    if not tdl.has_powers(uuid) then
+        tdl.say(uuid, "Only the owner can teleport in a survival world, and only having taken their powers (powers on).")
+        return
+    end
     local x, y, z = string.match(rest, "^(%-?[%d%.]+)%s+(%-?[%d%.]+)%s+(%-?[%d%.]+)$")
     local target
     if x then
@@ -185,7 +249,9 @@ end)
 tdl.command("admins", "admin", function(uuid)
     local names = {}
     for _, who in pairs(by_name) do
-        if game.is_operator(who) then names[#names + 1] = tdl.name(who) end
+        if game.is_operator(who) then
+            names[#names + 1] = tdl.name(who) .. (tdl.is_owner(who) and " (the owner)" or "")
+        end
     end
     table.sort(names)
     tdl.say(uuid, "Admins here: " .. table.concat(names, ", ") .. ". Make more with /op.")

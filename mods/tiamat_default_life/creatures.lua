@@ -71,6 +71,8 @@
 --                       time = "day" | "night" | "any", sun_min, sun_max,
 --                       dark = true: at night, or by day where sun <= sun_max (a monster),
 --                       group = { min, max }, weight, cap, chance (in a hundred: a rare kind),
+--                       groups = { { min, max }, ... }: one of these ranges at random
+--                       instead of `group`, for a kind seen in few or many but not between,
 --                       swarm = { chance, group }: sometimes a swarm, over the cap (bats),
 --                       headroom = blocks clear over the ground it needs (default 2),
 --                       water = true: at the sea rather than on land (a swimmer),
@@ -371,7 +373,7 @@ tdl.register_mob{
     sight = 10, chase = 14, wander_radius = 12, pause_min = 40, pause_max = 200,
     sound = { "hiss", "hiss_2" }, sound_death = "hiss", voice_min = 300, voice_max = 1200,
     drops = {},
-    spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3, chance = 25,
+    spawn = { land = true, biomes = C.cave_biomes, dark = true, sun_max = 3, chance = 12,
               time = "any", group = { 1, 2 }, weight = 3, cap = 6 },
 }
 
@@ -511,7 +513,7 @@ tdl.register_mob{
     sight = 16, wander_radius = 12, pause_min = 100, pause_max = 400,
     sound = { "growl_2", "growl_3" }, sound_death = "growl_3", voice_min = 800, voice_max = 3000,
     drops = {},
-    spawn = { biomes = C.cave_biomes, sun_max = 2, chance = 4, headroom = 4,
+    spawn = { biomes = C.cave_biomes, sun_max = 2, chance = 9, headroom = 4,
               time = "any", group = { 1, 1 }, weight = 1, cap = 1 },
 }
 
@@ -576,7 +578,7 @@ tdl.register_mob{
     keeps_off = 40,
     sight = 12, wander_radius = 10, pause_min = 60, pause_max = 300,
     drops = {},
-    spawn = { land = true, time = "night", chance = 5,
+    spawn = { land = true, time = "night", chance = 12,
               group = { 1, 1 }, weight = 1, cap = 1, distance = { 56, 88 } },
 }
 
@@ -669,8 +671,8 @@ tdl.register_mob{
 -- pecking under `sneak`.
 tdl.register_mob{
     id = "crow", name = "Crow", health = 3,
-    collider = { width = 1.2, height = 1.2 },
-    model = "models/crow.glb", texture = "models/crow.png", grazes = true,
+    collider = { width = 1.6, height = 1.6 },
+    model = "models/crow.glb", texture = "models/crow.png", model_scale = 1.3, grazes = true,
     flyer = true, lands = true, flock = true, navigates = true, speed = 0.35, speed_fast = 0.6,
     walk_speed = 0.8,
     shy = 5, wary = 10, sight = 20,
@@ -679,7 +681,10 @@ tdl.register_mob{
     -- Anywhere on dry land.
     spawn = { land = true,
               ground = { G .. "grass", G .. "packed_dirt", G .. "leaf_litter", G .. "dead_wood", G .. "dirt" },
-              time = "any", sun_min = 8, group = { 3, 6 }, weight = 3, cap = 12, distance = { 56, 88 } },
+              -- A few birds or a great many, never the middling flock (the
+              -- designer, 2026-10-12).
+              time = "any", sun_min = 8, groups = { { 1, 3 }, { 10, 16 } }, weight = 3, cap = 20,
+              distance = { 56, 88 } },
 }
 
 -- Bats: the dark's own, and no threat to anybody: a bat flutters about

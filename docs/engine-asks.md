@@ -5,9 +5,10 @@ Each entry says what was wanted, why the mod cannot do it, and the smallest
 engine change that would. Newest first. Landed items stay here, marked, as
 the record; the open ones are copied to the engine repo (see below).
 
-## Where these stand (2026-10-09)
+## Where these stand (2026-10-12)
 
-**None are open.** 20 landed 2026-10-05, and 18 and 19 on 2026-09-30 and
+**One is open: 21**, an operator's flight a mod cannot withhold
+(2026-10-12). 20 landed 2026-10-05, and 18 and 19 on 2026-09-30 and
 2026-09-29; all three await the designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
 (engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
 One thing landed that was never numbered: the place control at nothing (open sky, or a
@@ -20,6 +21,7 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
+| 21 an operator's flight is not the mod's to withhold | **Open.** | in a survival world only the owner, having taken their powers, should fly; every operator still flies with N. |
 | 20 a creature drawn at its pitch | Landed, engine ed5826d2. | a climbing spider is pitched nose up (`set_entity{ pitch }`) and lies on its wall. |
 | 19 a creature is lit where it stands | Landed, engine 847a908. | nothing to do: a cave's bats and rats are dark as the cave is. |
 | 18 riding | Landed, engine 7974abc. | a grown horse is ridden (`ride` on a kind, husbandry.lua); set down beside it on the way off. |
@@ -42,6 +44,29 @@ included.
 | 7 `submerged` and `fell` | Landed, engine a3db9fa. | the head-block probe and the peak tracker are gone. |
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
+
+## 21. An operator flies whatever the mod says (2026-10-12): OPEN
+
+**Wanted.** In a survival world (Default, Adventure) nobody flies, not even
+an admin, unless they are the world's owner and have taken their powers
+with `powers on`, which the whole server is told (modes.lua). The designer
+asked for exactly that: flying is a cheat in survival, and an admin who
+uses it should have to say so in front of everybody.
+
+**Why the mod cannot do it.** `game.set_player_abilities{ fly }` is OR-ed
+with the operator list: `PlayerSim::abilities` is `fly: granted.fly ||
+operator`, and `may_fly` on the network thread answers true for any
+operator before it looks at the grant (`transport/endpoint.rs`). So the mod
+can grant flight and can never withhold it from an operator, and every
+admin can press N in a survival world. `tp` is this mod's own and is shut;
+N is the engine's.
+
+**Smallest change.** Let a mod's grant say no to an operator too, for
+example `game.set_player_abilities(uuid, { fly = false, operator_fly =
+false })`: with `operator_fly = false` the grant is the whole answer and
+the operator list is not consulted for that player. Left out, it is as now,
+so no other mod changes. Both places that decide (`abilities` and
+`may_fly`) read the same field, as they read the same grant today.
 
 ## 20. A creature is drawn level, whatever its pitch (2026-10-05): LANDED, engine ed5826d2
 

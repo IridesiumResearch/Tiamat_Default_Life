@@ -448,7 +448,9 @@ local function push_abilities(uuid, v)
     local cold = not whole and v.temp <= -C.temp_uncomfortable
     local speed = cold and C.cold_speed or 1
     local sprint = whole or v.food > 0
-    local fly = tdl.mode == "Creative"
+    -- Flight is a power: everybody in a creative world, and in a survival
+    -- world only the owner who has taken it (modes.lua).
+    local fly = tdl.mode == "Creative" or tdl.has_powers(uuid)
     local gravity = 1
     local names = {}
     for source, spec in pairs(ability_sources[uuid] or {}) do

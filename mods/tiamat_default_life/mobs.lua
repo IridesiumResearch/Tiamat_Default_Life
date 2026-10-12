@@ -419,7 +419,8 @@ local function try_spawn_near(v)
                 end
             end
             if chosen then
-                local group = chosen.spawn.group or { 1, 1 }
+                local groups = chosen.spawn.groups
+                local group = groups and groups[between(1, #groups)] or chosen.spawn.group or { 1, 1 }
                 local n = between(group[1], group[2])
                 n = math.min(n, (chosen.spawn.cap or 4) - (counts[chosen.id] or 0))
                 -- Now and then a swarm instead: over the kind's own cap, which

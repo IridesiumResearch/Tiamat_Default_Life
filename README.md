@@ -185,10 +185,17 @@ fixed for its life:
   for good, until an admin says `revive`.
 
 Admins are the server's operators: in a world you host, you, and whoever
-the engine's own `/op` names. Admins may be indestructible (`god`), go
-anywhere (`tp <x> <y> <z>`, `tp <name>`, `tp home`), raise the dead
-(`revive`), see who else is one (`admins`), and use the testing words.
-Operators fly in any mode; in a creative world everybody does. Say `mode`
+the engine's own `/op` names. Admins may be indestructible (`god`), raise
+the dead (`revive`), see who else is one (`admins`), and use the testing
+words.
+
+Flying (N) and going anywhere (`tp <x> <y> <z>`, `tp <name>`, `tp home`)
+are **powers**. In a creative world everybody flies and every admin may
+`tp`. In a survival world (Default or Adventure) nobody has them but the
+world's **owner**, the first admin it ever saw, and only after saying
+`powers on`, which tells the whole server; `powers off` puts them down,
+and they end when the owner leaves. The engine still lets every operator
+fly with N whatever this mod says, until engine ask 21 is answered. Say `mode`
 to hear what kind of world you are in. Answers to chat words come back in
 chat.
 
@@ -385,7 +392,7 @@ the generated placeholders from `tools/make_sounds.py`.
 ## Chat words
 
 Anyone: `mode`, `vitals`. Creative worlds or admins: `kit`. Admins only:
-`god`, `tp`, `revive`, `admins`, and the testing words `hurt
+`god`, `revive`, `admins`; the owner's `powers on|off`, and `tp` with them; and the testing words `hurt
 [n]`, `heal`, `feed`, `starve [n]`, `poison [ticks]`, `wither`, `burn`,
 `choke`, `freeze`, `roast`, `boom [radius]`, `die`, `spawn <kind> [n] [young]` (`spawn swarm` for a bat swarm, `spawn cow 2 young` for calves),
 `mobs`, `mob [kind]`, `odds`, `plan <transit|circle|tree|land>` (the nearest
@@ -414,20 +421,20 @@ goats, pigs now and then, foxes, wolves, bears, stags, mammoths), bone
 | Squirrel | A quarter as often as these say: common in the woods and silverwood; uncommon in the flower forest, redwoods and taiga; scarce on the frostpine coast and in the jungle. By day | Tiny, nervy, quick; bolts at five blocks. Two points; silent | nothing |
 | Wolf | Uncommon in the taiga and on the frostpine coast; scarce in the mountains, tundra and redwoods; rare in the frozen wastes and woods. Any hour, in packs of 2 to 4 | Leaves you be; hurt one and it hunts you for fifteen seconds, biting for 4. Fourteen points; barks (a dog's take, for now) | 1 to 2 raw meat |
 | Mammoth | Scarce in the frozen wastes and tundra; rare on the Icefall and the Rime Wall. By day, in ones to threes | Slow and enormous, four blocks long; hurt it and it tramples you for 9. Sixty points; trumpets | 4 to 8 raw meat |
-| Spider | The first monster: any land at night, and the ordinary caves at any hour, and not often; never in daylight | Hunts whoever it sees in the dark within ten blocks and bites for 2, slower than you walk, and lets you go at fourteen; in daylight leaves you be. Never jumps: it climbs any wall in its way, up and over, and its one leap is a pounce at you from four blocks off. Twelve points; hisses | nothing |
+| Spider | The first monster: any land at night, and the ordinary caves at any hour, and seldom; never in daylight | Hunts whoever it sees in the dark within ten blocks and bites for 2, slower than you walk, and lets you go at fourteen; in daylight leaves you be. Never jumps: it climbs any wall in its way, up and over, and its one leap is a pounce at you from four blocks off. Twelve points; hisses | nothing |
 | Cave rat | The ordinary caves, common, at any hour, always alone | A giant, the size of a spider. Nibbles about the cave floor and bolts from you at four blocks. Harmless. Six points; silent | 1 raw meat, 0 to 1 bone |
 | Crab | The beaches and the mangrove mud, commonly; the cliffs, the cinder and frostpine coasts less; any hour, in ones to threes | Scuttles about and off from you; hit it and it pinches back for a point. Four points | 0 to 1 raw meat |
 | Sea turtle | Ashore on the sandy beaches, less in the mangroves, by day, in ones and twos | Slow on the sand and in no hurry; wanders off from you at two blocks | 1 to 2 raw meat |
 | Dolphin | The open ocean and the shallows, commonly; the kelp forest less; pods of two to four at any hour | The first creature of the sea: cruises round where it appeared and never leaves the water. Harmless. Ten points | nothing |
 | Scurrier | Only the ordinary caves, where it is dark, and extremely seldom; alone | Hunts whoever it sees in the dark, fast on its feet but not as fast as you sprint, and bites for 3. Ten points; silent | nothing |
-| Cave troll | The ordinary caves, where it is dark and there is room for it, very seldom; alone | Wants nothing to do with you: come within ten blocks and it walks off until it is fifteen away. Hit it and it hunts you for good, through death and a restart, and hits for 10. Eighty points; growls | nothing |
+| Cave troll | The ordinary caves, where it is dark and there is room for it, seldom; alone | Wants nothing to do with you: come within ten blocks and it walks off until it is fifteen away. Hit it and it hunts you for good, through death and a restart, and hits for 10. Eighty points; growls | nothing |
 | Swamp hag | The fens and the mangroves only, very, very seldom; alone | Hunts whoever she sees in the dark; her staff strikes for 3 and poisons. Twenty points; silent | nothing |
 | The Mortal | The deep woods (the woodlands, silverwood, the redwoods, the taiga) and the top of the Rime Wall at the edge of the world; very seldom, alone | A tall antlered figure of old wood that stands where it is and almost never moves. Come within four blocks and it throws one of everything this mod has, at random, at your feet, once every five minutes. Hit it twice and it takes it; the third blow, it walks to you and strikes once, and nobody survives that. Two hundred points; silent | nothing |
-| Ghost | Any land, at night only, extremely seldom, and always a long way off (56 to 88 blocks); alone | Drifts about far off. Come within forty blocks of it, or let the night end, and it is gone in a breath of mist. It never harms anybody | nothing |
+| Ghost | Any land, at night only, seldom, and always a long way off (56 to 88 blocks); alone | Drifts about far off. Come within forty blocks of it, or let the night end, and it is gone in a breath of mist. It never harms anybody | nothing |
 | Scarecrow | Very rarely, and only in the fields: the grassland and river meadows. Any hour, alone | Stands in its field and never moves. Hit it and it follows you for good: never further than thirty-six blocks, never nearer than eighteen, keeping pace however you run, turning to watch you when it stands still. It never strikes. Only when it happens to come up against an apple tree does it stop, and eat. Twenty points; silent | nothing |
 | Bear | Seldom: scarce in the taiga and redwoods, rare in the woods, silverwood, frostpine coast and mountains, and only a fifth of those come to anything; never more than one about | Ambles and forages and leaves you be; hurt it and it hunts you, faster than a walk and slower than a sprint, swiping for 7. Thirty points | 2 to 4 raw meat |
 | Hen | Uncommon on the grassland, river meadows and in the flower forest; scarce in the woods, savanna and on the moor. By day, in twos to fours | Pecks about, shies from you; lays an egg every few minutes. Fed on grain, and bred (Husbandry) | 1 raw meat, 1 to 2 feathers |
-| Crow | Any biome on dry land, coming in over the horizon, any time, in flocks of 3 to 6 | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
+| Crow | Any biome on dry land, coming in over the horizon, any time, in a few, one to three, or in a great flock of ten to sixteen, never between | Passing over behind a leader: crosses the country straight-ish at its own height, wheels round a point for a while, settles in a tree (more often after dark) until you come within ten blocks or it takes a notion to go, and now and then comes down to walk and peck. Flies on out of the world once it is past everyone. Never attacks | nothing |
 | Bat | The ordinary caves, lit and dark, where it is dark enough; now and then a swarm of eight to fourteen | Leaves you be. Hit one and it bites back for a point, once or twice, fluttering off between. At rest it hangs upside down from a ceiling, or comes down to crawl and eat. A swarm churns round its leader and roosts where it roosts, and leaves you be until you hit one of it, when all of it comes for you | nothing |
 
 Spawning happens in passes around each player: a spot on the ground

@@ -2358,7 +2358,14 @@ fn climate_check() {
     // After dark the spiders come out, on any land; by day there were none.
     *r.sounds.time.lock().unwrap() = 0.9;
     r.say("god");
-    let night = kinds_in(&mut r, "rolling_grasslands");
+    // Spiders are a draw in eight that lands on them, so look a few nights.
+    let mut night = Vec::new();
+    for _ in 0..3 {
+        night.extend(kinds_in(&mut r, "rolling_grasslands"));
+        if night.iter().any(|k| k == "spider") { break; }
+    }
+    night.sort();
+    night.dedup();
     assert!(night.iter().any(|k| k == "spider"), "spiders on the grassland at night: {night:?}");
     assert!(!night.iter().any(|k| k == "cow" || k == "sheep"), "and the day's herds do not appear then: {night:?}");
     r.say("god");
@@ -3042,7 +3049,8 @@ fn farm_check(r: &mut Rig) {
         r.dig_at(100, 64, 101);
         best = best.max(units(r, "tiamat_default_life:wheat") - before);
     }
-    assert!(best >= 27 * 4, "another mod's scythe harvests threefold: {best}");
+    // Wheat gives one or two; threefold is three or six, and nothing between.
+    assert!(best >= 27 * 3 && best % (27 * 3) == 0, "another mod's scythe harvests threefold: {best}");
     stack(r, "tiamat_default_craft:iron_hoe", 1);
     r.use_at(101, 63, 101);
     assert_eq!(r.block_name(101, 63, 101), "tiamat_default_life:farmland", "another mod's hoe tills");
@@ -3274,8 +3282,26 @@ fn modes_check() {
     r.tick(1);
     assert_eq!(r.number("hp"), 22.0, "and can be again");
 
+    // Teleporting and flying are powers: in a survival world only the owner
+    // (Alice, the first admin here) has them, once she takes them, and
+    // everybody is told.
+    let moved = |r: &Rig| r.entities.0.lock().unwrap().moved_to.len();
+    let before = moved(&r);
+    r.say("tp 10 70 -4");
+    assert_eq!(moved(&r), before, "no tp without powers: {}", r.said());
+    r.tick(2);
+    assert_eq!(r.abilities().map(|a| a.fly), Some(false), "an admin does not fly in survival");
+    r.say("powers on");
+    assert!(r.huds.said_to(BOB).contains("Alice, the owner of this world, has given themselves the power to fly"),
+        "the server is told: {}", r.huds.said_to(BOB));
+    r.tick(2);
+    assert_eq!(r.abilities().map(|a| a.fly), Some(true), "the owner, having taken them, flies");
     r.say("tp 10 70 -4");
     assert_eq!(r.entities.0.lock().unwrap().moved_to.last().copied(), Some([10.0, 70.0, -4.0]));
+    r.say("powers off");
+    assert!(r.huds.said_to(BOB).contains("Alice has put their powers down"));
+    r.tick(2);
+    assert_eq!(r.abilities().map(|a| a.fly), Some(false), "and put down, she walks");
 
     // The engine's `/op` makes Bob one, and he is at once.
     r.huds.op(BOB);
@@ -3283,14 +3309,19 @@ fn modes_check() {
     r.tick(1);
     assert!(r.huds.said_to(BOB).contains("Nothing can hurt you"), "Bob was made an admin");
     r.say("admins");
-    assert!(r.said().contains("Alice") && r.said().contains("Bob"), "{}", r.said());
+    assert!(r.said().contains("Alice (the owner)") && r.said().contains("Bob"), "{}", r.said());
+    // An admin who is not the owner cannot take powers, or teleport.
+    r.say_as(BOB, "powers on");
+    assert!(r.huds.said_to(BOB).contains("Only the owner"), "{}", r.huds.said_to(BOB));
+    r.say_as(BOB, "tp 0 70 0");
+    assert!(r.huds.said_to(BOB).contains("Only the owner can teleport"), "{}", r.huds.said_to(BOB));
     // And `/deop` takes it all back, god included.
     r.huds.deop(BOB);
     r.say_as(BOB, "hurt 5");
     r.tick(1);
     assert!(r.huds.said_to(BOB).contains("admins"), "Bob is refused again");
     assert!(!matches!(r.huds.of(BOB).get("god"), Some(Value::Flag(true))), "a deopped god is mortal");
-    println!("ok  admins: the server's operators; god, tp and admins work, are refused to others, and end at deop");
+    println!("ok  admins: the server's operators; god and admins work; flight and tp are the owner's, taken aloud; refused to others; end at deop");
 
     // A creative world: nothing hurts, nothing drains, the kit is everybody's.
     let mut c = rig_with("tdl_overrides = { climate = false, world_radius = 500, mode = 'Creative' }\n");
