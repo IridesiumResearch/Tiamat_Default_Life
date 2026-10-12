@@ -7,8 +7,9 @@ the record; the open ones are copied to the engine repo (see below).
 
 ## Where these stand (2026-10-12)
 
-**One is open: 21**, an operator's flight a mod cannot withhold
-(2026-10-12). 20 landed 2026-10-05, and 18 and 19 on 2026-09-30 and
+**One is open: 22**, an operator's flight a mod cannot withhold
+(2026-10-12). 21, a tint on a creature, landed 2026-10-09 (engine
+f2ff9f71) and a hit flashes it faintly red. 20 landed 2026-10-05, and 18 and 19 on 2026-09-30 and
 2026-09-29; all three await the designer's eye in the game. Everything landed, and the mod uses every answer: 17 landed 2026-09-26
 (engine 50462b7) as `game.register_on_use_entity`, and the farm's husbandry is built on it.
 One thing landed that was never numbered: the place control at nothing (open sky, or a
@@ -21,7 +22,8 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
-| 21 an operator's flight is not the mod's to withhold | **Open.** | in a survival world only the owner, having taken their powers, should fly; every operator still flies with N. |
+| 22 an operator's flight is not the mod's to withhold | **Open.** | in a survival world only the owner, having taken their powers, should fly; every operator still flies with N. |
+| 21 a tint on a creature | Landed, engine f2ff9f71, protocol 88. | a creature hit flashes faintly red for six ticks (`set_entity{ tint, tint_ticks }`, `C.hurt_tint`). |
 | 20 a creature drawn at its pitch | Landed, engine ed5826d2. | a climbing spider is pitched nose up (`set_entity{ pitch }`) and lies on its wall. |
 | 19 a creature is lit where it stands | Landed, engine 847a908. | nothing to do: a cave's bats and rats are dark as the cave is. |
 | 18 riding | Landed, engine 7974abc. | a grown horse is ridden (`ride` on a kind, husbandry.lua); set down beside it on the way off. |
@@ -45,7 +47,7 @@ included.
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 21. An operator flies whatever the mod says (2026-10-12): OPEN
+## 22. An operator flies whatever the mod says (2026-10-12): OPEN
 
 **Wanted.** In a survival world (Default, Adventure) nobody flies, not even
 an admin, unless they are the world's owner and have taken their powers
@@ -67,6 +69,27 @@ false })`: with `operator_fly = false` the grant is the whole answer and
 the operator list is not consulted for that player. Left out, it is as now,
 so no other mod changes. Both places that decide (`abilities` and
 `may_fly`) read the same field, as they read the same grant today.
+
+## 21. A creature cannot be tinted (2026-10-09): LANDED, engine f2ff9f71
+
+*Filed in the engine's sheet for this mod on 2026-10-09 and landed the
+same day, as asked, protocol 88. The mod uses it in `tdl.hurt_mob`
+(mobs.lua): a creature hit flashes `C.hurt_tint` and fades back over
+`C.hurt_tint_ticks`. To see in the game: hit a cow, and it flushes a
+little red and fades back within a third of a second.*
+
+**Wanted.** An animal hit flashes faintly red for a few ticks, the familiar
+"that landed" signal.
+
+**Why the mod could not.** A figure's colour is its texture and the light
+where it stands. `set_entity` had no colour field, and a model is chosen
+only at `spawn_entity`; respawning a red copy loses the entity's id and
+everything keyed on it (grudges, tethers, a rider).
+
+**What landed.** `game.set_entity(id, { tint = { r, g, b } })` colours the
+figure until changed, `tint = false` clears it, and with `tint_ticks` the
+colour is a flash over the tint underneath, counted down on the server's
+tick and blended between ticks on the client. Not persisted.
 
 ## 20. A creature is drawn level, whatever its pitch (2026-10-05): LANDED, engine ed5826d2
 

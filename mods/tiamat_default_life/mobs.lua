@@ -518,7 +518,7 @@ function tdl.hurt_mob(id, amount, by, knock)
         if by then tdl.emit("kill", by, m.kind.id) end
         return true
     end
-    game.set_entity(id, { health = left })
+    game.set_entity(id, { health = left, tint = C.hurt_tint, tint_ticks = C.hurt_tint_ticks })
 
     -- Knocked back from whoever hit it, and a reaction: the timid run,
     -- the fierce turn on you.

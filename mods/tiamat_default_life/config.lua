@@ -157,6 +157,8 @@ C.knockback_up = 0.5
 -- the reference sword's 6 lands 9.
 C.crit_multiplier = 1.5
 C.crit_knockback = 1.8         -- and knocks whatever it hits this much further back
+C.hurt_tint = { r = 1.0, g = 0.7, b = 0.7 }  -- a creature hit flushes faintly red...
+C.hurt_tint_ticks = 6          -- ...and fades back to its own colour over this many ticks
 
 -- Death -------------------------------------------------------------------
 

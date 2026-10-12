@@ -23,7 +23,7 @@
 -- the world's OWNER — the first admin it ever saw, remembered with the world
 -- — and only once they take them with `powers on`, which the whole server
 -- is told. They last the session, or until `powers off`. The engine lets an
--- operator fly whatever a mod says (docs/engine-asks.md, ask 21), so until
+-- operator fly whatever a mod says (docs/engine-asks.md, ask 22), so until
 -- that is answered an admin can still fly with N; `tp` is this mod's, and
 -- is shut.
 --

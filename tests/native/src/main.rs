@@ -2430,6 +2430,9 @@ fn crit_check(r: &mut Rig) {
     assert_eq!(health, 9, "a fist is one point");
     let plain = v[0];
     assert!((plain - 0.9).abs() < 1e-4 && (v[1] - 0.5).abs() < 1e-4, "the ordinary knockback: {v:?}");
+    let flash = r.entities.0.lock().unwrap().entities[&cow].flash.clone().expect("a hit flashes");
+    assert!(flash.tint[0] == 255 && flash.tint[1] < 255 && flash.tint[1] > 128 && flash.total == 6,
+        "faintly red, for six ticks: {:?} over {}", flash.tint, flash.total);
 
     // In the air and coming down: two points, and further back.
     r.tick(12);
@@ -2446,7 +2449,7 @@ fn crit_check(r: &mut Rig) {
     assert!((v[0] - plain * 1.8).abs() < 1e-4 && (v[1] - 0.9).abs() < 1e-4, "knocked further back: {v:?}");
     r.say("cull");
     r.tick(20);
-    println!("ok  a jump's blow lands half again as hard and knocks a cow 1.8 times as far");
+    println!("ok  a hit flashes the cow faintly red; a jump's blow lands half again as hard and knocks it 1.8 times as far");
 }
 
 /// The white stag: the stag's model, its own skin, alone and hard to bring down.
