@@ -400,11 +400,18 @@ end)
 
 -- Hives ---------------------------------------------------------------------------------
 --
--- A hive fills by random tick when there are flowers near it, and a full
--- one is emptied of its honey with a right-click. Wild hives are found
--- under the trees of the flower forest: a spawn pass of the same cadence
--- as the creatures', never more than `hive_per_chunk` in a chunk column,
--- remembered with the world so a forest does not fill with them.
+-- A hive of this mod's fills by random tick when there are flowers near it,
+-- and a full one is emptied of its honey with a right-click.
+--
+-- The WILD hive is the world's (`wild_hive`, its answer to our W3): a lump
+-- of comb hung under an apple bough in the flower forest, generated with
+-- the tree. It shares its block with the bough's wood, and the engine offers
+-- no random tick to a block of more than one material, so it cannot fill
+-- the way ours does. It fills by the clock instead, asked when somebody
+-- reaches for it: full if it has never been emptied, or if
+-- `wild_hive_refill_ticks` have passed since it was and there are flowers
+-- near. Nothing about it is drawn full; the honey is the answer. When it
+-- was last emptied is kept with the world, one key a hive anybody has used.
 
 local FLOWERS = U.materials((function()
     local set = {}
@@ -412,9 +419,10 @@ local FLOWERS = U.materials((function()
     return set
 end)())
 
+-- A hive hangs one to three blocks over the flowers it lives on.
 local function flowers_near(pos)
     local r = C.hive_flower_reach
-    for dy = -2, 1 do
+    for dy = -3, 1 do
         for dx = -r, r do
             for dz = -r, r do
                 if U.material_in(FLOWERS, { x = pos.x + dx, y = pos.y + dy, z = pos.z + dz }) then return true end
@@ -433,52 +441,58 @@ if game.register_random_tick then
     end)
 end
 
+local function take_honey(uuid)
+    game.give(uuid, { material = game.mod_id .. ":honey", count = U.chance(30) and 2 or 1 })
+    tdl.cue(uuid, "drink")
+end
+
 tdl.on_use(function(event)
     if event.x == nil or event.material ~= I.beehive_full then return end
     local at = U.cell_block(event.x, event.y, event.z)
-    game.give(event.player, { material = game.mod_id .. ":honey", count = U.chance(30) and 2 or 1 })
+    take_honey(event.player)
     game.set_block(at, game.mod_id .. ":beehive")
-    tdl.cue(event.player, "drink")
     return ""
 end)
 
---- One look for a wild hive near a player: a column at random in reach,
---- in the flower forest, whose top is a tree; the hive goes on the first
---- clear block under the canopy.
-local function find_hive(v)
-    local pos = v.pos
-    if pos == nil or not U.chance(100 // C.hive_chance) then return end
-    local dist = U.between(C.mob_spawn_min, C.mob_spawn_max)
-    local dx = U.between(-dist, dist)
-    local dz = (U.below(2) == 0 and 1 or -1) * (dist - math.abs(dx))
-    local x, z = math.floor(pos.x) + dx, math.floor(pos.z) + dz
-    local key = "hive:" .. (x // 16) .. "," .. (z // 16)
-    if (game.storage.get(key) or 0) >= C.hive_per_chunk then return end
-    local top = game.surface_at{ x = x, z = z, from = math.floor(pos.y) + 32, depth = 96 }
-    if top == nil or not I.perches[top.material] then return end
-    local biome = MOBS.biome_at({ x = x, y = top.y, z = z })
-    if biome ~= "flower_forest" then return end
-    for y = top.y - 1, top.y - 12, -1 do
-        local block = game.get_block({ x = x, y = y, z = z })
-        if block == nil then return end
-        if block.occupancy == 0 then
-            game.set_block({ x = x, y = y, z = z }, game.mod_id .. ":beehive")
-            game.storage.set(key, (game.storage.get(key) or 0) + 1)
-            game.log(string.format("tiamat_default_life: a wild hive at %d, %d, %d", x, y, z))
-            return
-        end
-    end
+-- The world's clock, for the wild hives: ticks this world has run with this
+-- mod in it, kept in storage once a minute, so a restart loses a minute at
+-- most and never runs it backwards.
+local CLOCK_SAVE = 20 * 60
+local clock = nil
+local clock_saved = 0
+
+local function clock_now()
+    if clock == nil then clock = game.storage.get("clock") or 0 end
+    return clock
 end
 
-local spawn_acc = 0
+local WILD_HIVE = U.material(W .. "wild_hive")
+
+tdl.on_use(function(event)
+    if event.x == nil or WILD_HIVE == nil or event.material ~= WILD_HIVE then return end
+    local at = U.cell_block(event.x, event.y, event.z)
+    local key = "wild_hive:" .. (event.domain or "overworld") .. ":" .. U.key(at)
+    local emptied = game.storage.get(key)
+    local t = clock_now()
+    if emptied ~= nil and t - emptied < C.wild_hive_refill_ticks then
+        tdl.toast(event.player, "The comb is empty. The bees are at work.", 60)
+        return ""
+    end
+    if emptied ~= nil and not flowers_near(at) then
+        tdl.toast(event.player, "The comb is empty, and there are no flowers near.", 60)
+        return ""
+    end
+    take_honey(event.player)
+    game.storage.set(key, t)
+    return ""
+end)
 
 tdl.on_tick(function(dt)
     now = now + dt
-    spawn_acc = spawn_acc + dt
-    if spawn_acc < C.mob_spawn_every then return end
-    spawn_acc = 0
-    for _, v in pairs(tdl.online()) do
-        find_hive(v)
+    clock = clock_now() + dt
+    if clock - clock_saved >= CLOCK_SAVE then
+        game.storage.set("clock", clock)
+        clock_saved = clock
     end
 end)
 

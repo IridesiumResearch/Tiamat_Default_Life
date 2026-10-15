@@ -28,6 +28,7 @@ and follows the body. This rewrites such a file as the engine wants it:
 Standard library only:
 
     python tools/skin_glb.py <in.glb> <out.glb> --length 6.0 [--rename Eating=sneak] [--speed walk=2] [--axis z]
+    python tools/skin_glb.py <in.glb> <out.glb> --height 5.4      (an upright body, a player's)
 """
 import argparse
 import json
@@ -182,7 +183,7 @@ class Writer:
         return len(self.accessors) - 1
 
 
-def convert(source, target, length_cells, renames, flip, speeds=None, axis=None):
+def convert(source, target, length_cells, renames, flip, speeds=None, axis=None, height_cells=None):
     speeds = speeds or {}
     g = Glb(source)
     j = g.json
@@ -340,9 +341,14 @@ def convert(source, target, length_cells, renames, flip, speeds=None, axis=None)
         turn = 90.0 if facing_back else -90.0
     elif facing_back:
         turn = 180.0
+    if height_cells is not None:
+        # An upright body (a player's): sized by its height, and facing the
+        # way it was exported, since a figure with its arms at its sides is
+        # wider across than it is deep and the guess above would turn it.
+        turn = 0.0
     if flip:
         turn += 180.0
-    k = length_cells / span[long_axis]
+    k = (height_cells / span[1]) if height_cells is not None else length_cells / span[long_axis]
 
     # The standing transform: turned to face +Z, sized to cells, centred, feet down.
     half = math.radians(turn) / 2
@@ -564,9 +570,10 @@ if __name__ == "__main__":
     ap.add_argument("--rename", action="append", default=[], metavar="Old=new", help="rename a clip")
     ap.add_argument("--flip", action="store_true", help="turn it round, if the head was guessed wrong")
     ap.add_argument("--axis", choices=("x", "z"), help="nose to tail along this axis, if the wider span is not it")
+    ap.add_argument("--height", type=float, help="an upright body: feet to crown in cells, facing as exported (overrides --length)")
     ap.add_argument("--speed", action="append", default=[], metavar="clip=factor",
                     help="play a clip (by its final name) this many times faster")
     args = ap.parse_args()
     convert(args.source, args.target, args.length,
             dict(pair.split("=", 1) for pair in args.rename), args.flip,
-            {k.lower(): float(v) for k, v in (pair.split("=", 1) for pair in args.speed)}, args.axis)
+            {k.lower(): float(v) for k, v in (pair.split("=", 1) for pair in args.speed)}, args.axis, args.height)

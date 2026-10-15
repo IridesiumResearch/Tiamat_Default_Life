@@ -77,6 +77,8 @@ struct EntityStore {
     moved_to: Vec<[f64; 3]>,
     shoves: Vec<[f32; 3]>,
     abilities: HashMap<[u8; 32], Option<Abilities>>,
+    /// The body each player was last dressed in (`set_player_model`).
+    bodies: HashMap<[u8; 32], Option<String>>,
     /// What the player rides, and the seat they were given.
     riding: Option<(u64, ent::mount::Seat)>,
 }
@@ -98,6 +100,7 @@ impl Entities {
             moved_to: Vec::new(),
             shoves: Vec::new(),
             abilities: HashMap::new(),
+            bodies: HashMap::new(),
             riding: None,
         })))
     }
@@ -193,6 +196,10 @@ impl ent::Access for Entities {
     fn set_abilities(&self, uuid: [u8; 32], abilities: Option<Abilities>) -> bool {
         self.0.lock().unwrap().abilities.insert(uuid, abilities);
         true
+    }
+    fn set_player_model(&self, uuid: [u8; 32], id: Option<&str>) -> Result<bool, String> {
+        self.0.lock().unwrap().bodies.insert(uuid, id.map(str::to_owned));
+        Ok(true)
     }
     fn mount(&self, uuid: [u8; 32], id: EntityId, seat: ent::mount::Seat) -> Result<(), ent::mount::Refusal> {
         use ent::mount::Refusal;
@@ -716,6 +723,10 @@ impl Rig {
         let mob = store.entities.get_mut(&id).unwrap();
         mob.transform = Transform::from_world(x, y, z);
     }
+    /// The body the player was last dressed in.
+    fn body(&self) -> Option<String> {
+        self.entities.0.lock().unwrap().bodies.get(&PLAYER).cloned().flatten()
+    }
     /// The last abilities said for the player.
     fn abilities(&self) -> Option<Abilities> {
         self.entities.0.lock().unwrap().abilities.get(&PLAYER).copied().flatten()
@@ -782,7 +793,7 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
                 'packed_dirt', 'dead_wood', 'snow', 'permafrost', 'oak_leaves', 'apple_log', 'fern', 'tall_grass',
                 'ladys_mantle', 'ladys_mantle_bloom', 'mycelium', 'mulch', 'moss', 'black_mud', 'reeds', 'heather',
                 'lichen', 'glow_cap', 'mushroom_cap', 'monstera', 'pitcher_plant', 'apple_leaves', 'apple_blossom',
-                'poppy', 'water', 'lava', 'sand' }) do
+                'poppy', 'water', 'lava', 'sand', 'wild_hive' }) do
             game.register_block{ id = id, passable = (id == 'fern' or id == 'tall_grass'
                 or id == 'ladys_mantle' or id == 'ladys_mantle_bloom' or id == 'poppy' or id == 'heather') }
         end
@@ -824,6 +835,15 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
         after.push("tiamat_default_ui".to_owned());
     }
     vm.note_dependencies(MOD, &after);
+    // The `body` setting, as mod.toml declares it; the loader does this
+    // just before init.lua.
+    vm.declare_manifest_settings(MOD, &[tiamat_core::modload::ManifestSetting {
+        id: "body".into(),
+        name: "Body".into(),
+        description: String::new(),
+        options: vec!["Male".into(), "Female".into()],
+        default: 1,
+    }]);
     let init = format!("{prelude}{}", std::fs::read_to_string(dir.join("init.lua")).unwrap());
     vm.load_mod(MOD, &init, &dir).expect("the mod loads");
     // A stand-in for Tiamat Weather, which loads after this mod and puts its
@@ -842,6 +862,29 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
         assert(life.add_contact_fire("tiamat_weather:fire", { damage = "lots" }) == false)
         assert(life.add_heat_source("tiamat_weather:fire", 7) == false)
         assert(life.set_alight({}, 40) == false)
+        -- What is falling and how warm it is, handed over the same way; a
+        -- test switches them in chat (`wx rain`, `wx none`, `warmth 200`,
+        -- `warmth none`), and both answer nothing until it does.
+        local falling, warmth = nil, nil
+        assert(life.use_weather{ falling_on = 7 } == false)
+        assert(life.use_weather{ warmth = function() end, comfort = 2000 } == false)
+        assert(life.use_weather{} == false)
+        assert(life.use_weather{
+            falling_on = function(uuid) return falling end,
+            warmth = function(x, y, z) return warmth end,
+        } == true)
+        game.register_on_chat(function(e)
+            local f = string.match(e.text, "^wx (%a+)$")
+            if f then
+                falling = f ~= "none" and f or nil
+                return false
+            end
+            local w = string.match(e.text, "^warmth (%w+)$")
+            if w then
+                warmth = tonumber(w)
+                return false
+            end
+        end)
         "#,
         &dir,
     )
@@ -992,11 +1035,18 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
 fn main() {
     let mut r = rig();
     assert_eq!(r.vm.registered_hud_scripts().len(), 1);
+    // Everyone is drawn as an Alike; the Male Alike, registered first, is
+    // whom a new player spawns in as.
+    let bodies = r.vm.registered_player_models();
+    assert_eq!(bodies.first().map(|b| b.id.as_str()), Some("male_alike"), "the Male Alike leads: {bodies:?}");
+    assert!(r.vm.registered_models().iter().any(|m| m.id == "tiamat_default_life:male_alike"
+        && m.file == "models/male_alike.glb"));
+    println!("ok  players are Alikes, and the Male Alike is the body they spawn in");
     // The engine makes the first player of a hosted world its operator.
     r.huds.op(PLAYER);
 
     // Joining: fresh vitals, a welcome, values on the HUD after one tick.
-    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
     r.tick(1);
     assert_eq!(r.number("hp"), 27.0);
     assert_eq!(r.number("food"), 18.0, "visible food is capped at the cookies");
@@ -1004,7 +1054,17 @@ fn main() {
     assert!(!r.flag("air_show"));
     assert!(!r.flag("temp_show"));
     assert!(r.text("toast").starts_with("Welcome, Alice"));
+    assert_eq!(r.body(), Some("male_alike".into()), "a player who chose nothing is the Male Alike");
     println!("ok  join: hearts full, cookies full, nothing else showing");
+
+    // The body setting, changed mid-game, is seen within two seconds.
+    r.vm.set_player_setting(&PlayerUuid::from_bytes(PLAYER), &format!("{MOD}:body"), 1);
+    r.tick(41);
+    assert_eq!(r.body(), Some("female_alike".into()), "chose Female: the Female Alike");
+    r.vm.set_player_setting(&PlayerUuid::from_bytes(PLAYER), &format!("{MOD}:body"), 0);
+    r.tick(41);
+    assert_eq!(r.body(), Some("male_alike".into()), "and back");
+    println!("ok  the body setting dresses a player as the Male or the Female Alike");
 
     // Standing still for a while costs nothing visible and faults nothing.
     r.tick(300);
@@ -1166,6 +1226,7 @@ fn main() {
     assert_eq!(r.abilities().map(|a| a.fly), Some(false), "nobody flies by this mod in a default world");
     assert_eq!(r.abilities().map(|a| a.operator_fly), Some(false), "and being an operator is no licence to");
     assert_eq!(r.abilities().map(|a| a.wind_sky), Some(true), "an admin may wind the sky");
+    assert_eq!(r.abilities().map(|a| a.crawl), Some(true), "anyone may lie down under a low ceiling");
     r.huds.deop(PLAYER);
     r.tick(1);
     assert_eq!(r.abilities().map(|a| a.wind_sky), Some(false), "nobody else may, where nights are meant");
@@ -1288,6 +1349,25 @@ fn main() {
     assert!(!r.text("fx").contains("burning"), "and it goes out");
     println!("ok  Weather's fire, through the export, burned and set a body alight");
 
+    // Weather's rain, handed over through `use_weather`: it puts a burning
+    // body out, and breaks no fall as water does; snow chills.
+    r.say("heal");
+    r.say("burn 400");
+    r.tick(1);
+    assert!(r.text("fx").contains("burning"));
+    r.say("wx rain");
+    r.tick(20);
+    assert!(!r.text("fx").contains("burning"), "rain on you puts you out");
+    let hp = r.number("hp");
+    r.entities.body(|b| b.fell = 8.0);
+    r.tick(1);
+    r.entities.body(|b| b.fell = 0.0);
+    r.tick(1);
+    assert!(r.number("hp") < hp, "rain is not water under you: a fall still hurts");
+    r.say("heal");
+    r.say("wx none");
+    println!("ok  Weather's rain douses a burning body and breaks no fall");
+
     // Death: a scatter on the ground, a move, a screen, everything reset.
     r.say("heal");
     r.tick(1);
@@ -1390,7 +1470,7 @@ fn main() {
     r.vm.player_leave(&LeaveEvent { player: PLAYER, name: "Alice".into() });
     let saved = r.storage.get(MOD, &format!("v:{}", PlayerUuid::from_bytes(PLAYER).to_hex()));
     assert!(matches!(saved, Some(storage::Value::Text(ref t)) if t.contains("food=7")), "{saved:?}");
-    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
     r.tick(1);
     assert_eq!(r.number("food"), 7.0, "food came back from storage");
     println!("ok  vitals survive leaving and rejoining");
@@ -2255,7 +2335,7 @@ fn walk_fit(tree: &ui_layout::Tree, at: usize, laid: &ui_layout::Laid, parent: O
 fn ui_check() {
     let mut r = rig_ui();
     r.huds.op(PLAYER);
-    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
     r.tick(1);
     let shown = |r: &Rig| r.dialogs.0.lock().unwrap().len();
     let last = |r: &Rig| r.dialogs.0.lock().unwrap().last().cloned().unwrap();
@@ -2300,7 +2380,7 @@ fn ui_check() {
 fn climate_check() {
     let mut r = rig_with("");
     r.huds.op(PLAYER);
-    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
     let grass = r.material("tiamat_default_world:grass");
     *r.world.floor.lock().unwrap() = Some((63, grass));
 
@@ -2309,6 +2389,16 @@ fn climate_check() {
     r.tick(600);
     assert!(r.number("temp").abs() < 0.3, "temperate ring is comfortable: {}", r.number("temp"));
     assert!(!r.flag("temp_show"));
+    // Weather's warmth stands in for this mod's copy of the climate: a cold
+    // place, by its say, chills a body the sum alone leaves comfortable, and
+    // with nothing from it the sum is back.
+    r.say("warmth 100");
+    r.tick(900);
+    assert!(r.flag("cold"), "Weather's warmth of 100 is cold: {}", r.number("temp"));
+    r.say("warmth none");
+    r.tick(900);
+    assert!(r.number("temp").abs() < 0.3, "and without it, the mod's own sum again: {}", r.number("temp"));
+    println!("ok  Weather's warmth sets the climate, and the mod's own sum stands in without it");
     // Whatever appeared on the plain meanwhile is culled here, while it is
     // still within reach: the fake store lists the whole world.
     r.say("cull");
@@ -2801,7 +2891,7 @@ fn progress_check(r: &mut Rig) {
     assert!(before < 6.0, "{before}");
     r.vm.player_leave(&LeaveEvent { player: PLAYER, name: "tester".into() });
     r.tick(1);
-    r.vm.player_join(&JoinEvent { player: PLAYER, name: "tester".into() });
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "tester".into(), skin: None });
     r.say("mana");
     let after: f64 = r.said().parse().expect("a number");
     assert!((after - before).abs() < 0.5, "mana survives leaving and rejoining: {before} vs {after}");
@@ -3202,7 +3292,7 @@ fn farm_check(r: &mut Rig) {
     println!("ok  a led cow follows and stands by you, and the lead breaks at a distance");
 
     // A gate opens and shuts; a hive fills beside flowers and gives honey;
-    // a wild hive is found under the flower forest's trees.
+    // the world's wild hive gives honey by the clock.
     r.world.put(103, 64, 101, r.material("tiamat_default_life:gate"));
     r.hold_nothing();
     r.use_at(103, 64, 101);
@@ -3225,23 +3315,38 @@ fn farm_check(r: &mut Rig) {
     r.use_at(100, 66, 101);
     assert!(units(r, "tiamat_default_life:honey") > honey, "honey taken");
     assert_eq!(r.block_name(100, 66, 101), "tiamat_default_life:beehive", "and the hive is empty again");
-    let leaves = r.material("tiamat_default_world:oak_leaves");
-    for x in 60..140 {
-        for z in 60..140 {
-            r.world.put(x, 72, z, leaves);
+    // Forty minutes on: the time it was emptied, put back by that much.
+    let age = |r: &Rig| {
+        let key = (MOD.to_owned(), "wild_hive:overworld:100,67,101".to_owned());
+        let mut map = r.storage.0.lock().unwrap();
+        if let Some(storage::Value::Number(t)) = map.get(&key).cloned() {
+            map.insert(key, storage::Value::Number(t - (20 * 60 * 40) as f64));
         }
-    }
-    r.say("biome flower_forest");
-    r.tick(100 * 40);
-    let hives: Vec<String> = r.storage.0.lock().unwrap().keys().filter(|(m, k)| m == MOD && k.starts_with("hive:")).map(|(_, k)| k.clone()).collect();
-    assert!(!hives.is_empty(), "a wild hive was found under the canopy");
-    let placed = r.world.blocks.lock().unwrap().values().filter(|(m, _)| *m == r.material("tiamat_default_life:beehive")).count();
-    assert!(placed >= hives.len(), "and stands under the leaves: {placed} of {}", hives.len());
+    };
+    // The poppy is three blocks under it, where the world's hives hang.
+    r.world.clear();
+    r.world.put(100, 67, 101, r.material("tiamat_default_world:wild_hive"));
+    r.world.put(101, 64, 101, r.material("tiamat_default_world:poppy"));
+    let honey = units(r, "tiamat_default_life:honey");
+    r.use_at(100, 67, 101);
+    assert!(units(r, "tiamat_default_life:honey") > honey, "a wild hive found is full");
+    let honey = units(r, "tiamat_default_life:honey");
+    r.use_at(100, 67, 101);
+    assert_eq!(units(r, "tiamat_default_life:honey"), honey, "and empty once taken");
+    age(r);
+    r.use_at(100, 67, 101);
+    assert!(units(r, "tiamat_default_life:honey") > honey, "full again forty minutes on, flowers below it");
+    assert_eq!(r.block_name(100, 67, 101), "tiamat_default_world:wild_hive", "and the comb is left as it hangs");
+    let honey = units(r, "tiamat_default_life:honey");
+    r.world.blocks.lock().unwrap().remove(&(101, 64, 101));
+    age(r);
+    r.use_at(100, 67, 101);
+    assert_eq!(units(r, "tiamat_default_life:honey"), honey, "no flowers near, no honey");
     r.say("biome rolling_grasslands");
     r.world.clear();
     r.say("cull");
     r.tick(1);
-    println!("ok  a gate swings, a hive fills beside flowers and gives honey, wild hives hang in the flower forest");
+    println!("ok  a gate swings, a hive fills beside flowers and gives honey, a wild hive gives it by the clock");
     *r.world.floor.lock().unwrap() = None;
 }
 
@@ -3270,8 +3375,8 @@ fn modes_check() {
     // is not, and the answers come back in chat.
     let mut r = rig();
     r.huds.op(PLAYER);
-    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
-    r.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into() });
+    r.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
+    r.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into(), skin: None });
     r.tick(1);
     r.say_as(BOB, "god");
     r.tick(1);
@@ -3335,8 +3440,8 @@ fn modes_check() {
     // A creative world: nothing hurts, nothing drains, the kit is everybody's.
     let mut c = rig_with("tdl_overrides = { climate = false, world_radius = 500, mode = 'Creative' }\n");
     c.huds.op(PLAYER);
-    c.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
-    c.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into() });
+    c.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
+    c.vm.player_join(&JoinEvent { player: BOB, name: "Bob".into(), skin: None });
     c.tick(70);
     c.say("hurt 9");
     c.entities.body(|b| b.submerged = 1.0);
@@ -3357,7 +3462,7 @@ fn modes_check() {
     // An adventure world: one life.
     let mut a = rig_with("tdl_overrides = { climate = false, world_radius = 500, mode = 'Adventure' }\n");
     a.huds.op(PLAYER);
-    a.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    a.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
     a.tick(70);
     assert!(a.text("toast").contains("one life"));
     a.say("kit");
@@ -3381,7 +3486,7 @@ fn modes_check() {
 
     // Still dead after leaving and coming back.
     a.vm.player_leave(&LeaveEvent { player: PLAYER, name: "Alice".into() });
-    a.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into() });
+    a.vm.player_join(&JoinEvent { player: PLAYER, name: "Alice".into(), skin: None });
     a.tick(1);
     assert!(a.flag("ghost"), "death outlasts a rejoin");
     assert!(!dig(&mut a));

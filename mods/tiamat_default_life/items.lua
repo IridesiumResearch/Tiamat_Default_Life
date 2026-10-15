@@ -205,10 +205,10 @@ M.gate_open = game.register_block{
     cutout = true, passable = true,
 }
 
--- A beehive (husbandry.lua): found wild under the trees of the flower
--- forest, and moved wherever there are flowers. It fills by random tick
--- when flowers are near, and a full one is emptied of its honey with a
--- right-click.
+-- A beehive (husbandry.lua), kept wherever there are flowers. It fills by
+-- random tick when flowers are near, and a full one is emptied of its honey
+-- with a right-click. The wild ones are the world's (`wild_hive`, in the
+-- flower forest), and give honey by the clock instead.
 M.beehive = game.register_block{
     id = "beehive",
     name = "Beehive",

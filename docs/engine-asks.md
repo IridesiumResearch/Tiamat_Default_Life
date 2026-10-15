@@ -8,7 +8,14 @@ the record; the open ones are copied to the engine repo (see below).
 ## Where these stand (2026-10-14)
 
 **One is open: 23**, players wearing the mod's models (male and
-female) and their own skins (if the host allows), swimming and crawling (2026-10-14). 22, an operator's flight a mod could not withhold,
+female) and their own skins (if the host allows), swimming and crawling (2026-10-14).
+Its parts 2 and 3 landed the same day (engine 9d03dbed, protocol 91): a
+swimming player is drawn swimming, and with `crawl = true` (vitals.lua, on
+everyone) a player sneaking at a one-block gap lies down and crawls through.
+Part 1's bodies and skins landed later the same day (engine 603ecf34,
+protocol 92): every player is drawn as the Male or the Female Alike, by
+their `body` setting (alikes.lua). What is
+left is a player's own skin, which the engine is building. 22, an operator's flight a mod could not withhold,
 landed 2026-10-13 (engine 3e5a019d): a survival world sends
 `operator_fly = false`, so only the owner with their powers taken flies. 21, a tint on a creature, landed 2026-10-09 (engine
 f2ff9f71) and a hit flashes it faintly red. 20 landed 2026-10-05, and 18 and 19 on 2026-09-30 and
@@ -24,7 +31,7 @@ included.
 
 | Item | State | In this mod |
 |---|---|---|
-| 23 the player models and skins, swimming, crawling | **Open.** | players are always the engine's white humanoid, no skin of their own can reach the server, they are never drawn swimming, and cannot enter a one-block gap. |
+| 23 the player models and skins, swimming, crawling | **A player's own skin open**; the rest landed, engine 9d03dbed (protocol 91) and 603ecf34 (protocol 92). | `crawl = true` for everyone (`C.crawl`, vitals.lua); every player is drawn as the Male or the Female Alike, by their `body` setting, crawling and swimming in its own clips (alikes.lua). No skin of a player's own can reach the server yet. |
 | 22 an operator's flight is not the mod's to withhold | Landed, engine 3e5a019d. | `operator_fly = false` in a survival world (vitals.lua): only the owner, having taken their powers, flies. |
 | 21 a tint on a creature | Landed, engine f2ff9f71, protocol 88. | a creature hit flashes faintly red for six ticks (`set_entity{ tint, tint_ticks }`, `C.hurt_tint`). |
 | 20 a creature drawn at its pitch | Landed, engine ed5826d2. | a climbing spider is pitched nose up (`set_entity{ pitch }`) and lies on its wall. |
@@ -50,7 +57,17 @@ included.
 | 8 operators | Landed, engine a3db9fa. | admins ARE operators; the mod's list and `op`/`deop` are gone. |
 | 6 picture hashes | Landed 2026-09-17. | every HUD icon is registered. |
 
-## 23. Players wear the mod's models and their own skins, swim and crawl (2026-10-14, revised the same day): OPEN
+## 23. Players wear the mod's models and their own skins, swim and crawl (2026-10-14, revised the same day): parts 2 and 3 LANDED, engine 9d03dbed; part 1 OPEN
+
+**Landed, 2026-10-14 (engine 9d03dbed, protocol 91).** Swimming: a body
+off the bottom in a fluid is tagged `SWIM` on everybody's figure, so
+nothing to do. Crawling: `crawl = true` on `set_player_abilities`, which
+this mod sends to everyone (`C.crawl`); the low box is 2.4 cells with the
+sneak's pace and no jump, `game.entity(body).crawling` reads it, and the
+figure plays a `crawl` clip, which the engine's humanoid lacks, so until
+the player models arrive a crawler is drawn standing idle. Part 1 is next
+on the engine's side, in the order asked.
+
 
 **Wanted.** Three things the designer asked for together, because the body
 a player is drawn as has to be drawn doing everything a player does:

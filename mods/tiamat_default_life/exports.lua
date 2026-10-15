@@ -6,7 +6,8 @@
 --
 -- Two readers today. Tiamat Weather (its docs/exports-contract.md) loads
 -- after this mod, so it cannot be named back; it calls the fire functions
--- once at its load to put its burning block into this mod's tables. Tiamat
+-- once at its load to put its burning block into this mod's tables, and
+-- `use_weather` to hand over what is falling and how warm it is. Tiamat
 -- Default Craft (its docs/sibling-asks.md) will register what it cooks and
 -- forges through `add_food` and `add_weapon`, and its bronze and iron farm
 -- tools through `add_tilling_tool` and `add_harvest_tool`, so that what a
@@ -102,6 +103,36 @@ return {
             return false
         end
         I.add_heat_source(material, strength)
+        return true
+    end,
+
+    --- Tiamat Weather's half, handed in at its load, since it loads after
+    --- this mod and cannot be named back (its docs/exports-contract.md):
+    --- `spec = { falling_on, warmth, comfort }`, each optional.
+    --- `falling_on(uuid)` answers "rain", "snow", "ash" or "dust" on a player
+    --- under open sky, else nil: rain and snow chill and douse a fire.
+    --- `warmth(x, y, z)` answers 0..1000, and stands in for this mod's own
+    --- copy of the world's climate; `comfort` (0..1000, default 770, the
+    --- Spindle's spawn plain) is the warmth a body is comfortable at. The
+    --- functions run in the giver's sandbox, so a fault in one disables the
+    --- giver and answers nil here, and this mod goes on without it. Answers
+    --- whether anything was taken; a malformed spec takes nothing.
+    use_weather = function(spec)
+        if type(spec) ~= "table" then return false end
+        local falling, warmth = spec.falling_on, spec.warmth
+        if (falling ~= nil and type(falling) ~= "function") or (warmth ~= nil and type(warmth) ~= "function") then
+            return false
+        end
+        local comfort = spec.comfort
+        if comfort ~= nil then
+            comfort = whole(comfort, 0, 1000)
+            if not comfort then return false end
+        end
+        if not (falling or warmth) then return false end
+        local W = tdl.weather
+        if falling then W.falling_on = falling end
+        if warmth then W.warmth = warmth end
+        if comfort then W.comfort = comfort end
         return true
     end,
 

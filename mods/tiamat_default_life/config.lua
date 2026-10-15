@@ -82,7 +82,8 @@ C.temp_sample_ticks = 10
 C.temp_drift = 0.04            -- fraction of the gap closed per sample (about 12 s to settle)
 C.temp_show = 0.35             -- the thermometer appears past this
 C.temp_uncomfortable = 0.55    -- "cold" / "hot": hunger burns faster, and cold slows you
-C.cold_speed = 0.8             -- a body this cold or colder moves at this share of its speed
+C.crawl = true                 -- sneak into a one-block gap and you lie down and crawl (engine ask 23)
+C.cold_speed = 0.8            -- a body this cold or colder moves at this share of its speed
 C.temp_extreme = 0.90          -- "freezing" / "overheating": slow damage
 C.temp_damage_ticks = 100      -- overheating: a point every five seconds
 C.freeze_damage_ticks = 200    -- freezing: a point every ten seconds, slower than heat
@@ -93,6 +94,13 @@ C.temp_noon = 0.20             -- under the open sky around midday
 C.temp_cave = -0.20            -- out of the sun entirely
 C.temp_water = -0.60           -- swimming
 C.temp_wet = -0.25             -- standing in shallow water
+-- What is falling on a body under open sky, when Tiamat Weather hands this
+-- mod its `falling_on` (exports.lua, `use_weather`). The colder of this and
+-- the water's term applies, not both: rain on a swimmer is no colder.
+C.temp_falling = { rain = -0.15, snow = -0.25 }
+-- And which of them puts out a body that is burning, as water does. Rain on
+-- you is not water under you: it breaks no fall.
+C.falling_douses = { rain = true, snow = true }
 C.temp_clothing = 0.40         -- per warm (or cool) garment worn, up to two
 C.temp_food = 0.45             -- a hot stew or a cool melon, while the effect lasts
 C.temp_source_radius = 3       -- blocks, for heat and cold sources
@@ -105,7 +113,10 @@ C.cave_sun_max = 5             -- get_light().sun at the head; 15 is open sky
 -- temperature RADIAL: `T = 4t(1 - t)` in `t = r / R`, cold at the axis,
 -- hottest halfway out, cold again at the rim (its docs/spindle-mod-plan.md,
 -- C.3). This mod reads nothing of the world's; it does the same sum from
--- the player's position, so the two must be kept in step by hand.
+-- the player's position, so the two must be kept in step by hand — unless
+-- Tiamat Weather is loaded and hands over its `warmth` (`use_weather`),
+-- which is the same T read from the world, less the cold of altitude; then
+-- that is used, and this sum only where it answers nothing.
 -- Comfortable is the temperate ring, where the world puts a new player.
 C.climate = true
 C.world_radius = 59000         -- blocks: the Spindle's R_DISC, 59 km
@@ -341,8 +352,15 @@ end
 
 -- The world's climate at a position, as an ambient shift: 0 on the spawn
 -- plain, warm toward the Glass Waste, cold toward the Crown and the Hem.
-function C.climate_at(x, z)
+function C.climate_at(x, z, y)
     if not C.climate then return 0 end
+    local weather = tdl.weather and tdl.weather.warmth
+    if weather and y then
+        local w = weather(x, y, z)
+        if type(w) == "number" and w >= 0 and w <= 1000 then
+            return (w - tdl.weather.comfort) / 1000 * C.climate_scale
+        end
+    end
     local t = math.sqrt(x * x + z * z) / C.world_radius
     if t > 1 then t = 1 end
     local T = 4 * t * (1 - t)
@@ -394,9 +412,8 @@ C.farmland_absorb_rate = 9     -- cells of fluid a block of farmland drinks a fl
 C.bramble_regrow_chance = 50   -- a turn regrows a picked bramble's berries
 C.sickle_yield = 2             -- a sickle's harvest, as a multiple of a hand's
 C.hive_fill_chance = 40        -- a turn fills a hive with flowers near it
-C.hive_flower_reach = 4        -- blocks a hive looks for flowers
-C.hive_chance = 6              -- of the spawn passes in the flower forest, one in this many finds a wild hive
-C.hive_per_chunk = 1           -- never more than this many wild hives in a chunk column, ever
+C.hive_flower_reach = 4        -- blocks a hive looks for flowers (and one to three below it)
+C.wild_hive_refill_ticks = 20 * 60 * 40  -- the world's wild hive has honey again forty minutes after it was emptied
 
 -- The world's flowers, which a hive wants near it (husbandry.lua).
 C.flowers = {

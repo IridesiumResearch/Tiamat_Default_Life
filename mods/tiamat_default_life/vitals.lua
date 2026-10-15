@@ -319,8 +319,8 @@ end
 
 local function tick_fire(uuid, v, dt)
     local fire = v.env.fire
-    if v.env.submerged or v.env.wet then
-        -- Water puts you out.
+    if v.env.submerged or v.env.wet or C.falling_douses[v.env.falling] then
+        -- Water puts you out, and so does rain on you (Tiamat Weather's).
         if E.has(v, "burning") then E.remove(v, "burning") end
         v.fire_acc = 0
         return
@@ -473,9 +473,9 @@ local function push_abilities(uuid, v)
     if said == v.abilities then return end
     v.abilities = said
     -- In a survival world the grant is the whole answer: being an operator
-    -- is not a licence to fly (engine ask 22).
+    -- is not a licence to fly (engine ask 22). Anyone may crawl (ask 23).
     game.set_player_abilities(uuid, { speed = speed, sprint = sprint, fly = fly, wind_sky = wind_sky,
-        gravity = gravity, operator_fly = tdl.mode == "Creative" })
+        gravity = gravity, operator_fly = tdl.mode == "Creative", crawl = C.crawl })
 end
 
 tdl.on_join(function(event)

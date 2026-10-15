@@ -31,6 +31,17 @@ with its texture beside it as a `.png`.
 | `assets/source/voxel_hen.glb` and `assets/source/hen_pixel_atlas.png` | a Blender export (Khronos glTF Blender I/O v5.2), not the generator above; whether it was modelled by hand or generated is to be confirmed | to be confirmed | to be confirmed | none yet |
 | `mods/tiamat_default_life/models/<creature>.glb` and `.png` (26 of each) | derived from the files above by `tools/skin_glb.py`; `hen.png` is `hen_pixel_atlas.png` as it came; `white_stag.png` is `stag.png` whitened by `tools/make_white_stag.py` | as above | as above | none yet |
 
+## The players' bodies (Alikes)
+
+Exported the same way and converted by `tools/skin_glb.py --height 5.4`,
+which sizes an upright body by its height and keeps the facing it was
+exported with; registered as player models in `alikes.lua`.
+
+| Files | Source | Author | Licence | Licence in tree |
+|---|---|---|---|---|
+| `assets/source/Male-Alike.glb`, `assets/source/Male_Alike_Default_texture.png`, `assets/source/Female-Alike.glb` and `assets/source/Female_Alike_Default_texture.png` | Blender exports (Khronos glTF Blender I/O v5.2.40), each texture embedded in its model and also delivered beside it (the same bytes); whether modelled by hand or generated is to be confirmed | to be confirmed | to be confirmed | none yet |
+| `mods/tiamat_default_life/models/male_alike.glb`, `male_alike.png`, `female_alike.glb` and `female_alike.png` | derived from the files above by `tools/skin_glb.py --height 5.4` (the embedded images dropped); each `.png` is its texture as it came | as above | as above | none yet |
+
 ## Creature voices and the underwater loop
 
 Taken from the project's sound library (`../Tiamat Sounds`, outside this

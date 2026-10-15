@@ -41,14 +41,24 @@ it and put the leaf back), or a random tick on `apple_leaves` this mod may
 ask for through an export, since the engine allows one handler per material
 and the leaves are the world's.
 
-### W3. A wild hive block of the world's own (2026-09-26): OPEN, low
+### W3. A wild hive block of the world's own (2026-09-26): ANSWERED by the world, 2026-10-14 (World 27193d7)
 
 **Wanted.** Hives the flower forest is generated with.
 
-**Standing in.** This mod hangs its own `beehive` under the forest's trees
-as players come near, one to a chunk at most, remembered with the world.
-It is a spawn pass, not worldgen, so a hive is never in a chunk nobody has
-walked to — which nobody can tell.
+**Answered.** `wild_hive`: a 19-cell lump of comb hung under the first limb
+of one apple tree in six in the flower forest, two or three blocks over the
+ground. The world registers no tick and no use on it; the honey is this
+mod's (husbandry.lua). This mod's stand-in, which hung its own `beehive`
+under the trees as players came near, is gone.
+
+**One thing it could not be: filled by random tick.** The comb shares its
+block with the bough's wood, and the engine offers no random tick to a
+block of more than one material (`material_at` answers nothing for one),
+so a wild hive is filled by the clock instead, asked at the right-click:
+full when first found, and again `wild_hive_refill_ticks` (forty minutes)
+after it was emptied, if flowers are near. It is not drawn full; the honey
+is the answer. Flowers are looked for three blocks down now, since the
+hives hang that high.
 
 ## Tiamat Default Magic and Tiamat Default Science
 
@@ -104,8 +114,14 @@ hot stew (items.lua), since an `add_food` from Craft would replace this
 mod's numbers wholesale (Craft's L9, answered 2026-09-28). Cured meat waits
 on Craft's salt recipe.
 
-### C2. Leather, cord and cloth (2026-09-26): OPEN, and Craft's to build
+### C2. Leather, cord and cloth (2026-09-26): ANSWERED by Craft, 2026-09-28 and 2026-10-14
 
-Hide, sinew, bone, wool and feathers drop from the animals now (each kind's
-`drops`, and `add_drop` for more). What they become — leather armour,
-bowstrings, needles, bellows, a bed that is not a block — is Craft's.
+Hide, sinew, bone, wool and feathers drop from the animals (each kind's
+`drops`, and `add_drop` for more), and Craft makes them into things: leather
+(a hide tanned with bark), cord from sinew, cloth from wool and a bone
+needle (2026-09-28), with this mod's warm coat, cool cloak and bandages
+sewn from them, and bellows of leather. Feathers are bedding since Craft
+452d034 (2026-10-14): three of them, as hide, wool and grass are, for this
+mod's bed at the workbench. Not built, and not owed: bowstrings wait on a
+bow, which no mod has, and a bed that is not a block is this mod's to make
+if it wants one.

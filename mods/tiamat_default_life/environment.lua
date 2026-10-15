@@ -27,6 +27,12 @@ local R = C.temp_source_radius
 
 local now = 0
 
+-- What Tiamat Weather hands over at its load (exports.lua, `use_weather`):
+-- its `falling_on(uuid)` and `warmth(x, y, z)`, which run in ITS sandbox
+-- and answer nil once it is gone, and the warmth that is comfortable.
+-- Weather loads after this mod and cannot be read from here, so it calls in.
+tdl.weather = { falling_on = nil, warmth = nil, comfort = math.floor(C.climate_comfort * 1000 + 0.5) }
+
 local material_in = U.material_in
 
 --- How deep in fluid the body is, from the engine's own measure.
@@ -64,15 +70,26 @@ local function sample_blocks(v, body)
         or material_in(I.contact_fire, head) or env.hot_fluid or I.fluid_fire(below)
 end
 
-local function sample_sources(v, body)
+--- What the sky is dropping on this player: "rain", "snow", "ash" or "dust"
+--- under open sky, nil otherwise, or with no Weather to ask.
+local FALLING = { rain = true, snow = true, ash = true, dust = true }
+local function falling_on(uuid)
+    local ask = tdl.weather.falling_on
+    if not ask then return nil end
+    local family = ask(uuid)
+    return FALLING[family] and family or nil
+end
+
+local function sample_sources(uuid, v, body)
     local env = v.env
     local pos = body.pos
     local feet = U.block_at(pos)
     local head = U.block_at(pos, EYE)
 
     -- The world's climate first: where on the disc the body stands.
-    local ambient = C.climate_at(pos.x, pos.z)
+    local ambient = C.climate_at(pos.x, pos.z, pos.y)
     env.ring = C.ring_at(pos.x, pos.z)
+    env.falling = falling_on(uuid)
 
     -- Then the sky's share: caves are cool; nights are cold; midday is warm.
     local sun = game.get_light(head).sun
@@ -88,11 +105,8 @@ local function sample_sources(v, body)
             ambient = ambient + C.temp_noon * U.clamp(day, 0, 1) * open
         end
     end
-    if env.submerged then
-        ambient = ambient + C.temp_water
-    elseif env.wet then
-        ambient = ambient + C.temp_wet
-    end
+    local water = env.submerged and C.temp_water or env.wet and C.temp_wet or 0
+    ambient = ambient + math.min(water, C.temp_falling[env.falling] or 0)
 
     -- Heat and cold sources around the body, strongest wins on each side.
     local heat, cold = 0, 0
@@ -163,7 +177,7 @@ tdl.on_tick(function(dt)
 
             sample_fluid(v, body)
             if (now + slot) % BLOCKS_EVERY == 0 then sample_blocks(v, body) end
-            if (now + slot) % SOURCES_EVERY == 0 then sample_sources(v, body) end
+            if (now + slot) % SOURCES_EVERY == 0 then sample_sources(uuid, v, body) end
             if (now + slot) % WORN_EVERY == 0 then sample_worn(uuid, v) end
             if not v.dead then track_fall(uuid, v, body) end
         else

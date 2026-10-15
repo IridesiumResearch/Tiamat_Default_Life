@@ -31,6 +31,7 @@ in `depends` or `optional_depends`. Source: `mods/tiamat_default_life/exports.lu
 | `add_crop(def)` | `def = { id, stages = { "mod:block", ... } (2..8 of YOUR blocks, sprouting first, ripe last), seed = "mod:item", produce = "mod:item", produce_min, produce_max, seed_min, seed_max, soil = "tilled"\|"wet"\|{ "mod:block", ... }, light = "sun"\|"dark", biomes = { ids }, name }` | Your crop is sown, grown by random tick and harvested by this mod's rules, exactly as its own are. Register the stage blocks yourself (a texture is a file of the registering mod) and do NOT random-tick them: this mod does, and the engine allows one handler per material. Registration window only. |
 | `add_harvest_tool(material, yield)` | `material` your item's name; `yield` a number 1..8 | A ripe crop dug with it gives `yield` times a hand's produce (this mod's sickle gives two). |
 | `add_tilling_tool(material)` | `material` your item's name | Grass or earth right-clicked with it is tilled ground. |
+| `use_weather(spec)` | `spec = { falling_on, warmth, comfort }`, each optional but not all absent: `falling_on(uuid)` a function answering `"rain"`, `"snow"`, `"ash"` or `"dust"` on a player under open sky, else `nil`; `warmth(x, y, z)` a function answering 0..1000; `comfort` a whole number 0..1000, the warmth a body is comfortable at (default 770, the Spindle's spawn plain) | Tiamat Weather's half, handed in at its load, since it loads after this mod and cannot be named back. Rain and snow on a player chill them (the colder of that and any water they stand in) and put out a body that is burning; they break no fall, as water under you does. The warmth stands in for this mod's own copy of the world's climate, and where it answers nothing (or Weather is gone) the copy is used. The functions run in the giver's sandbox. Answers whether anything was taken. |
 | `mode()` | | The world's mode: `"Default"`, `"Creative"` or `"Adventure"`. |
 | `is_ghost(uuid)`, `is_admin(uuid)` | `uuid` a player's hex UUID | Whether the player is a ghost (died in an Adventure world; a ghost may touch nothing), or an admin. |
 | `on_kill(fn)`, `on_death(fn)`, `on_eat(fn)`, `on_sleep(fn)` | `fn` a function of yours | Survival events: `fn(uuid, kind)` when a player's blow kills one of this mod's creatures (`kind` its short id); `fn(uuid, pos, drops)` on a death, with where they fell and the entity ids of the stacks that fell; `fn(uuid, material)` on a meal, with the food's qualified id; `fn(uuid)` on a night slept through. Your function runs in your sandbox. |
@@ -113,5 +114,6 @@ Not exports, listed so the direction is clear: it reads the exports of
 belong; `add_soil_alias`, which it calls so tilled ground counts as dirt)
 and `tiamat_default_ui` (for the wardrobe tab and the death screen) when
 they are loaded, and looks up the world's blocks by name in `config.lua`.
-It never reads Tiamat Weather, which loads after it: rain reaches the farm
-through the engine, as a fluid tilled ground absorbs.
+It never reads Tiamat Weather, which loads after it and so cannot be named:
+Weather hands in what this mod uses of it through `use_weather`, and rain
+reaches the farm through the engine, as a fluid tilled ground absorbs.

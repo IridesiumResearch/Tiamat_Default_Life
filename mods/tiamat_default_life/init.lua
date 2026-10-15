@@ -47,6 +47,7 @@ load("creatures")            -- cow, sheep, pig, crow, bat, as data
 load("husbandry")            -- feeding, breeding, milk, wool, eggs, honey, leads and gates
 load("farming")              -- tilled ground, sowing, growth, harvest, foraging
 load("crops")                -- wheat, turnip, rice, melon, mushrooms, as data
+load("alikes")               -- the players' bodies: the Male Alike, whom everyone spawns in as
 
 -- The HUD: hearts, cookies, bubbles and the thermometer, drawn on the
 -- player's machine from the values vitals.lua sends with `game.set_hud`.

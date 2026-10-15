@@ -33,3 +33,12 @@ name = "Mode"
 description = "Default is survival. Creative: nobody can be hurt and nothing drains. Adventure: one life."
 options = ["Default", "Creative", "Adventure"]
 default = 1
+
+# Chosen by each player, on the start screen's Mods tab or in the game's
+# settings: which Alike they are drawn as (alikes.lua). One-based here.
+[[setting]]
+id = "body"
+name = "Body"
+description = "Whether you are drawn as the Male or the Female Alike."
+options = ["Male", "Female"]
+default = 1
