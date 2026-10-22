@@ -262,6 +262,8 @@ local function ground_at(x, z, y, under_trees)
     return nil
 end
 
+M.ground_at = ground_at
+
 -- The world's water, as a fluid number, asked for on first use: the engine
 -- hands fluid numbers out once every mod has loaded.
 local WATER = nil

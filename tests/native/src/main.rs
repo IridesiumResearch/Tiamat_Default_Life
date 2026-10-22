@@ -822,6 +822,37 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
     )
     .unwrap();
     vm.load_mod("core_gear", "game.register_item{ id = 'sword' }", &dir).unwrap();
+    // A stand-in for Tiamat Default Structures: it keeps the listener Life
+    // hands its `on_first_entry`, and `site <json-ish>` in chat is a site
+    // entered for the first time, as its move hook would fire it (ST-L1).
+    vm.load_mod(
+        "tiamat_default_structures",
+        r#"
+        local listeners = {}
+        game.register_on_chat(function(e)
+            if e.text ~= "site" then return end
+            local site = {
+                id = "test:barrow/1", kind = "test:barrow", tags = { "ruin" }, turn = 0,
+                root = { x = 110, y = 64, z = 110 },
+                bounds = { min = { x = 106, y = 64, z = 106 }, max = { x = 114, y = 70, z = 114 } },
+                inhabitants = {
+                    { kind = "tiamat_default_life:cave_rat", count = 3 },
+                    { kind = "tiamat_default_life:cow", count = 1, young = true },
+                    { kind = "other_mod:wisp", count = 2 },
+                    { kind = "tiamat_default_life:nonsense", count = 1 },
+                    { kind = "tiamat_default_life:pig", count = "lots" },
+                    "not a table",
+                },
+            }
+            for _, fn in ipairs(listeners) do fn(site) end
+            for _, fn in ipairs(listeners) do fn({ inhabitants = 7 }) end
+            return false
+        end)
+        game.export{ version = 1, on_first_entry = function(fn) listeners[#listeners + 1] = fn return true end }
+        "#,
+        &dir,
+    )
+    .unwrap();
     if with_ui {
         let ui = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../../Tiamat_Default_Inventory/mods/tiamat_default_ui");
@@ -830,7 +861,7 @@ fn rig_full(prelude: &str, with_ui: bool) -> Rig {
     }
     // As mod.toml's `optional_depends` has it: the world always, the
     // interface when it is here.
-    let mut after = vec!["tiamat_default_world".to_owned()];
+    let mut after = vec!["tiamat_default_world".to_owned(), "tiamat_default_structures".to_owned()];
     if with_ui {
         after.push("tiamat_default_ui".to_owned());
     }
@@ -1492,6 +1523,7 @@ fn main() {
     println!("ok  the wardrobe and the death screen are valid dialog trees");
 
     mob_check(&mut r);
+    site_check(&mut r);
     farm_check(&mut r);
     progress_check(&mut r);
     magic_check(&mut r);
@@ -3348,6 +3380,30 @@ fn farm_check(r: &mut Rig) {
     r.tick(1);
     println!("ok  a gate swings, a hive fills beside flowers and gives honey, a wild hive gives it by the clock");
     *r.world.floor.lock().unwrap() = None;
+}
+
+/// A site of Tiamat Default Structures, entered for the first time: Life
+/// puts its own kinds there, inside the bounds and on the floor, and leaves
+/// everyone else's and anything malformed alone (Structures' ST-L1).
+fn site_check(r: &mut Rig) {
+    let grass = r.material("tiamat_default_world:grass");
+    *r.world.floor.lock().unwrap() = Some((63, grass));
+    r.say("cull");
+    r.tick(1);
+    r.say("site");
+    let mut found: Vec<String> = Vec::new();
+    for (_, e) in r.mobs() {
+        let [x, y, z] = e.transform.to_world();
+        assert!((106.0..=115.0).contains(&x) && (106.0..=115.0).contains(&z), "inside the site: {x}, {z}");
+        assert!((y - 64.0).abs() < 0.01, "on the floor: {y}");
+        found.extend(kind_of(&e));
+    }
+    found.sort();
+    assert_eq!(found, vec!["cave_rat", "cave_rat", "cave_rat", "cow_young"], "Life's own, young where asked, and nothing else");
+    r.say("cull");
+    r.tick(1);
+    *r.world.floor.lock().unwrap() = None;
+    println!("ok  a site first entered holds the creatures it declares that are Life's, and nothing else");
 }
 
 fn kind_of(e: &Entity) -> Option<String> {

@@ -17,7 +17,10 @@ depends = ["core >=0.1"]
 # - The interface: the wardrobe is a tab on its inventory screen and the
 #   death screen is built from its widgets (screens.lua). Without it, plain
 #   dialogs.
-optional_depends = ["tiamat_default_world", "tiamat_default_ui"]
+# - Structures, whose sites say who lives in them; this mod spawns its own
+#   kinds there the first time anyone enters one (sites.lua, its ST-L1).
+#   Structures depends on no sibling but the world, so there is no cycle.
+optional_depends = ["tiamat_default_world", "tiamat_default_ui", "tiamat_default_structures"]
 description = "Health, hunger, air and body temperature for players, and everything that lives in the world."
 license = "GPL-3.0-only"
 

@@ -60,6 +60,23 @@ after it was emptied, if flowers are near. It is not drawn full; the honey
 is the answer. Flowers are looked for three blocks down now, since the
 hives hang that high.
 
+## Tiamat Default Structures
+
+Its asks of this mod (its `docs/sibling-asks.md`):
+
+- **ST-L1**, populate sites (asked 2026-10-22, answered the same day):
+  Structures is in `optional_depends`, and `sites.lua` hands
+  `on_first_entry` a listener. The first time anyone enters a site, this
+  mod spawns the kinds in `site.inhabitants` named
+  `tiamat_default_life:<short id>` (`count` 1 to 16, `young` honoured, at
+  most 32 a site), on the floor near `site.root` and inside `site.bounds`
+  when it is `{ min, max }`; another mod's kinds, unknown kinds, a bad
+  entry and any domain but the overworld are left alone. Nothing respawns.
+  Written against Structures' brief (§4.5) before Structures exports
+  anything, so it is checked against a stand-in in `tests/native`; when the
+  site's real shape lands, `point` and `reach_of` in `sites.lua` are where
+  to look.
+
 ## Tiamat Default Magic and Tiamat Default Science
 
 Their asks of this mod (each repo's `docs/sibling-asks.md`), all answered

@@ -112,8 +112,9 @@ pushed with `game.set_hud` are read only by this mod's own HUD script.
 Not exports, listed so the direction is clear: it reads the exports of
 `tiamat_default_world` (`biome_under`, for where creatures appear and crops
 belong; `add_soil_alias`, which it calls so tilled ground counts as dirt)
-and `tiamat_default_ui` (for the wardrobe tab and the death screen) when
-they are loaded, and looks up the world's blocks by name in `config.lua`.
+`tiamat_default_ui` (for the wardrobe tab and the death screen) and
+`tiamat_default_structures` (`on_first_entry`, to put a site's inhabitants
+there; its ST-L1) when they are loaded, and looks up the world's blocks by name in `config.lua`.
 It never reads Tiamat Weather, which loads after it and so cannot be named:
 Weather hands in what this mod uses of it through `use_weather`, and rain
 reaches the farm through the engine, as a fluid tilled ground absorbs.
